@@ -233,6 +233,9 @@ finding-oneself/
 
 ### 4. ⚔️ Экипировка (Equipment)
 
+![Экипировка](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Equipment.gif)
+(Экипировка)
+
 Система экипировки предметов на персонажа с визуальным отображением.
 
 **Возможности:**
