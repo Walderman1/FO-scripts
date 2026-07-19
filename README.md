@@ -37,84 +37,93 @@ Finding Oneself — это экспериментальная RPG, где пон
 
 Проект разделён на несколько ключевых модулей.
 
-Ядро (Core Systems) включает EventManager (событийная шина), EventStateManager (состояния событий), FlagManager (глобальные флаги) и QuestManager (квесты).
+**Ядро (Core Systems)** включает EventManager (событийная шина), EventStateManager (состояния событий), FlagManager (глобальные флаги) и QuestManager (квесты).
 
-Игровая логика (Gameplay) включает Abilities (способности), Inventory (инвентарь), Equipment (экипировка) и Dialogue (диалоги).
+**Игровая логика (Gameplay)** включает Abilities (способности), Inventory (инвентарь), Equipment (экипировка) и Dialogue (диалоги).
 
-Пользовательский интерфейс (UI) включает MenuUIManager (главное меню), InventoryUI (инвентарь), DialogueUI (диалоги), QuestUI (квесты) и RadialMenu (радиальное меню).
+**Пользовательский интерфейс (UI)** включает MenuUIManager (главное меню), InventoryUI (инвентарь), DialogueUI (диалоги), QuestUI (квесты) и RadialMenu (радиальное меню).
 
-Навигация (Navigation) включает LocationNeighbors (соседи локаций) и NavigationArrow (навигация).
+**Навигация (Navigation)** включает LocationNeighbors (соседи локаций) и NavigationArrow (навигация).
 
-Отладка (Debug) включает QuestDebugger (отладка квестов).
-
----
-
-## 📦 Модули
-
-### Core Systems
-
-Event System — это ScriptableObject-базированная система событий с поддержкой условий (requirements) и политик выполнения (ExecutionPolicy). Она сохраняется в JSON и восстанавливается обратно, имеет автосохранение при компиляции и выходе из Play Mode, а также создаёт бэкапы событий. Ключевые файлы: EventManager.cs (управление событиями), EventStateManager.cs (состояния событий), EventDataManager.cs (сохранение/загрузка JSON), GameEvent.cs (ScriptableObject события), EventAction.cs (действия: StartDialogue, AddItem, SetFlag и другие).
-
-Flag System — это глобальные флаги для управления состоянием игры с интеграцией в Event System. Ключевой файл: FlagManager.cs.
-
-### Gameplay
-
-Abilities (Способности): Ability — абстрактный класс с кулдауном и энергией. AbilityManager — управление способностями. MagicLightAbility — пример сложной способности со светом, детекцией и трейлами.
-
-Inventory (Инвентарь): поддерживает drag-and-drop между слотами, двойной клик для быстрого снятия, контекстное меню (ПКМ), стэкинг, разделение стэка (Shift + клик). ItemSO — ScriptableObject для предметов. ItemDatabase — централизованное хранение.
-
-Equipment (Экипировка): позволяет экипировать предметы на персонажа с визуальным отображением на модели. Использует систему пивотов для разных типов (Head, Chest, Weapon и другие). Поддерживает 10+ типов экипировки.
-
-Dialogue (Диалоги): загружает диалоги из текстовых файлов, поддерживает маркеры (choice, finish, continue, end), интегрируется с персонажами (появление, анимации, перемещение). Имеет кнопку пропуска диалога. DialogueData — ScriptableObject для настройки.
-
-### UI
-
-Menu UI: анимация букв "Finding Oneself" с подсветкой, плавные переходы между панелями, настройки с вкладками (Графика, Звук, Управление, Игра). Конфигурация через MenuUIConfig.
-
-Quest UI: панель с вкладками (активные, выполненные, проваленные), прогресс-бары для квестов, детальная панель с целями и предметами, кнопка отслеживания (tracking), уведомления при старте, обновлении и завершении квеста.
-
-Radial Menu: радиальное меню с кнопками (Circle, Fan, Vertical, Horizontal), контекстное меню для предметов, поддержка выбора в диалогах.
-
-### Navigation
-
-Автоматическое обнаружение соседей локаций, переход между локациями со слайд-анимацией, поддержка клавиатурных стрелок. Персонаж перемещается вместе с камерой.
-
----
-
-## 🛠 Установка и запуск
-
-Требования: Unity 6000.4.8f1 (или новее) и Git.
-
-Установка:
-1. Клонируйте репозиторий: git clone https://github.com/Walderman1/finding-oneself.git и перейдите в папку проекта.
-2. Откройте проект в Unity Hub (Add → выберите папку с проектом).
-3. Загрузите стартовую сцену: Assets/Scenes/MainScene.unity.
-4. Нажмите Play и начните игру.
+**Отладка (Debug)** включает QuestDebugger (отладка квестов).
 
 ---
 
 ## 📁 Структура проекта
 
+```
 finding-oneself/
+│
 ├── Assets/
 │   ├── Scripts/
 │   │   ├── Core/
 │   │   │   ├── EventSystem/
+│   │   │   │   ├── EventManager.cs
+│   │   │   │   ├── EventStateManager.cs
+│   │   │   │   ├── EventDataManager.cs
+│   │   │   │   ├── GameEvent.cs
+│   │   │   │   ├── EventAction.cs
+│   │   │   │   ├── EventContext.cs
+│   │   │   │   ├── EventTypes.cs
+│   │   │   │   └── EventConverter.cs
 │   │   │   ├── FlagManager.cs
 │   │   │   └── GlobalControl.cs
 │   │   ├── Gameplay/
 │   │   │   ├── Abilities/
+│   │   │   │   ├── Ability.cs
+│   │   │   │   ├── AbilityManager.cs
+│   │   │   │   └── MagicLightAbility.cs
 │   │   │   ├── Inventory/
+│   │   │   │   ├── InventoryUIManager.cs
+│   │   │   │   ├── InventorySlot.cs
+│   │   │   │   ├── InventoryItemMarker.cs
+│   │   │   │   ├── ItemSO.cs
+│   │   │   │   ├── ItemData.cs
+│   │   │   │   ├── ItemType.cs
+│   │   │   │   └── ItemDatabase.cs
 │   │   │   ├── Equipment/
+│   │   │   │   ├── EquipmentSystem.cs
+│   │   │   │   └── EquipmentSlot.cs
 │   │   │   ├── Dialogue/
+│   │   │   │   ├── TextBeginner.cs
+│   │   │   │   ├── DialogueData.cs
+│   │   │   │   ├── DialogueUI.cs
+│   │   │   │   ├── DialogueFileManager.cs
+│   │   │   │   ├── DialogueCharacterManager.cs
+│   │   │   │   └── DialogueTrigger.cs
 │   │   │   └── Quests/
+│   │   │       ├── QuestManager.cs
+│   │   │       ├── QuestUI.cs
+│   │   │       ├── QuestInstance.cs
+│   │   │       ├── QuestSO.cs
+│   │   │       ├── QuestConfigSO.cs
+│   │   │       ├── QuestListItem.cs
+│   │   │       ├── QuestNotifications.cs
+│   │   │       └── QuestDebugger.cs
 │   │   ├── UI/
 │   │   │   ├── Menu/
-│   │   │   ├── Inventory/
-│   │   │   ├── Quest/
-│   │   │   └── Dialogue/
+│   │   │   │   ├── MenuUIManager.cs
+│   │   │   │   ├── MenuUIConfig.cs
+│   │   │   │   ├── PanelManager.cs
+│   │   │   │   ├── BackgroundManager.cs
+│   │   │   │   ├── TabManager.cs
+│   │   │   │   ├── UIBuilder.cs
+│   │   │   │   └── FindingOneselfAnimation.cs
+│   │   │   ├── RadialMenu/
+│   │   │   │   ├── RadialMenu.cs
+│   │   │   │   ├── RadialButton.cs
+│   │   │   │   ├── RadialMenuOpener.cs
+│   │   │   │   └── MenuManager.cs
+│   │   │   ├── TooltipManager.cs
+│   │   │   ├── ItemViewPanel.cs
+│   │   │   └── MenuCloseHandler.cs
 │   │   └── Navigation/
-│   ├── Editor/                    ← Редакторские скрипты
+│   │       ├── LocationNeighbors.cs
+│   │       ├── NavigationArrow.cs
+│   │       ├── LocationArrows.cs
+│   │       ├── SceneSlideTransition.cs
+│   │       └── SceneTransition.cs
+│   ├── Editor/
 │   │   ├── QuestSOEditor.cs
 │   │   ├── GameEventEditor.cs
 │   │   ├── ItemSOEditor.cs
@@ -124,19 +133,25 @@ finding-oneself/
 │   │   ├── EventDataRestorer.cs
 │   │   └── EventEditorHelper.cs
 │   ├── Resources/
-│   │   ├── Quests/                ← Квесты (ScriptableObject)
-│   │   ├── Items/                 ← Предметы (ScriptableObject)
-│   │   ├── Configs/               ← Конфиги (MenuUIConfig, QuestConfig)
-│   │   └── UI/                    ← Префабы UI
+│   │   ├── Quests/
+│   │   ├── Items/
+│   │   ├── Configs/
+│   │   └── UI/
 │   ├── Scenes/
-│   │   ├── MainScene.unity        ← Главная сцена
+│   │   ├── MainScene.unity
 │   │   └── ...
 │   ├── TextAssets/
-│   │   └── Texts/                 ← Файлы диалогов (.txt)
-│   └── EventsData/                ← JSON бэкапы событий
+│   │   └── Texts/
+│   │       ├── ReplicProlouge.txt
+│   │       └── Trixie.txt
+│   └── EventsData/
+│       ├── *.json
+│       └── Backups/
+│           └── *.json
 ├── README.md
 ├── LICENSE
 └── .gitignore
+```
 
 ---
 
@@ -144,7 +159,7 @@ finding-oneself/
 
 Вы можете помочь в следующих областях: идеи (сюжет, механики, квесты, мир), нейросети (освоение инструментов, промпты, контент), арт (генерация картинок, текстур, спрайтов), код (скрипты, баги, оптимизация, рефакторинг), поддержка (тестирование, фидбек, репосты).
 
-Как присоединиться: форкните репозиторий, создайте ветку для вашей фичи (git checkout -b feature/awesome-idea), сделайте коммит (git commit -m 'Add awesome feature'), выполните пуш (git push origin feature/awesome-idea) и создайте Pull Request.
+Как присоединиться: форкните репозиторий, создайте ветку для вашей фичи (`git checkout -b feature/awesome-idea`), сделайте коммит (`git commit -m 'Add awesome feature'`), выполните пуш (`git push origin feature/awesome-idea`) и создайте Pull Request.
 
 ---
 
@@ -164,13 +179,13 @@ finding-oneself/
 
 Спасибо всем, кто поддерживает этот проект! 💜
 
-"Даже если ты потерял память, ты всегда можешь найти себя заново." — Трикси
+> *"Даже если ты потерял память, ты всегда можешь найти себя заново."* — Трикси
 
 ---
 
 ## 📊 Статус разработки
 
-Передвижение и взаимодействие — готово. Базовая нейро-арт — готово. Событийная система — готово. Квестовая система — готово. Инвентарь — в разработке. Экипировка — в разработке. Прокачка — планируется. Крафт — планируется. Система отряда — планируется. Боевая система — планируется. Множество локаций — планируется.
+Передвижение и взаимодействие — ✅ Готово. Базовая нейро-арт — ✅ Готово. Событийная система — ✅ Готово. Квестовая система — ✅ Готово. Инвентарь — ⚙️ В разработке. Экипировка — ⚙️ В разработке. Прокачка — 📝 Планируется. Крафт — 📝 Планируется. Система отряда — 📝 Планируется. Боевая система — 📝 Планируется. Множество локаций — 📝 Планируется.
 
 ---
 
