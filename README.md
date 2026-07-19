@@ -272,6 +272,9 @@ finding-oneself/
 
 ### 6. 🎮 Главное меню (Menu UI)
 
+![Меню](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Menu.gif)
+(Меню)
+
 Полноценное главное меню с анимациями и настройками.
 
 **Возможности:**
