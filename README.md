@@ -95,27 +95,48 @@ Radial Menu: радиальное меню с кнопками (Circle, Fan, Ver
 
 ## 📁 Структура проекта
 
-Assets/Scripts/Core/EventSystem/ — события и флаги.
-Assets/Scripts/Core/FlagManager.cs — управление флагами.
-Assets/Scripts/Core/GlobalControl.cs — глобальный контроллер.
-Assets/Scripts/Gameplay/Abilities/ — способности.
-Assets/Scripts/Gameplay/Inventory/ — инвентарь.
-Assets/Scripts/Gameplay/Equipment/ — экипировка.
-Assets/Scripts/Gameplay/Dialogue/ — диалоги.
-Assets/Scripts/Gameplay/Quests/ — квесты.
-Assets/Scripts/UI/Menu/ — главное меню.
-Assets/Scripts/UI/Inventory/ — интерфейс инвентаря.
-Assets/Scripts/UI/Quest/ — интерфейс квестов.
-Assets/Scripts/UI/Dialogue/ — интерфейс диалогов.
-Assets/Scripts/Navigation/ — навигация по локациям.
-Assets/Editor/ — редакторские скрипты (QuestSOEditor, GameEventEditor, ItemSOEditor, QuestConfigEditor, MenuUIConfigEditor, DialogueDataEditor, EventDataRestorer, EventEditorHelper).
-Assets/Resources/Quests/ — квесты (ScriptableObject).
-Assets/Resources/Items/ — предметы (ScriptableObject).
-Assets/Resources/Configs/ — конфиги (MenuUIConfig, QuestConfig).
-Assets/Resources/UI/ — префабы UI.
-Assets/Scenes/ — игровые сцены.
-Assets/TextAssets/Texts/ — файлы диалогов (.txt).
-Assets/EventsData/ — JSON бэкапы событий.
+finding-oneself/
+├── Assets/
+│   ├── Scripts/
+│   │   ├── Core/
+│   │   │   ├── EventSystem/
+│   │   │   ├── FlagManager.cs
+│   │   │   └── GlobalControl.cs
+│   │   ├── Gameplay/
+│   │   │   ├── Abilities/
+│   │   │   ├── Inventory/
+│   │   │   ├── Equipment/
+│   │   │   ├── Dialogue/
+│   │   │   └── Quests/
+│   │   ├── UI/
+│   │   │   ├── Menu/
+│   │   │   ├── Inventory/
+│   │   │   ├── Quest/
+│   │   │   └── Dialogue/
+│   │   └── Navigation/
+│   ├── Editor/                    ← Редакторские скрипты
+│   │   ├── QuestSOEditor.cs
+│   │   ├── GameEventEditor.cs
+│   │   ├── ItemSOEditor.cs
+│   │   ├── QuestConfigEditor.cs
+│   │   ├── MenuUIConfigEditor.cs
+│   │   ├── DialogueDataEditor.cs
+│   │   ├── EventDataRestorer.cs
+│   │   └── EventEditorHelper.cs
+│   ├── Resources/
+│   │   ├── Quests/                ← Квесты (ScriptableObject)
+│   │   ├── Items/                 ← Предметы (ScriptableObject)
+│   │   ├── Configs/               ← Конфиги (MenuUIConfig, QuestConfig)
+│   │   └── UI/                    ← Префабы UI
+│   ├── Scenes/
+│   │   ├── MainScene.unity        ← Главная сцена
+│   │   └── ...
+│   ├── TextAssets/
+│   │   └── Texts/                 ← Файлы диалогов (.txt)
+│   └── EventsData/                ← JSON бэкапы событий
+├── README.md
+├── LICENSE
+└── .gitignore
 
 ---
 
