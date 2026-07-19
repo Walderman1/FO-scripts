@@ -159,6 +159,8 @@ finding-oneself/
 
 ### 1. 🧠 Событийная система (Event System)
 
+![Демонстрация события](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Event.gif)
+
 Полноценная событийная система на ScriptableObject с сохранением в JSON.
 
 **Возможности:**
