@@ -335,6 +335,8 @@ finding-oneself/
 
 ## 🛠 Редакторские инструменты (Editor Tools)
 
+![Кастомные редакторы](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Editor.gif)
+
 Для удобной настройки контента созданы кастомные редакторы, которые значительно ускоряют разработку.
 
 **Список редакторов:**
