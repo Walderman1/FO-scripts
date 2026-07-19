@@ -293,7 +293,7 @@ finding-oneself/
 
 ### 7. 🌀 Радиальное меню (Radial Menu)
 
-![Радиальное меню и его возможности](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Menu.gif)
+![Радиальное меню и его возможности](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/RadialMenu.gif)
 (Радиальное меню и его возможности)
 
 Универсальное радиальное меню для взаимодействия с миром и предметами.
@@ -310,6 +310,9 @@ finding-oneself/
 ---
 
 ### 8. 🗺️ Навигация (Navigation)
+
+![Перемещение](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Navigation.gif)
+(Перемещение)
 
 Система перемещения между локациями.
 
