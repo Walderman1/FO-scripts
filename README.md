@@ -2,7 +2,7 @@
 
 > Unity RPG about a lost pony. AI art + experimental mechanics.
 
-[![Unity](https://img.shields.io/badge/Unity-2022.3+-black?logo=unity)](https://unity.com)
+[![Unity](https://img.shields.io/badge/Unity-6000.4.8f1-black?logo=unity)](https://unity.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Prototype-orange)]()
 
@@ -32,7 +32,7 @@
 
 ## 🛠 Tech Stack
 
-- **Engine:** Unity 2022.3 LTS
+- **Engine:** Unity 6000.4.8f1
 - **Language:** C#
 - **AI Tools:** Stable Diffusion, ChatGPT
 - **Version Control:** Git + GitHub
