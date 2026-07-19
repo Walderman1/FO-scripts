@@ -1,54 +1,162 @@
 # 🦄 Finding Oneself
 
-> Unity RPG about a lost pony. AI art + experimental mechanics.
+Экспериментальная RPG о пони Трикси, которая потеряла память. Визуал и часть логики создаются с помощью нейросетей. Проект на Unity 6000.4.8f1.
 
 [![Unity](https://img.shields.io/badge/Unity-6000.4.8f1-black?logo=unity)](https://unity.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Prototype-orange)]()
+[![AI](https://img.shields.io/badge/AI-Powered-purple?logo=openai)]()
 
 ---
 
-## 📖 About
+## 📖 О проекте
 
-**Finding Oneself** — экспериментальная RPG, где пони **Трикси** просыпается в шахте без воспоминаний. Ей предстоит заново учиться, сражаться и исследовать огромный мир. Первое опасное место на её пути — **Вечнозеленый лес**, полный тайн и недобрых пони-путников.
-
-**Главная фишка:** визуал и часть логики создаются с помощью нейросетей. Это эксперимент — насколько ИИ может помочь соло-разработчику.
+Finding Oneself — это экспериментальная RPG, где пони Трикси просыпается в шахте без воспоминаний. Ей предстоит заново учиться, сражаться и собирать отряд в опасном Вечнозеленом лесу и за его пределами. Главная фишка: визуал и часть логики создаются с помощью нейросетей. Это эксперимент — насколько ИИ может помочь соло-разработчику.
 
 ---
 
-## 🌍 World
+## 🎭 Сюжет
 
-Игроков ждёт путешествие по разным локациям, где Трикси будет:
-- Встречать новых персонажей
-- Собирать верный отряд по всему миру
-- Раскрывать тайны прошлого
-
-Вечнозеленый лес — лишь первая глава в большой истории.
+Трикси просыпается в заброшенной шахте без воспоминаний. Вокруг — опасный Вечнозеленый лес, враждебные пони-путники и множество тайн. Героине предстоит заново научиться всему с нуля, набить руку в бою, собрать верный отряд по всему миру и раскрыть тайну своего прошлого. Вечнозеленый лес — лишь первая глава в большой истории.
 
 ---
 
-## 🎮 Features
+## 🤖 Ключевая особенность
 
-| Feature | Status |
-|---------|--------|
-| Movement & Interaction | ✅ Done |
-| Basic AI Art | ✅ Done |
-| Leveling System | ⚙️ WIP |
-| Inventory | ⚙️ WIP |
-| Crafting | ⚙️ WIP |
-| Party System (worldwide) | ⚙️ WIP |
-| Combat | ⚙️ WIP |
-| Multiple Locations | 📝 Planned |
+Это эксперимент: насколько нейросети могут помочь соло-разработчику. Визуал (арты персонажей, фоны, текстуры) генерируется через ИИ. Часть игровых механик и контента (идеи, тексты, диалоги) также создаётся с помощью нейросетей.
 
 ---
 
-## 🛠 Tech Stack
+## 🛠 Технологический стек
 
-- **Engine:** Unity 6000.4.8f1
-- **Language:** C#
-- **AI Tools:** Stable Diffusion, ChatGPT
-- **Version Control:** Git + GitHub
+Движок: Unity 6000.4.8f1. Язык: C#. ИИ-инструменты: Stable Diffusion, ChatGPT. Контроль версий: Git + GitHub. Система событий: кастомная (ScriptableObject + JSON). Квестовая система: кастомная (ScriptableObject + JSON). UI: Unity UI + TextMeshPro.
 
 ---
 
-## 📁 Project Structure
+## 🏗 Архитектура проекта
+
+Проект разделён на несколько ключевых модулей.
+
+Ядро (Core Systems) включает EventManager (событийная шина), EventStateManager (состояния событий), FlagManager (глобальные флаги) и QuestManager (квесты).
+
+Игровая логика (Gameplay) включает Abilities (способности), Inventory (инвентарь), Equipment (экипировка) и Dialogue (диалоги).
+
+Пользовательский интерфейс (UI) включает MenuUIManager (главное меню), InventoryUI (инвентарь), DialogueUI (диалоги), QuestUI (квесты) и RadialMenu (радиальное меню).
+
+Навигация (Navigation) включает LocationNeighbors (соседи локаций) и NavigationArrow (навигация).
+
+Отладка (Debug) включает QuestDebugger (отладка квестов).
+
+---
+
+## 📦 Модули
+
+### Core Systems
+
+Event System — это ScriptableObject-базированная система событий с поддержкой условий (requirements) и политик выполнения (ExecutionPolicy). Она сохраняется в JSON и восстанавливается обратно, имеет автосохранение при компиляции и выходе из Play Mode, а также создаёт бэкапы событий. Ключевые файлы: EventManager.cs (управление событиями), EventStateManager.cs (состояния событий), EventDataManager.cs (сохранение/загрузка JSON), GameEvent.cs (ScriptableObject события), EventAction.cs (действия: StartDialogue, AddItem, SetFlag и другие).
+
+Flag System — это глобальные флаги для управления состоянием игры с интеграцией в Event System. Ключевой файл: FlagManager.cs.
+
+### Gameplay
+
+Abilities (Способности): Ability — абстрактный класс с кулдауном и энергией. AbilityManager — управление способностями. MagicLightAbility — пример сложной способности со светом, детекцией и трейлами.
+
+Inventory (Инвентарь): поддерживает drag-and-drop между слотами, двойной клик для быстрого снятия, контекстное меню (ПКМ), стэкинг, разделение стэка (Shift + клик). ItemSO — ScriptableObject для предметов. ItemDatabase — централизованное хранение.
+
+Equipment (Экипировка): позволяет экипировать предметы на персонажа с визуальным отображением на модели. Использует систему пивотов для разных типов (Head, Chest, Weapon и другие). Поддерживает 10+ типов экипировки.
+
+Dialogue (Диалоги): загружает диалоги из текстовых файлов, поддерживает маркеры (choice, finish, continue, end), интегрируется с персонажами (появление, анимации, перемещение). Имеет кнопку пропуска диалога. DialogueData — ScriptableObject для настройки.
+
+### UI
+
+Menu UI: анимация букв "Finding Oneself" с подсветкой, плавные переходы между панелями, настройки с вкладками (Графика, Звук, Управление, Игра). Конфигурация через MenuUIConfig.
+
+Quest UI: панель с вкладками (активные, выполненные, проваленные), прогресс-бары для квестов, детальная панель с целями и предметами, кнопка отслеживания (tracking), уведомления при старте, обновлении и завершении квеста.
+
+Radial Menu: радиальное меню с кнопками (Circle, Fan, Vertical, Horizontal), контекстное меню для предметов, поддержка выбора в диалогах.
+
+### Navigation
+
+Автоматическое обнаружение соседей локаций, переход между локациями со слайд-анимацией, поддержка клавиатурных стрелок. Персонаж перемещается вместе с камерой.
+
+---
+
+## 🛠 Установка и запуск
+
+Требования: Unity 6000.4.8f1 (или новее) и Git.
+
+Установка:
+1. Клонируйте репозиторий: git clone https://github.com/Walderman1/finding-oneself.git и перейдите в папку проекта.
+2. Откройте проект в Unity Hub (Add → выберите папку с проектом).
+3. Загрузите стартовую сцену: Assets/Scenes/MainScene.unity.
+4. Нажмите Play и начните игру.
+
+---
+
+## 📁 Структура проекта
+
+Assets/Scripts/Core/EventSystem/ — события и флаги.
+Assets/Scripts/Core/FlagManager.cs — управление флагами.
+Assets/Scripts/Core/GlobalControl.cs — глобальный контроллер.
+Assets/Scripts/Gameplay/Abilities/ — способности.
+Assets/Scripts/Gameplay/Inventory/ — инвентарь.
+Assets/Scripts/Gameplay/Equipment/ — экипировка.
+Assets/Scripts/Gameplay/Dialogue/ — диалоги.
+Assets/Scripts/Gameplay/Quests/ — квесты.
+Assets/Scripts/UI/Menu/ — главное меню.
+Assets/Scripts/UI/Inventory/ — интерфейс инвентаря.
+Assets/Scripts/UI/Quest/ — интерфейс квестов.
+Assets/Scripts/UI/Dialogue/ — интерфейс диалогов.
+Assets/Scripts/Navigation/ — навигация по локациям.
+Assets/Editor/ — редакторские скрипты (QuestSOEditor, GameEventEditor, ItemSOEditor, QuestConfigEditor, MenuUIConfigEditor, DialogueDataEditor, EventDataRestorer, EventEditorHelper).
+Assets/Resources/Quests/ — квесты (ScriptableObject).
+Assets/Resources/Items/ — предметы (ScriptableObject).
+Assets/Resources/Configs/ — конфиги (MenuUIConfig, QuestConfig).
+Assets/Resources/UI/ — префабы UI.
+Assets/Scenes/ — игровые сцены.
+Assets/TextAssets/Texts/ — файлы диалогов (.txt).
+Assets/EventsData/ — JSON бэкапы событий.
+
+---
+
+## 🤝 Как помочь
+
+Вы можете помочь в следующих областях: идеи (сюжет, механики, квесты, мир), нейросети (освоение инструментов, промпты, контент), арт (генерация картинок, текстур, спрайтов), код (скрипты, баги, оптимизация, рефакторинг), поддержка (тестирование, фидбек, репосты).
+
+Как присоединиться: форкните репозиторий, создайте ветку для вашей фичи (git checkout -b feature/awesome-idea), сделайте коммит (git commit -m 'Add awesome feature'), выполните пуш (git push origin feature/awesome-idea) и создайте Pull Request.
+
+---
+
+## 👥 Команда
+
+Соло-разработчик: Walderman (GitHub: https://github.com/Walderman1). Проект открыт для контрибьюторов! Присоединяйтесь! 🦄
+
+---
+
+## 📄 Лицензия
+
+Проект лицензирован под MIT License — см. файл LICENSE для деталей.
+
+---
+
+## 🙏 Благодарности
+
+Спасибо всем, кто поддерживает этот проект! 💜
+
+"Даже если ты потерял память, ты всегда можешь найти себя заново." — Трикси
+
+---
+
+## 📊 Статус разработки
+
+Передвижение и взаимодействие — готово. Базовая нейро-арт — готово. Событийная система — готово. Квестовая система — готово. Инвентарь — в разработке. Экипировка — в разработке. Прокачка — планируется. Крафт — планируется. Система отряда — планируется. Боевая система — планируется. Множество локаций — планируется.
+
+---
+
+## 🔗 Ссылки
+
+GitHub Репозиторий: https://github.com/Walderman1/finding-oneself
+Gist с описанием: https://gist.github.com/Walderman1/...
+Telegram: https://t.me/your_username
+
+⭐ Если вам нравится проект — поставьте звезду на GitHub! ⭐
