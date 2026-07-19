@@ -9,14 +9,9 @@
 
 <div align="center">
 
-<!-- Градиентный заголовок -->
-<h1>
-  <span style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 30%, #4facfe 60%, #43e97b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-    ✨ Finding Oneself
-  </span>
-</h1>
+# ✨ Finding Oneself
 
-<h3><i>Экспериментальная RPG о пони, потерявшей память</i></h3>
+### *Экспериментальная RPG о пони, потерявшей память*
 
 <br>
 
@@ -54,7 +49,7 @@
 
 ---
 
-## 📖 О проекте
+## 🎯 О проекте
 
 <div align="center">
 
@@ -576,20 +571,6 @@ finding-oneself/
 
 ---
 
-## ⌨️ Управление (Hotkeys)
-
-| Клавиша | Действие |
-|:--------|:---------|
-| `I` | Открыть инвентарь |
-| `E` | Открыть экипировку |
-| `J` | Открыть квесты |
-| `L` | Магический свет |
-| `ПКМ` | Радиальное меню |
-| `Стрелки` | Перемещение между локациями |
-| `Esc` | Закрыть все меню |
-
----
-
 ## 🙏 Благодарности
 
 <div align="center">
@@ -609,8 +590,8 @@ finding-oneself/
 
 <div align="center">
 
-[![Telegram](https://img.shields.io/badge/Telegram-@VValderman-26A5E4?style=for-the-badge&logo=telegram&logoColor=white&labelColor=1a1a2e)](https://t.me/VValderman)
-[![GitHub](https://img.shields.io/badge/GitHub-Walderman1-181717?style=for-the-badge&logo=github&logoColor=white&labelColor=1a1a2e)](https://github.com/Walderman1)
+[![Telegram](https://img.shields.io/badge/Telegram-@VValderman-26A5E4?style=for-the-badge&logo=telegram)](https://t.me/VValderman)
+[![GitHub](https://img.shields.io/badge/GitHub-Walderman1-181717?style=for-the-badge&logo=github)](https://github.com/Walderman1)
 
 </div>
 
