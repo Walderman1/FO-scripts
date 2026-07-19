@@ -252,6 +252,9 @@ finding-oneself/
 
 ### 5. 💬 Диалоговая система (Dialogue)
 
+![Система диалогов и выборов](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Dialogue.gif)
+(Система диалогов и выборов)
+
 Гибкая система диалогов с загрузкой из текстовых файлов.
 
 **Возможности:**
