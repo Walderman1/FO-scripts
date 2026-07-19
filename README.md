@@ -183,7 +183,7 @@ finding-oneself/
 
 ### 2. 📜 Квестовая система (Quest System)
 
-![Демонстрация события](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Quest.gif)
+![Сбор предметов](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Quest.gif)
 (Сбор предметов)
 
 Полноценная квестовая система с UI, уведомлениями и отладкой.
@@ -209,6 +209,9 @@ finding-oneself/
 ---
 
 ### 3. 🎒 Инвентарь (Inventory)
+
+![Инвентарь и его возможности](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Inventory.gif)
+(Инвентарь и его возможности)
 
 Полноценная система инвентаря с drag-and-drop и контекстным меню.
 
