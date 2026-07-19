@@ -327,7 +327,7 @@ finding-oneself/
 
 ## 👥 Команда
 
-Соло-разработчик: Walderman (GitHub: Walderman1). Проект открыт для контрибьюторов! Присоединяйтесь! 🦄
+Соло-разработчик: Walderman ([GitHub](https://github.com/Walderman1)). Проект открыт для контрибьюторов! Присоединяйтесь! 🦄
 
 ---
 
@@ -364,5 +364,5 @@ finding-oneself/
 
 ## 🔗 Контакты
 
-Telegram: https://t.me/VValderman
-GitHub: https://github.com/Walderman1
+Telegram: [@VValderman](https://t.me/VValderman)
+GitHub: [Walderman1](https://github.com/Walderman1)
