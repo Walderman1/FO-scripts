@@ -183,6 +183,9 @@ finding-oneself/
 
 ### 2. 📜 Квестовая система (Quest System)
 
+![Демонстрация события](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Quest.gif)
+(Сбор предметов)
+
 Полноценная квестовая система с UI, уведомлениями и отладкой.
 
 **Возможности:**
