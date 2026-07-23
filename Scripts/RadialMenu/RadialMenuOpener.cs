@@ -16,6 +16,7 @@ public class RadialMenuOpener : MonoBehaviour
             if (cachedRadialMenu != null)
             {
                 cachedRadialMenu.Hide();
+                Logger.Log(LogModule.RadialMenu, "RadialMenuOpener: RadialMenu скрыт при старте");
             }
         }
     }
@@ -24,7 +25,6 @@ public class RadialMenuOpener : MonoBehaviour
     {
         if (Input.GetKeyDown(openKey))
         {
-            // Проверяем, не клик ли по инвентарю
             if (EventSystem.current != null)
             {
                 var pointer = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
@@ -37,19 +37,21 @@ public class RadialMenuOpener : MonoBehaviour
                         result.gameObject.GetComponent<InventoryItemMarker>() != null ||
                         result.gameObject.CompareTag("InventoryPanel"))
                     {
+                        Logger.Log(LogModule.RadialMenu, "Клик по инвентарю, открытие меню заблокировано");
                         return;
                     }
                 }
             }
 
-            // Открываем или закрываем основное меню
             if (MenuManager.Instance.IsMainMenuOpen())
             {
                 MenuManager.Instance.CloseAllMenus();
+                Logger.Log(LogModule.RadialMenu, "Главное меню закрыто по повторному нажатию");
             }
             else
             {
                 MenuManager.Instance.OpenMainMenu();
+                Logger.Log(LogModule.RadialMenu, "Главное меню открыто");
             }
         }
     }
