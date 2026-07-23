@@ -1,4 +1,3 @@
-// SessionManager.cs
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -23,6 +22,7 @@ public class SessionManager : MonoBehaviour
         }
         else
         {
+            Logger.Log(LogModule.Core, "Уничтожение дублирующего SessionManager");
             Destroy(gameObject);
         }
     }
@@ -31,30 +31,33 @@ public class SessionManager : MonoBehaviour
     {
         currentSessionID = System.DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
         sessionStartTime = Time.time;
-        Debug.Log($"🆕 New session started: {currentSessionID}");
+        Logger.Log(LogModule.Core, $"Начата новая сессия: {currentSessionID}");
     }
 
     public string GetSessionID() => currentSessionID;
 
     public float GetSessionTime() => Time.time - sessionStartTime;
 
-    // Сохранение состояния событий
     public void SaveEventStates()
     {
-        if (EventStateManager.Instance == null) return;
+        if (EventStateManager.Instance == null)
+        {
+            Logger.LogWarning(LogModule.Core, "EventStateManager не найден, сохранение состояний событий пропущено");
+            return;
+        }
 
-        // Сохраняем состояния всех событий
-        // Здесь можно реализовать сохранение в файл
-        Debug.Log($"💾 Event states saved for session: {currentSessionID}");
+        Logger.Log(LogModule.Core, $"Сохранены состояния событий для сессии: {currentSessionID}");
     }
 
-    // Загрузка состояния событий
     public void LoadEventStates()
     {
-        if (EventStateManager.Instance == null) return;
+        if (EventStateManager.Instance == null)
+        {
+            Logger.LogWarning(LogModule.Core, "EventStateManager не найден, загрузка состояний событий пропущена");
+            return;
+        }
 
-        // Загружаем состояния событий
-        Debug.Log($"📂 Event states loaded for session: {currentSessionID}");
+        Logger.Log(LogModule.Core, $"Загружены состояния событий для сессии: {currentSessionID}");
     }
 
     private void OnApplicationQuit()
@@ -62,6 +65,7 @@ public class SessionManager : MonoBehaviour
         if (autoSaveOnQuit)
         {
             SaveEventStates();
+            Logger.Log(LogModule.Core, $"Сессия {currentSessionID} завершена, данные сохранены");
         }
     }
 
@@ -70,6 +74,7 @@ public class SessionManager : MonoBehaviour
         if (pauseStatus && autoSaveOnQuit)
         {
             SaveEventStates();
+            Logger.Log(LogModule.Core, $"Приложение приостановлено, данные сессии {currentSessionID} сохранены");
         }
     }
 }
