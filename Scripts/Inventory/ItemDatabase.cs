@@ -1,4 +1,3 @@
-// ItemDatabase.cs - РУСИФИЦИРОВАННЫЙ
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,11 +14,9 @@ public class ItemDatabase : MonoBehaviour
     [Header("=== ЗАПАСНОЙ ПРЕДМЕТ ===")]
     [SerializeField] private ItemSO fallbackItem;
 
-    // Кэшированные словари для быстрого доступа
     private Dictionary<ItemType, ItemSO> itemsByType = new Dictionary<ItemType, ItemSO>();
     private Dictionary<string, ItemSO> itemsByName = new Dictionary<string, ItemSO>();
 
-    // Событие при загрузке базы
     public System.Action OnDatabaseLoaded;
 
     private void Awake()
@@ -28,14 +25,14 @@ public class ItemDatabase : MonoBehaviour
         {
             Instance = this;
             if (autoLoadOnStart) LoadDatabase();
+            Logger.Log(LogModule.Inventory, "ItemDatabase инициализирован");
         }
         else
         {
+            Logger.Log(LogModule.Inventory, "Уничтожение дублирующего ItemDatabase");
             Destroy(gameObject);
         }
     }
-
-    // ========== ЗАГРУЗКА ==========
 
     [ContextMenu("Загрузить базу данных")]
     public void LoadDatabase()
@@ -43,11 +40,10 @@ public class ItemDatabase : MonoBehaviour
         itemsByType.Clear();
         itemsByName.Clear();
 
-        // Если список пуст, пытаемся загрузить из Resources
         if (allItems == null || allItems.Count == 0)
         {
             allItems = Resources.LoadAll<ItemSO>("Items").ToList();
-            Debug.Log($"Автозагрузка: найдено {allItems.Count} предметов в Resources/Items");
+            Logger.Log(LogModule.Inventory, $"Автозагрузка: найдено {allItems.Count} предметов в Resources/Items");
         }
 
         foreach (var item in allItems)
@@ -60,7 +56,7 @@ public class ItemDatabase : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"Дубликат типа предмета: {item.itemType} в базе данных");
+                Logger.LogWarning(LogModule.Inventory, $"Дубликат типа предмета: {item.itemType} в базе данных");
             }
 
             if (!itemsByName.ContainsKey(item.itemName))
@@ -71,11 +67,9 @@ public class ItemDatabase : MonoBehaviour
 
         if (validateOnLoad) ValidateDatabase();
 
-        Debug.Log($"✅ База данных загружена: {itemsByType.Count} предметов");
+        Logger.Log(LogModule.Inventory, $"База данных загружена: {itemsByType.Count} предметов");
         OnDatabaseLoaded?.Invoke();
     }
-
-    // ========== ВАЛИДАЦИЯ ==========
 
     private void ValidateDatabase()
     {
@@ -84,27 +78,25 @@ public class ItemDatabase : MonoBehaviour
             if (item == null) continue;
 
             if (item.itemType == ItemType.None)
-                Debug.LogWarning($"Предмет {item.name} имеет тип None");
+                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} имеет тип None");
 
             if (string.IsNullOrEmpty(item.itemName))
-                Debug.LogWarning($"Предмет {item.name} не имеет названия");
+                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} не имеет названия");
 
             if (item.icon == null)
-                Debug.LogWarning($"Предмет {item.name} не имеет иконки");
+                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} не имеет иконки");
 
             if (item.isEquippable && item.equipmentType == EquipmentType.None)
-                Debug.LogWarning($"Предмет {item.name} экипируемый, но не указан тип экипировки");
+                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} экипируемый, но не указан тип экипировки");
         }
     }
-
-    // ========== ПОЛУЧЕНИЕ ДАННЫХ ==========
 
     public ItemSO GetItem(ItemType type)
     {
         if (itemsByType.TryGetValue(type, out ItemSO item))
             return item;
 
-        Debug.LogWarning($"Предмет не найден: {type}");
+        Logger.LogWarning(LogModule.Inventory, $"Предмет не найден: {type}");
         return fallbackItem;
     }
 
@@ -113,7 +105,7 @@ public class ItemDatabase : MonoBehaviour
         if (itemsByName.TryGetValue(name, out ItemSO item))
             return item;
 
-        Debug.LogWarning($"Предмет не найден: {name}");
+        Logger.LogWarning(LogModule.Inventory, $"Предмет не найден: {name}");
         return fallbackItem;
     }
 
@@ -127,14 +119,10 @@ public class ItemDatabase : MonoBehaviour
     public GameObject GetUIPrefab(ItemType type) => GetItem(type)?.uiPrefab;
     public GameObject GetWorldPrefab(ItemType type) => GetItem(type)?.worldPrefab;
 
-    // ========== СПИСКИ ==========
-
     public List<ItemSO> GetAllItems() => allItems;
     public List<ItemSO> GetEquippableItems() => allItems.Where(i => i != null && i.isEquippable).ToList();
     public List<ItemSO> GetItemsByType(EquipmentType equipmentType) =>
         allItems.Where(i => i != null && i.isEquippable && i.equipmentType == equipmentType).ToList();
-
-    // ========== СОЗДАНИЕ ПРЕДМЕТОВ ==========
 
     public GameObject SpawnWorldItem(ItemType type, Vector3 position)
     {
@@ -148,8 +136,6 @@ public class ItemDatabase : MonoBehaviour
         return item != null ? item.CreateUIElement(parent) : null;
     }
 
-    // ========== РЕДАКТОРНЫЕ МЕТОДЫ ==========
-
 #if UNITY_EDITOR
     [ContextMenu("Обновить из Resources")]
     public void RefreshFromResources()
@@ -157,7 +143,7 @@ public class ItemDatabase : MonoBehaviour
         allItems = Resources.LoadAll<ItemSO>("Items").ToList();
         UnityEditor.EditorUtility.SetDirty(this);
         LoadDatabase();
-        Debug.Log($"База данных обновлена: {allItems.Count} предметов");
+        Logger.Log(LogModule.Inventory, $"База данных обновлена: {allItems.Count} предметов");
     }
 
     [ContextMenu("Сортировать предметы")]
@@ -165,6 +151,7 @@ public class ItemDatabase : MonoBehaviour
     {
         allItems = allItems.OrderBy(i => i != null ? i.itemType : ItemType.None).ToList();
         UnityEditor.EditorUtility.SetDirty(this);
+        Logger.Log(LogModule.Inventory, "Предметы отсортированы по типу");
     }
 #endif
 }
