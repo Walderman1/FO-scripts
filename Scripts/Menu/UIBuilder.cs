@@ -27,13 +27,19 @@ public class UIBuilder : MonoBehaviour
         this.togglePrefab = togglePrefab;
         this.tabPrefab = tabPrefab;
         isInitialized = true;
+
+        Logger.Log(LogModule.Menu, "UIBuilder инициализирован");
     }
 
     #region Buttons
 
     public GameObject CreateButton(Transform parent, string name, System.Action onClick = null, bool isSmall = false)
     {
-        if (!isInitialized || buttonPrefab == null) return null;
+        if (!isInitialized || buttonPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "UIBuilder не инициализирован или buttonPrefab отсутствует");
+            return null;
+        }
 
         GameObject btn = Instantiate(buttonPrefab, parent);
         btn.name = name + "Button";
@@ -81,6 +87,7 @@ public class UIBuilder : MonoBehaviour
             tmp.overflowMode = TextOverflowModes.Ellipsis;
         }
 
+        Logger.Log(LogModule.Menu, $"Создана кнопка: {name}");
         return btn;
     }
 
@@ -147,7 +154,11 @@ public class UIBuilder : MonoBehaviour
     public GameObject CreateSlider(Transform parent, Vector2 position, float minValue, float maxValue, float defaultValue,
                                    System.Action<float> onValueChanged = null)
     {
-        if (!isInitialized || sliderContainerPrefab == null) return null;
+        if (!isInitialized || sliderContainerPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "UIBuilder не инициализирован или sliderContainerPrefab отсутствует");
+            return null;
+        }
 
         GameObject sliderContainer = Instantiate(sliderContainerPrefab, parent);
         sliderContainer.name = "SliderContainer";
@@ -198,7 +209,11 @@ public class UIBuilder : MonoBehaviour
 
     public GameObject CreateVolumeSlider(Transform parent, Vector2 position)
     {
-        if (!isInitialized || sliderContainerPrefab == null) return null;
+        if (!isInitialized || sliderContainerPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "UIBuilder не инициализирован или sliderContainerPrefab отсутствует");
+            return null;
+        }
 
         GameObject sliderContainer = Instantiate(sliderContainerPrefab, parent);
         sliderContainer.name = "VolumeSliderContainer";
@@ -284,6 +299,7 @@ public class UIBuilder : MonoBehaviour
             }
         }
 
+        Logger.Log(LogModule.Menu, "Создан ползунок громкости");
         return sliderContainer;
     }
 
@@ -293,7 +309,11 @@ public class UIBuilder : MonoBehaviour
 
     public GameObject CreateToggle(Transform parent, Vector2 position, bool defaultValue, System.Action<bool> onValueChanged = null)
     {
-        if (!isInitialized || togglePrefab == null) return null;
+        if (!isInitialized || togglePrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "UIBuilder не инициализирован или togglePrefab отсутствует");
+            return null;
+        }
 
         GameObject toggleObj = Instantiate(togglePrefab, parent);
         toggleObj.name = "Toggle";
@@ -347,6 +367,7 @@ public class UIBuilder : MonoBehaviour
             });
         }
 
+        Logger.Log(LogModule.Menu, $"Создан переключатель со значением: {defaultValue}");
         return toggleObj;
     }
 
@@ -450,6 +471,7 @@ public class UIBuilder : MonoBehaviour
         dropdown.template = templateRt;
         dropdown.itemText = dropdownObj.GetComponentInChildren<TMP_Text>();
 
+        Logger.Log(LogModule.Menu, $"Создан выпадающий список с {options.Length} вариантами");
         return dropdownObj;
     }
 
@@ -459,7 +481,11 @@ public class UIBuilder : MonoBehaviour
 
     public GameObject CreateTabButton(Transform parent, string name, System.Action onClick = null)
     {
-        if (!isInitialized || tabPrefab == null) return null;
+        if (!isInitialized || tabPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "UIBuilder не инициализирован или tabPrefab отсутствует");
+            return null;
+        }
 
         GameObject tab = Instantiate(tabPrefab, parent);
         tab.name = name + "Tab";
@@ -492,6 +518,7 @@ public class UIBuilder : MonoBehaviour
             bg.raycastTarget = true;
         }
 
+        Logger.Log(LogModule.Menu, $"Создана кнопка вкладки: {name}");
         return tab;
     }
 
@@ -587,6 +614,7 @@ public class UIBuilder : MonoBehaviour
         backText.raycastTarget = false;
         if (defaultFont != null) backText.font = defaultFont;
 
+        Logger.Log(LogModule.Menu, "Создана кнопка возврата");
         return backBtn;
     }
 
@@ -614,6 +642,7 @@ public class UIBuilder : MonoBehaviour
         tmp.raycastTarget = false;
         if (defaultFont != null) tmp.font = defaultFont;
 
+        Logger.Log(LogModule.Menu, $"Создан текст-заполнитель: {text}");
         return placeholder;
     }
 
