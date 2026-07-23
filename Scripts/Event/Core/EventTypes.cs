@@ -1,4 +1,3 @@
-// EventTypes.cs
 using UnityEngine;
 
 public enum EventTriggerType
@@ -38,11 +37,10 @@ public enum EventActionType
     Delay
 }
 
-// ✅ ДОБАВЛЯЕМ СЮДА
 public enum ExecutionPolicy
 {
-    ExecuteOnce,        // Выполнить только один раз за всю игру
-    ExecuteMultiple,    // Выполнить несколько раз (ограничено maxExecutions)
-    ExecutePerSession,  // Выполнить один раз за сессию
-    ExecuteEveryTime    // Выполнять всегда, когда срабатывает триггер
+    ExecuteOnce,
+    ExecuteMultiple,
+    ExecutePerSession,
+    ExecuteEveryTime
 }
