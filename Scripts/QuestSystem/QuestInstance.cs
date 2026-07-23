@@ -1,6 +1,3 @@
-// ============================================================
-// QuestInstance.cs
-// ============================================================
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -80,6 +77,8 @@ public class QuestInstance
                 type = obj.type
             });
         }
+
+        Logger.Log(LogModule.QuestSystem, $"Создан экземпляр квеста: {QuestName} (ID: {QuestID})");
     }
 
     public QuestObjective GetObjective(string id)
