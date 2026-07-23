@@ -424,10 +424,10 @@ finding-oneself/
 
 ## 🛠 Редакторские инструменты
 
-![Кастомные редакторы](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Editor.gif)
-
 <details>
 <summary><b>📖 Развернуть список</b></summary>
+
+![Кастомные редакторы](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Editor.gif)
 
 | Редактор | Назначение |
 |:---------|:-----------|
