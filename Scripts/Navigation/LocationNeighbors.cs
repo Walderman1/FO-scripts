@@ -23,55 +23,53 @@ public class LocationNeighbors : MonoBehaviour
         {
             this.enabled = false;
         }
+
+        Logger.Log(LogModule.Navigation, $"LocationNeighbors инициализирован для {gameObject.name}");
     }
 
     private void FindLocationReference()
     {
         if (locationReference != null)
         {
-            Debug.Log($"📍 LocationReference назначен вручную: {locationReference.name}");
+            Logger.Log(LogModule.Navigation, $"LocationReference назначен вручную: {locationReference.name}");
             return;
         }
 
-        // Поиск по имени в дочерних
         Transform childByName = transform.Find("LocationReference");
         if (childByName != null)
         {
             locationReference = childByName.gameObject;
-            Debug.Log($"📍 LocationReference найден по имени в дочерних: {locationReference.name}");
+            Logger.Log(LogModule.Navigation, $"LocationReference найден по имени в дочерних: {locationReference.name}");
             return;
         }
 
-        // Поиск по тегу в дочерних
         foreach (Transform child in transform)
         {
             if (child.CompareTag("LocationReference"))
             {
                 locationReference = child.gameObject;
-                Debug.Log($"📍 LocationReference найден по тегу в дочерних: {locationReference.name}");
+                Logger.Log(LogModule.Navigation, $"LocationReference найден по тегу в дочерних: {locationReference.name}");
                 return;
             }
         }
 
-        // Поиск по тегу глобально (если дочерний)
         GameObject foundByTag = GameObject.FindGameObjectWithTag("LocationReference");
         if (foundByTag != null && foundByTag.transform.IsChildOf(transform))
         {
             locationReference = foundByTag;
-            Debug.Log($"📍 LocationReference найден по тегу глобально: {locationReference.name}");
+            Logger.Log(LogModule.Navigation, $"LocationReference найден по тегу глобально: {locationReference.name}");
             return;
         }
 
-        // Поиск по имени глобально (если дочерний)
         GameObject foundByName = GameObject.Find("LocationReference");
         if (foundByName != null && foundByName.transform.IsChildOf(transform))
         {
             locationReference = foundByName;
-            Debug.Log($"📍 LocationReference найден по имени глобально: {locationReference.name}");
+            Logger.Log(LogModule.Navigation, $"LocationReference найден по имени глобально: {locationReference.name}");
             return;
         }
 
-        Debug.LogWarning($"⚠️ LocationReference не найден для {gameObject.name}");
+        Logger.LogWarning(LogModule.Navigation, $"LocationReference не найден для {gameObject.name}");
     }
 
     private void FindNeighbors()
@@ -147,16 +145,15 @@ public class LocationNeighbors : MonoBehaviour
         upNeighbor = candidates["up"];
         downNeighbor = candidates["down"];
 
-        Debug.Log($"📍 {gameObject.name}: Left={leftNeighbor?.name ?? "None"}, Right={rightNeighbor?.name ?? "None"}, Up={upNeighbor?.name ?? "None"}, Down={downNeighbor?.name ?? "None"}");
+        Logger.Log(LogModule.Navigation, $"Соседи для {gameObject.name}: Left={leftNeighbor?.name ?? "None"}, Right={rightNeighbor?.name ?? "None"}, Up={upNeighbor?.name ?? "None"}, Down={downNeighbor?.name ?? "None"}");
 
-        // ✅ Проверка на null перед использованием
         if (locationReference != null)
         {
-            Debug.Log($"📍 {gameObject.name}: LocationReference={locationReference.name}");
+            Logger.Log(LogModule.Navigation, $"LocationReference для {gameObject.name}: {locationReference.name}");
         }
         else
         {
-            Debug.Log($"📍 {gameObject.name}: LocationReference=None");
+            Logger.Log(LogModule.Navigation, $"LocationReference для {gameObject.name}: None");
         }
     }
 
