@@ -33,6 +33,7 @@ public class MenuUIManager : MonoBehaviour
     private void Awake()
     {
         config = Resources.Load<MenuUIConfig>("Configs/MenuUIConfig") ?? ScriptableObject.CreateInstance<MenuUIConfig>();
+        Logger.Log(LogModule.Menu, "MenuUIManager: конфиг загружен");
     }
 
     private void Start()
@@ -46,6 +47,8 @@ public class MenuUIManager : MonoBehaviour
         CreateCanvas();
         InitializeManagers();
         BuildMenu();
+
+        Logger.Log(LogModule.Menu, "MenuUIManager инициализирован");
     }
 
     private void OnDestroy()
@@ -54,6 +57,7 @@ public class MenuUIManager : MonoBehaviour
         backgroundManager?.Cleanup();
         panelManager?.Cleanup();
         tabManager?.Cleanup();
+        Logger.Log(LogModule.Menu, "MenuUIManager уничтожен");
     }
 
     private void InitializeManagers()
@@ -70,6 +74,8 @@ public class MenuUIManager : MonoBehaviour
 
         tabManager = gameObject.AddComponent<TabManager>();
         tabManager.Initialize(config, uiBuilder, isFullscreen, OnFullscreenToggle, OnResetProgress);
+
+        Logger.Log(LogModule.Menu, "Менеджеры инициализированы");
     }
 
     private void EnsureEventSystem()
@@ -80,6 +86,8 @@ public class MenuUIManager : MonoBehaviour
         es.AddComponent<EventSystem>();
         es.AddComponent<StandaloneInputModule>();
         es.transform.SetParent(GetUIRoot().transform);
+
+        Logger.Log(LogModule.Menu, "EventSystem создан");
     }
 
     private GameObject GetUIRoot()
@@ -110,6 +118,8 @@ public class MenuUIManager : MonoBehaviour
         sliderContainerPrefab = Resources.Load<GameObject>(config.sliderContainerPrefabPath);
         togglePrefab = Resources.Load<GameObject>(config.togglePrefabPath);
         tabPrefab = Resources.Load<GameObject>(config.tabPrefabPath);
+
+        Logger.Log(LogModule.Menu, "Префабы загружены");
     }
 
     private void CreateCanvas()
@@ -126,6 +136,8 @@ public class MenuUIManager : MonoBehaviour
 
         if (menuCanvas.GetComponent<GraphicRaycaster>() == null)
             menuCanvas.AddComponent<GraphicRaycaster>();
+
+        Logger.Log(LogModule.Menu, "Canvas создан");
     }
 
     private void BuildMenu()
@@ -143,6 +155,8 @@ public class MenuUIManager : MonoBehaviour
         backgroundManager.ShowBackground(backgroundManager.GetMainBackground());
 
         CreateExitUI();
+
+        Logger.Log(LogModule.Menu, "Меню построено");
     }
 
     private void SetupPanelsContent()
@@ -155,6 +169,8 @@ public class MenuUIManager : MonoBehaviour
         panelManager.SetupMemoriesContent(
             setupBackButton: (parent) => uiBuilder.CreateBackButton(parent, ReturnToMainMenu)
         );
+
+        Logger.Log(LogModule.Menu, "Содержимое панелей настроено");
     }
 
     #region Exit UI
@@ -289,6 +305,8 @@ public class MenuUIManager : MonoBehaviour
                 exitRt.sizeDelta = config.exitButtonSize;
             }
         }
+
+        Logger.Log(LogModule.Menu, "UI выхода создан");
     }
 
     private void OpenExitPanel()
@@ -306,12 +324,14 @@ public class MenuUIManager : MonoBehaviour
         exitQuitButton.SetActive(true);
 
         StartCoroutine(AnimateExitPanel(true));
+        Logger.Log(LogModule.Menu, "Панель выхода открыта");
     }
 
     private void CloseExitPanel()
     {
         if (isTransitioning) return;
         StartCoroutine(AnimateExitPanel(false));
+        Logger.Log(LogModule.Menu, "Панель выхода закрыта");
     }
 
     private IEnumerator AnimateExitPanel(bool isOpening)
@@ -449,7 +469,7 @@ public class MenuUIManager : MonoBehaviour
 
         if (anim != null)
         {
-            Debug.Log($"Completing animation on {currentBg.name}");
+            Logger.Log(LogModule.Menu, $"Завершение анимации на {currentBg.name}");
             anim.CompleteAnimationImmediate();
         }
         else
@@ -474,7 +494,7 @@ public class MenuUIManager : MonoBehaviour
                 FindingOneselfAnimation anim = bg.GetComponentInChildren<FindingOneselfAnimation>();
                 if (anim != null)
                 {
-                    Debug.Log($"Completing animation on active background: {bg.name}");
+                    Logger.Log(LogModule.Menu, $"Завершение анимации на активном фоне: {bg.name}");
                     anim.CompleteAnimationImmediate();
                     break;
                 }
@@ -488,7 +508,11 @@ public class MenuUIManager : MonoBehaviour
 
     private void CreateButtons()
     {
-        if (panelManager.MainPanel == null) return;
+        if (panelManager.MainPanel == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "MainPanel отсутствует, кнопки не созданы");
+            return;
+        }
 
         string[] buttonNames = new string[]
         {
@@ -523,6 +547,8 @@ public class MenuUIManager : MonoBehaviour
 
             GameObject btn = uiBuilder.CreateButton(panelManager.MainPanel.transform, name, onClick);
         }
+
+        Logger.Log(LogModule.Menu, $"Создано {buttonNames.Length} кнопок");
     }
 
     #endregion
@@ -592,6 +618,8 @@ public class MenuUIManager : MonoBehaviour
         {
             OnContinue();
         }
+
+        Logger.Log(LogModule.Menu, $"Запуск игры: {(isNewGame ? "Новая игра" : "Продолжить")}");
     }
 
     #endregion
@@ -610,6 +638,8 @@ public class MenuUIManager : MonoBehaviour
             backgroundManager.GetSettingsBackground(),
             new Vector2(-config.backgroundOffset, 0)
         ));
+
+        Logger.Log(LogModule.Menu, "Открытие панели настроек");
     }
 
     private void OpenMemoriesPanel()
@@ -624,6 +654,8 @@ public class MenuUIManager : MonoBehaviour
             backgroundManager.GetMemoriesBackground(),
             new Vector2(config.backgroundOffset, 0)
         ));
+
+        Logger.Log(LogModule.Menu, "Открытие панели воспоминаний");
     }
 
     #endregion
@@ -700,6 +732,7 @@ public class MenuUIManager : MonoBehaviour
         }
 
         isTransitioning = false;
+        Logger.Log(LogModule.Menu, $"Переключение панели завершено");
     }
 
     #endregion
@@ -718,6 +751,8 @@ public class MenuUIManager : MonoBehaviour
             backgroundManager.GetMainBackground(),
             new Vector2(-config.backgroundOffset, 0)
         ));
+
+        Logger.Log(LogModule.Menu, "Возврат в главное меню");
     }
 
     #endregion
@@ -730,6 +765,7 @@ public class MenuUIManager : MonoBehaviour
         ApplyFullscreen();
         PlayerPrefs.SetInt("Fullscreen", value ? 1 : 0);
         PlayerPrefs.Save();
+        Logger.Log(LogModule.Menu, $"Полноэкранный режим: {(value ? "включён" : "выключен")}");
     }
 
     private void ApplyFullscreen() => Screen.fullScreen = isFullscreen;
@@ -737,7 +773,7 @@ public class MenuUIManager : MonoBehaviour
     private void OnResetProgress()
     {
         PlayerPrefs.DeleteAll();
-        Debug.Log("Прогресс сброшен!");
+        Logger.Log(LogModule.Menu, "Прогресс сброшен");
         StartCoroutine(ShowResetNotification());
     }
 
@@ -768,19 +804,19 @@ public class MenuUIManager : MonoBehaviour
 
     private void OnNewGame()
     {
-        Debug.Log("Новая игра");
+        Logger.Log(LogModule.Menu, "Новая игра");
         GlobalControl.Instance?.StartNewGame();
     }
 
     private void OnContinue()
     {
-        Debug.Log("Продолжить");
+        Logger.Log(LogModule.Menu, "Продолжить");
         GlobalControl.Instance?.ContinueGame();
     }
 
     private void OnQuit()
     {
-        Debug.Log("Выход из игры");
+        Logger.Log(LogModule.Menu, "Выход из игры");
         GlobalControl.Instance?.QuitGame();
     }
 
