@@ -10,55 +10,61 @@ public class NavigationArrow : MonoBehaviour
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            Logger.Log(LogModule.Navigation, "NavigationArrow инициализирован");
+        }
         else
+        {
+            Logger.Log(LogModule.Navigation, "Уничтожение дублирующего NavigationArrow");
             Destroy(gameObject);
+        }
     }
 
     private void Update()
     {
         if (!enableKeyboardArrows) return;
 
-        // ⬅️➡️⬆️⬇️ Стрелки на клавиатуре
         if (Input.GetKeyDown(KeyCode.RightArrow))
         {
+            Logger.Log(LogModule.Navigation, "Нажата стрелка вправо");
             TryNavigate(Vector2.right);
         }
         else if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
+            Logger.Log(LogModule.Navigation, "Нажата стрелка влево");
             TryNavigate(Vector2.left);
         }
         else if (Input.GetKeyDown(KeyCode.UpArrow))
         {
+            Logger.Log(LogModule.Navigation, "Нажата стрелка вверх");
             TryNavigate(Vector2.up);
         }
         else if (Input.GetKeyDown(KeyCode.DownArrow))
         {
+            Logger.Log(LogModule.Navigation, "Нажата стрелка вниз");
             TryNavigate(Vector2.down);
         }
     }
 
     public void TryNavigate(Vector2 direction)
     {
-        // Находим текущую активную локацию
         GameObject currentLocation = FindCurrentLocation();
 
         if (currentLocation == null)
         {
-            Debug.LogWarning("No active location found!");
+            Logger.LogWarning(LogModule.Navigation, "Активная локация не найдена");
             return;
         }
 
-        // Получаем соседей
         LocationNeighbors neighbors = currentLocation.GetComponent<LocationNeighbors>();
 
         if (neighbors == null)
         {
-            Debug.LogWarning($"No LocationNeighbors found on {currentLocation.name}");
+            Logger.LogWarning(LogModule.Navigation, $"LocationNeighbors не найден на {currentLocation.name}");
             return;
         }
 
-        // Определяем целевую локацию
         GameObject targetLocation = null;
 
         if (direction == Vector2.right)
@@ -72,12 +78,12 @@ public class NavigationArrow : MonoBehaviour
 
         if (targetLocation != null)
         {
-            // ✅ Передаём направление в переход
+            Logger.Log(LogModule.Navigation, $"Переход из {currentLocation.name} в {targetLocation.name} по направлению {direction}");
             SceneSlideTransition.Instance?.SwitchToScene(targetLocation.name, direction);
         }
         else
         {
-            Debug.Log("No location in this direction!");
+            Logger.Log(LogModule.Navigation, $"Нет локации в направлении {direction} из {currentLocation.name}");
         }
     }
 
@@ -87,8 +93,12 @@ public class NavigationArrow : MonoBehaviour
         foreach (GameObject loc in locations)
         {
             if (loc.activeSelf)
+            {
+                Logger.Log(LogModule.Navigation, $"Найдена активная локация: {loc.name}");
                 return loc;
+            }
         }
+        Logger.LogWarning(LogModule.Navigation, "Активная локация не найдена");
         return null;
     }
 }
