@@ -20,8 +20,16 @@ public class SceneSlideTransition : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance == null)
+        {
+            Instance = this;
+            Logger.Log(LogModule.Navigation, "SceneSlideTransition инициализирован");
+        }
+        else
+        {
+            Logger.Log(LogModule.Navigation, "Уничтожение дублирующего SceneSlideTransition");
+            Destroy(gameObject);
+        }
     }
 
     private void Start()
@@ -31,6 +39,8 @@ public class SceneSlideTransition : MonoBehaviour
         FindCurrentScene();
         InitializeNeighbors();
         FindTextBeginner();
+
+        Logger.Log(LogModule.Navigation, $"Найдено {scenes.Count} сцен");
     }
 
     private void FindTextBeginner()
@@ -38,6 +48,10 @@ public class SceneSlideTransition : MonoBehaviour
         if (textBeginner == null)
         {
             textBeginner = FindFirstObjectByType<TextBeginner>();
+            if (textBeginner != null)
+            {
+                Logger.Log(LogModule.Navigation, "TextBeginner найден автоматически");
+            }
         }
     }
 
@@ -45,13 +59,19 @@ public class SceneSlideTransition : MonoBehaviour
     {
         GameObject[] foundScenes = GameObject.FindGameObjectsWithTag("Location");
         scenes = foundScenes.ToList();
+        Logger.Log(LogModule.Navigation, $"Найдено {scenes.Count} локаций");
     }
 
     private void InitializeScenes()
     {
         foreach (GameObject scene in scenes)
         {
-            scene.SetActive(scene.transform.position == Vector3.zero);
+            bool isActive = scene.transform.position == Vector3.zero;
+            scene.SetActive(isActive);
+            if (isActive)
+            {
+                Logger.Log(LogModule.Navigation, $"Сцена {scene.name} активна при инициализации");
+            }
         }
     }
 
@@ -62,6 +82,11 @@ public class SceneSlideTransition : MonoBehaviour
         {
             currentScene = scenes[0];
             currentScene.SetActive(true);
+            Logger.Log(LogModule.Navigation, $"Установлена первая сцена как текущая: {currentScene.name}");
+        }
+        else if (currentScene != null)
+        {
+            Logger.Log(LogModule.Navigation, $"Текущая сцена: {currentScene.name}");
         }
     }
 
@@ -70,26 +95,64 @@ public class SceneSlideTransition : MonoBehaviour
         foreach (GameObject scene in scenes)
         {
             LocationNeighbors neighbors = scene.GetComponent<LocationNeighbors>();
-            if (neighbors != null && !neighbors.enabled) neighbors.enabled = true;
+            if (neighbors != null && !neighbors.enabled)
+            {
+                neighbors.enabled = true;
+                Logger.Log(LogModule.Navigation, $"Активирован LocationNeighbors для {scene.name}");
+            }
         }
     }
 
     public void SwitchToScene(string sceneName, Vector2 slideDirection)
     {
-        if (isTransitioning) return;
+        if (isTransitioning)
+        {
+            Logger.Log(LogModule.Navigation, "Переход уже выполняется, пропуск");
+            return;
+        }
+
         GameObject scene = scenes.Find(s => s.name == sceneName);
-        if (scene == null || scene == currentScene) return;
+        if (scene == null)
+        {
+            Logger.LogWarning(LogModule.Navigation, $"Сцена {sceneName} не найдена");
+            return;
+        }
+
+        if (scene == currentScene)
+        {
+            Logger.Log(LogModule.Navigation, $"Уже находимся на сцене {sceneName}");
+            return;
+        }
+
         targetScene = scene;
+        Logger.Log(LogModule.Navigation, $"Начало перехода на сцену {sceneName} по направлению {slideDirection}");
         StartCoroutine(SlideTransition(slideDirection));
     }
 
     public void SwitchToScene(string sceneName)
     {
-        if (isTransitioning) return;
+        if (isTransitioning)
+        {
+            Logger.Log(LogModule.Navigation, "Переход уже выполняется, пропуск");
+            return;
+        }
+
         GameObject scene = scenes.Find(s => s.name == sceneName);
-        if (scene == null || scene == currentScene) return;
+        if (scene == null)
+        {
+            Logger.LogWarning(LogModule.Navigation, $"Сцена {sceneName} не найдена");
+            return;
+        }
+
+        if (scene == currentScene)
+        {
+            Logger.Log(LogModule.Navigation, $"Уже находимся на сцене {sceneName}");
+            return;
+        }
+
         targetScene = scene;
         Vector2 direction = GetDirection(currentScene, targetScene);
+        Logger.Log(LogModule.Navigation, $"Начало перехода на сцену {sceneName} с автоматическим направлением {direction}");
         StartCoroutine(SlideTransition(direction));
     }
 
@@ -107,6 +170,8 @@ public class SceneSlideTransition : MonoBehaviour
 
         float elapsed = 0f;
         bool switched = false;
+
+        Logger.Log(LogModule.Navigation, $"Анимация перехода из {currentScene.name} в {targetScene.name}");
 
         while (elapsed < slideDuration)
         {
@@ -136,30 +201,32 @@ public class SceneSlideTransition : MonoBehaviour
         targetScene = null;
         isTransitioning = false;
 
+        Logger.Log(LogModule.Navigation, $"Переход завершён, текущая сцена: {currentScene.name}");
+
         yield return null;
 
-        // ✅ Перемещаем персонажа на новую сцену
         if (textBeginner != null)
         {
             textBeginner.MoveCharacterToCurrentScene();
             textBeginner.MoveCharacterToActiveLocationReference();
-            Debug.Log("Character moved to new location!");
+            Logger.Log(LogModule.Navigation, "Персонаж перемещён на новую локацию");
 
-            // Обновляем локацию в TextBeginner
             textBeginner.UpdateCurrentLocation();
-            Debug.Log($"📍 Локация обновлена в TextBeginner: {currentScene.name}");
+            Logger.Log(LogModule.Navigation, $"Локация обновлена в TextBeginner: {currentScene.name}");
 
-            // Вызываем событие входа в локацию через EventManager
             EventManager.Instance?.TriggerEvent(EventTriggerType.EnterLocation,
                 new EventContext().WithLocation(currentScene.name));
-            Debug.Log($"📍 Событие входа в локацию: {currentScene.name}");
+            Logger.Log(LogModule.Navigation, $"Событие входа в локацию: {currentScene.name}");
 
-            // 🔥 ПРЯМОЙ ВЫЗОВ КВЕСТОВ (гарантированно работает)
             if (QuestManager.Instance != null)
             {
-                Debug.Log($"✅ Прямое обновление квеста по локации: {currentScene.name}");
+                Logger.Log(LogModule.Navigation, $"Прямое обновление квеста по локации: {currentScene.name}");
                 QuestManager.Instance.UpdateQuestByLocation(currentScene.name);
             }
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Navigation, "TextBeginner отсутствует, перемещение персонажа пропущено");
         }
     }
 
@@ -180,9 +247,12 @@ public class SceneSlideTransition : MonoBehaviour
     private Vector2 GetDirection(GameObject from, GameObject to)
     {
         Vector3 diff = to.transform.position - from.transform.position;
-        return Mathf.Abs(diff.x) > Mathf.Abs(diff.y)
+        Vector2 result = Mathf.Abs(diff.x) > Mathf.Abs(diff.y)
             ? new Vector2(Mathf.Sign(diff.x), 0)
             : new Vector2(0, Mathf.Sign(diff.y));
+
+        Logger.Log(LogModule.Navigation, $"Определено направление: {result} из {from.name} в {to.name}");
+        return result;
     }
 
     private float GetWorldWidth()
@@ -197,6 +267,14 @@ public class SceneSlideTransition : MonoBehaviour
         return Mathf.Abs(worldOffset.y);
     }
 
-    public GameObject GetCurrentScene() => currentScene;
-    public List<GameObject> GetAllScenes() => scenes;
+    public GameObject GetCurrentScene()
+    {
+        Logger.Log(LogModule.Navigation, $"Запрос текущей сцены: {currentScene?.name ?? "None"}");
+        return currentScene;
+    }
+
+    public List<GameObject> GetAllScenes()
+    {
+        return scenes;
+    }
 }
