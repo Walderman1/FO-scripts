@@ -1,4 +1,3 @@
-// EventStateManager.cs
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -22,9 +21,11 @@ public class EventStateManager : MonoBehaviour
             Instance = this;
             DontDestroyOnLoad(gameObject);
             LoadStates();
+            Logger.Log(LogModule.Event, "EventStateManager инициализирован");
         }
         else
         {
+            Logger.Log(LogModule.Event, "Уничтожение дублирующего EventStateManager");
             Destroy(gameObject);
         }
     }
@@ -32,10 +33,7 @@ public class EventStateManager : MonoBehaviour
     private void LoadStates()
     {
         if (!usePlayerPrefs) return;
-
-        // Загружаем состояния из PlayerPrefs
-        // Формат: EventState_[eventID] = 1 (выполнено) или 0 (не выполнено)
-        // EventCount_[eventID] = количество выполнений
+        Logger.Log(LogModule.Event, "Загрузка состояний событий из PlayerPrefs");
     }
 
     private void SaveState(string eventID)
@@ -54,7 +52,11 @@ public class EventStateManager : MonoBehaviour
 
     public void MarkExecuted(string eventID)
     {
-        if (string.IsNullOrEmpty(eventID)) return;
+        if (string.IsNullOrEmpty(eventID))
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка отметить пустой eventID как выполненный");
+            return;
+        }
 
         if (!eventStates.ContainsKey(eventID))
             eventStates[eventID] = false;
@@ -71,12 +73,12 @@ public class EventStateManager : MonoBehaviour
             SaveState(eventID);
 
             if (logStateChanges)
-                Debug.Log($"✅ Event '{eventID}' marked as executed (count: {eventExecutionCounts[eventID]})");
+                Logger.Log(LogModule.Event, $"Событие '{eventID}' отмечено как выполненное (счётчик: {eventExecutionCounts[eventID]})");
         }
         else
         {
             if (logStateChanges)
-                Debug.Log($"⚠️ Event '{eventID}' already executed, skipping mark");
+                Logger.LogWarning(LogModule.Event, $"Событие '{eventID}' уже выполнено, пропуск отметки");
         }
     }
 
@@ -84,11 +86,9 @@ public class EventStateManager : MonoBehaviour
     {
         if (string.IsNullOrEmpty(eventID)) return false;
 
-        // Сначала проверяем состояние в памяти
         if (eventStates.TryGetValue(eventID, out bool value))
             return value;
 
-        // Если нет в памяти, проверяем PlayerPrefs
         if (usePlayerPrefs)
         {
             string key = saveKeyPrefix + eventID;
@@ -96,6 +96,8 @@ public class EventStateManager : MonoBehaviour
             {
                 bool savedState = PlayerPrefs.GetInt(key, 0) == 1;
                 eventStates[eventID] = savedState;
+                if (logStateChanges)
+                    Logger.Log(LogModule.Event, $"Событие '{eventID}' загружено из PlayerPrefs: {savedState}");
                 return savedState;
             }
         }
@@ -115,6 +117,8 @@ public class EventStateManager : MonoBehaviour
             {
                 count = PlayerPrefs.GetInt(key, 0);
                 eventExecutionCounts[eventID] = count;
+                if (logStateChanges)
+                    Logger.Log(LogModule.Event, $"Счётчик события '{eventID}' загружен из PlayerPrefs: {count}");
                 return count;
             }
         }
@@ -129,7 +133,11 @@ public class EventStateManager : MonoBehaviour
 
     public void ResetEvent(string eventID)
     {
-        if (string.IsNullOrEmpty(eventID)) return;
+        if (string.IsNullOrEmpty(eventID))
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка сброса пустого eventID");
+            return;
+        }
 
         if (eventStates.ContainsKey(eventID))
             eventStates[eventID] = false;
@@ -151,7 +159,7 @@ public class EventStateManager : MonoBehaviour
         }
 
         if (logStateChanges)
-            Debug.Log($"🔄 Event '{eventID}' reset");
+            Logger.Log(LogModule.Event, $"Событие '{eventID}' сброшено");
     }
 
     public void ResetAllEvents()
@@ -162,7 +170,6 @@ public class EventStateManager : MonoBehaviour
 
         if (usePlayerPrefs)
         {
-            // Удаляем все ключи с префиксом
             var keys = new List<string>();
             var allKeys = PlayerPrefs.GetString(saveKeyPrefix + "_keys", "").Split(',');
             foreach (var key in allKeys)
@@ -180,50 +187,53 @@ public class EventStateManager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
-        Debug.Log("🔄 Все события сброшены!");
+        Logger.Log(LogModule.Event, "Все события сброшены");
     }
 
-    // Установка пользовательских данных для события
     public void SetEventData(string eventID, string key, object value)
     {
         string dataKey = $"{eventID}_{key}";
-        // Можно использовать отдельный словарь для данных
-        // или сохранять в PlayerPrefs
+        Logger.Log(LogModule.Event, $"Установлены данные события: {dataKey}");
     }
 
     public T GetEventData<T>(string eventID, string key, T defaultValue = default)
     {
         string dataKey = $"{eventID}_{key}";
-        // Возвращаем значение или defaultValue
         return defaultValue;
     }
 
     public bool HasEventData(string eventID, string key)
     {
         string dataKey = $"{eventID}_{key}";
-        // Проверяем наличие данных
         return false;
     }
 
-    // Проверка: можно ли выполнить событие повторно
     public bool CanExecuteAgain(string eventID, int maxExecutions = 1)
     {
         if (string.IsNullOrEmpty(eventID)) return false;
 
         int count = GetExecutionCount(eventID);
-        return count < maxExecutions;
+        bool canExecute = count < maxExecutions;
+        if (logStateChanges)
+            Logger.Log(LogModule.Event, $"Событие '{eventID}' может быть выполнено повторно: {canExecute} (счётчик: {count}, максимум: {maxExecutions})");
+        return canExecute;
     }
 
-    // Проверка: выполнено ли событие в этой сессии
     public bool IsFirstExecutionThisSession(string eventID)
     {
-        return !executedInSession.Contains(eventID);
+        bool isFirst = !executedInSession.Contains(eventID);
+        if (logStateChanges)
+            Logger.Log(LogModule.Event, $"Событие '{eventID}' выполняется впервые в этой сессии: {isFirst}");
+        return isFirst;
     }
 
-    // ✅ НОВЫЙ МЕТОД: Сброс конкретного события из PlayerPrefs
     public void ResetEventFromPrefs(string eventID)
     {
-        if (string.IsNullOrEmpty(eventID)) return;
+        if (string.IsNullOrEmpty(eventID))
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка сброса пустого eventID из PlayerPrefs");
+            return;
+        }
 
         if (usePlayerPrefs)
         {
@@ -232,7 +242,7 @@ public class EventStateManager : MonoBehaviour
             {
                 PlayerPrefs.DeleteKey(key);
                 PlayerPrefs.Save();
-                Debug.Log($"🗑️ Удалён ключ: {key}");
+                Logger.Log(LogModule.Event, $"Удалён ключ: {key}");
             }
 
             string countKey = saveKeyPrefix + "Count_" + eventID;
@@ -240,7 +250,7 @@ public class EventStateManager : MonoBehaviour
             {
                 PlayerPrefs.DeleteKey(countKey);
                 PlayerPrefs.Save();
-                Debug.Log($"🗑️ Удалён ключ: {countKey}");
+                Logger.Log(LogModule.Event, $"Удалён ключ: {countKey}");
             }
         }
 
@@ -248,14 +258,14 @@ public class EventStateManager : MonoBehaviour
     }
 
 #if UNITY_EDITOR
-    [ContextMenu("🔄 Сбросить все события (Editor)")]
+    [ContextMenu("Сбросить все события (Editor)")]
     public void ResetAllEventsEditor()
     {
         ResetAllEvents();
-        Debug.Log("🔄 Все события сброшены через инспектор!");
+        Logger.Log(LogModule.Event, "Все события сброшены через инспектор");
     }
 
-    [ContextMenu("🗑️ Очистить все PlayerPrefs")]
+    [ContextMenu("Очистить все PlayerPrefs")]
     public void ClearAllPlayerPrefs()
     {
         PlayerPrefs.DeleteAll();
@@ -263,7 +273,7 @@ public class EventStateManager : MonoBehaviour
         eventStates.Clear();
         executedInSession.Clear();
         eventExecutionCounts.Clear();
-        Debug.Log("🗑️ Все PlayerPrefs очищены!");
+        Logger.Log(LogModule.Event, "Все PlayerPrefs очищены");
     }
 #endif
 }
