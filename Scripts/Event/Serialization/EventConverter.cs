@@ -1,14 +1,16 @@
-// EventConverter.cs - ИСПРАВЛЕННАЯ ВЕРСИЯ (удален TriggerConditionGlobalFlag)
 using UnityEngine;
 using System.Collections.Generic;
 using System;
 
 public static class EventConverter
 {
-    // ============ КОНВЕРТАЦИЯ GameEvent → EventData ============
     public static EventData ToEventData(GameEvent gameEvent)
     {
-        if (gameEvent == null) return null;
+        if (gameEvent == null)
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка конвертации null GameEvent");
+            return null;
+        }
 
         EventData data = new EventData
         {
@@ -47,28 +49,45 @@ public static class EventConverter
             }
         }
 
+        Logger.Log(LogModule.Event, $"Конвертация GameEvent в EventData: {gameEvent.eventID}");
         return data;
     }
 
-    // ============ КОНВЕРТАЦИЯ EventData → GameEvent ============
     public static GameEvent ToGameEvent(EventData data)
     {
-        if (data == null) return null;
+        if (data == null)
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка конвертации null EventData");
+            return null;
+        }
 
         GameEvent gameEvent = ScriptableObject.CreateInstance<GameEvent>();
         RestoreGameEvent(gameEvent, data);
+        Logger.Log(LogModule.Event, $"Конвертация EventData в GameEvent: {data.eventID}");
         return gameEvent;
     }
 
     public static void RestoreToExistingGameEvent(GameEvent gameEvent, EventData data)
     {
-        if (gameEvent == null || data == null) return;
+        if (gameEvent == null)
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка восстановления в null GameEvent");
+            return;
+        }
+
+        if (data == null)
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка восстановления из null EventData");
+            return;
+        }
 
         RestoreGameEvent(gameEvent, data);
 
 #if UNITY_EDITOR
         UnityEditor.EditorUtility.SetDirty(gameEvent);
 #endif
+
+        Logger.Log(LogModule.Event, $"Восстановление GameEvent: {data.eventID} -> {gameEvent.eventID}");
     }
 
     private static void RestoreGameEvent(GameEvent gameEvent, EventData data)
@@ -116,7 +135,6 @@ public static class EventConverter
         }
     }
 
-    // ============ КОНВЕРТАЦИЯ TRIGGER CONDITION ============
     public static TriggerConditionData ConvertTriggerCondition(TriggerCondition condition)
     {
         TriggerConditionData data = new TriggerConditionData();
@@ -139,19 +157,23 @@ public static class EventConverter
             data.flagName = flagCond.flagName;
             data.flagValue = flagCond.flagValue;
         }
-        // ❌ УДАЛЯЕМ TriggerConditionGlobalFlag
         else if (condition is TriggerConditionCustom customCond)
         {
             data.type = "Custom";
             data.customMethodName = customCond.customMethodName;
         }
 
+        Logger.Log(LogModule.Event, $"Конвертация TriggerCondition: {data.type}");
         return data;
     }
 
     public static TriggerCondition RestoreTriggerCondition(TriggerConditionData data)
     {
-        if (data == null) return null;
+        if (data == null)
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка восстановления null TriggerConditionData");
+            return null;
+        }
 
         switch (data.type)
         {
@@ -160,33 +182,35 @@ public static class EventConverter
                 if (Enum.TryParse<ItemType>(data.targetItem, out var itemType))
                     item.targetItem = itemType;
                 item.requireNotEquipped = data.requireNotEquipped;
+                Logger.Log(LogModule.Event, $"Восстановление TriggerCondition: Item");
                 return item;
 
             case "Location":
                 var loc = new TriggerConditionLocation();
                 loc.locationName = data.locationName;
                 loc.exactMatch = data.exactMatch;
+                Logger.Log(LogModule.Event, $"Восстановление TriggerCondition: Location");
                 return loc;
 
             case "Flag":
                 var flag = new TriggerConditionFlag();
                 flag.flagName = data.flagName;
                 flag.flagValue = data.flagValue;
+                Logger.Log(LogModule.Event, $"Восстановление TriggerCondition: Flag");
                 return flag;
-
-            // ❌ УДАЛЯЕМ TriggerConditionGlobalFlag
 
             case "Custom":
                 var custom = new TriggerConditionCustom();
                 custom.customMethodName = data.customMethodName;
+                Logger.Log(LogModule.Event, $"Восстановление TriggerCondition: Custom");
                 return custom;
 
             default:
+                Logger.LogWarning(LogModule.Event, $"Неизвестный тип TriggerCondition: {data.type}");
                 return null;
         }
     }
 
-    // ============ КОНВЕРТАЦИЯ ACTION ============
     public static EventActionData ConvertAction(EventAction action)
     {
         EventActionData data = new EventActionData();
@@ -299,16 +323,22 @@ public static class EventConverter
             data.value = save.value;
         }
 
+        Logger.Log(LogModule.Event, $"Конвертация Action: {data.type}");
         return data;
     }
 
     public static EventAction RestoreAction(EventActionData data)
     {
-        if (data == null) return null;
+        if (data == null)
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка восстановления null EventActionData");
+            return null;
+        }
 
         switch (data.type)
         {
             case "StartDialogue":
+                Logger.Log(LogModule.Event, $"Восстановление Action: StartDialogue");
                 return new EventActionStartDialogue
                 {
                     actionName = data.actionName,
@@ -324,6 +354,7 @@ public static class EventConverter
                 add.amount = data.amount;
                 add.actionName = data.actionName;
                 add.delay = data.delay;
+                Logger.Log(LogModule.Event, $"Восстановление Action: AddItem");
                 return add;
 
             case "RemoveItem":
@@ -333,9 +364,11 @@ public static class EventConverter
                 remove.amount = data.amount;
                 remove.actionName = data.actionName;
                 remove.delay = data.delay;
+                Logger.Log(LogModule.Event, $"Восстановление Action: RemoveItem");
                 return remove;
 
             case "SetFlag":
+                Logger.Log(LogModule.Event, $"Восстановление Action: SetFlag");
                 return new EventActionSetFlag
                 {
                     actionName = data.actionName,
@@ -345,6 +378,7 @@ public static class EventConverter
                 };
 
             case "Teleport":
+                Logger.Log(LogModule.Event, $"Восстановление Action: Teleport");
                 return new EventActionTeleport
                 {
                     actionName = data.actionName,
@@ -364,9 +398,11 @@ public static class EventConverter
                     if (restored != null)
                         multiple.subActions.Add(restored);
                 }
+                Logger.Log(LogModule.Event, $"Восстановление Action: Multiple с {multiple.subActions.Count} поддействиями");
                 return multiple;
 
             case "PlaySound":
+                Logger.Log(LogModule.Event, $"Восстановление Action: PlaySound");
                 return new EventActionPlaySound
                 {
                     actionName = data.actionName,
@@ -375,6 +411,7 @@ public static class EventConverter
                 };
 
             case "SpawnObject":
+                Logger.Log(LogModule.Event, $"Восстановление Action: SpawnObject");
                 return new EventActionSpawnObject
                 {
                     actionName = data.actionName,
@@ -383,6 +420,7 @@ public static class EventConverter
                 };
 
             case "DestroyObject":
+                Logger.Log(LogModule.Event, $"Восстановление Action: DestroyObject");
                 return new EventActionDestroyObject
                 {
                     actionName = data.actionName,
@@ -391,6 +429,7 @@ public static class EventConverter
                 };
 
             case "EnableObject":
+                Logger.Log(LogModule.Event, $"Восстановление Action: EnableObject");
                 return new EventActionEnableObject
                 {
                     actionName = data.actionName,
@@ -399,6 +438,7 @@ public static class EventConverter
                 };
 
             case "DisableObject":
+                Logger.Log(LogModule.Event, $"Восстановление Action: DisableObject");
                 return new EventActionDisableObject
                 {
                     actionName = data.actionName,
@@ -406,6 +446,7 @@ public static class EventConverter
                 };
 
             case "EnableEvent":
+                Logger.Log(LogModule.Event, $"Восстановление Action: EnableEvent");
                 return new EventActionEnableEvent
                 {
                     actionName = data.actionName,
@@ -415,6 +456,7 @@ public static class EventConverter
                 };
 
             case "DisableEvent":
+                Logger.Log(LogModule.Event, $"Восстановление Action: DisableEvent");
                 return new EventActionDisableEvent
                 {
                     actionName = data.actionName,
@@ -434,9 +476,11 @@ public static class EventConverter
                     checkEvent.actionIfTrue = RestoreAction(data.actionIfTrue);
                 if (data.actionIfFalse != null)
                     checkEvent.actionIfFalse = RestoreAction(data.actionIfFalse);
+                Logger.Log(LogModule.Event, $"Восстановление Action: CheckEvent");
                 return checkEvent;
 
             case "ResetEvent":
+                Logger.Log(LogModule.Event, $"Восстановление Action: ResetEvent");
                 return new EventActionResetEvent
                 {
                     actionName = data.actionName,
@@ -445,6 +489,7 @@ public static class EventConverter
                 };
 
             case "SaveState":
+                Logger.Log(LogModule.Event, $"Восстановление Action: SaveState");
                 return new EventActionSaveState
                 {
                     actionName = data.actionName,
@@ -454,11 +499,11 @@ public static class EventConverter
                 };
 
             default:
+                Logger.LogWarning(LogModule.Event, $"Неизвестный тип Action: {data.type}");
                 return null;
         }
     }
 
-    // ============ КОНВЕРТАЦИЯ REQUIREMENT ============
     public static RequirementData ConvertRequirement(EventRequirement requirement)
     {
         RequirementData data = new RequirementData();
@@ -507,12 +552,17 @@ public static class EventConverter
             data.targetObjectPath = custom.targetObject != null ? custom.targetObject.name : "";
         }
 
+        Logger.Log(LogModule.Event, $"Конвертация Requirement: {data.type}");
         return data;
     }
 
     public static EventRequirement RestoreRequirement(RequirementData data)
     {
-        if (data == null) return null;
+        if (data == null)
+        {
+            Logger.LogWarning(LogModule.Event, "Попытка восстановления null RequirementData");
+            return null;
+        }
 
         switch (data.type)
         {
@@ -521,9 +571,11 @@ public static class EventConverter
                 if (Enum.TryParse<ItemType>(data.itemType, out var itemType))
                     hasItem.itemType = itemType;
                 hasItem.minCount = data.minCount;
+                Logger.Log(LogModule.Event, $"Восстановление Requirement: HasItem");
                 return hasItem;
 
             case "Flag":
+                Logger.Log(LogModule.Event, $"Восстановление Requirement: Flag");
                 return new RequirementFlag
                 {
                     flagName = data.flagName,
@@ -531,12 +583,14 @@ public static class EventConverter
                 };
 
             case "Location":
+                Logger.Log(LogModule.Event, $"Восстановление Requirement: Location");
                 return new RequirementLocation
                 {
                     locationName = data.locationName
                 };
 
             case "EventExecuted":
+                Logger.Log(LogModule.Event, $"Восстановление Requirement: EventExecuted");
                 return new RequirementEventExecuted
                 {
                     eventID = data.eventID,
@@ -544,6 +598,7 @@ public static class EventConverter
                 };
 
             case "EventExecutionCount":
+                Logger.Log(LogModule.Event, $"Восстановление Requirement: EventExecutionCount");
                 return new RequirementEventExecutionCount
                 {
                     eventID = data.eventID,
@@ -552,6 +607,7 @@ public static class EventConverter
                 };
 
             case "RandomChance":
+                Logger.Log(LogModule.Event, $"Восстановление Requirement: RandomChance");
                 return new RequirementRandomChance
                 {
                     chance = data.chance,
@@ -560,12 +616,14 @@ public static class EventConverter
                 };
 
             case "CustomCondition":
+                Logger.Log(LogModule.Event, $"Восстановление Requirement: CustomCondition");
                 return new RequirementCustomCondition
                 {
                     methodName = data.methodName
                 };
 
             default:
+                Logger.LogWarning(LogModule.Event, $"Неизвестный тип Requirement: {data.type}");
                 return null;
         }
     }
