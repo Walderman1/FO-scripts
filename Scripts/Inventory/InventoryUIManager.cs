@@ -25,11 +25,11 @@ public class InventoryUIManager : MonoBehaviour
             if (grid != null)
             {
                 inventoryGrid = grid.gameObject;
-                Debug.Log("InventoryGrid found automatically!");
+                Logger.Log(LogModule.Inventory, "InventoryGrid найден автоматически");
             }
             else
             {
-                Debug.LogError("InventoryGrid not found! Please assign it manually.");
+                Logger.LogError(LogModule.Inventory, "InventoryGrid не найден");
             }
         }
 
@@ -43,12 +43,15 @@ public class InventoryUIManager : MonoBehaviour
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         isInventoryOpen = false;
+
+        Logger.Log(LogModule.Inventory, "InventoryUIManager инициализирован");
     }
 
     private void Start()
     {
         ClearInventory();
         CreateInventorySlots();
+        Logger.Log(LogModule.Inventory, $"Создано {inventorySize} слотов инвентаря");
     }
 
     public void OpenInventory()
@@ -57,6 +60,7 @@ public class InventoryUIManager : MonoBehaviour
         {
             if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
             fadeCoroutine = StartCoroutine(FadeCanvasGroup(1f, fadeDuration));
+            Logger.Log(LogModule.Inventory, "Инвентарь открыт");
         }
     }
 
@@ -67,8 +71,9 @@ public class InventoryUIManager : MonoBehaviour
             if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
             fadeCoroutine = StartCoroutine(FadeCanvasGroup(0f, fadeDuration));
 
-            // ✅ Закрываем меню при закрытии инвентаря
             MenuManager.Instance?.CloseAllMenus();
+
+            Logger.Log(LogModule.Inventory, "Инвентарь закрыт");
         }
     }
 
@@ -123,30 +128,52 @@ public class InventoryUIManager : MonoBehaviour
 
     public void UpdateAllSlots()
     {
-        if (inventoryGrid == null) return;
+        if (inventoryGrid == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "InventoryGrid не найден для обновления слотов");
+            return;
+        }
 
         InventorySlot[] slots = inventoryGrid.GetComponentsInChildren<InventorySlot>();
         foreach (InventorySlot slot in slots)
         {
             InventoryItemMarker marker = slot.GetComponentInChildren<InventoryItemMarker>();
             slot.isOccupied = marker != null;
-            slot.UpdateSlotText(); // ✅ Добавляем обновление текста
+            slot.UpdateSlotText();
         }
+
+        Logger.Log(LogModule.Inventory, $"Обновлено {slots.Length} слотов инвентаря");
     }
 
     private void ClearInventory()
     {
         if (inventoryGrid == null) return;
 
+        int count = inventoryGrid.transform.childCount;
         foreach (Transform child in inventoryGrid.transform)
         {
             Destroy(child.gameObject);
+        }
+
+        if (count > 0)
+        {
+            Logger.Log(LogModule.Inventory, $"Очищено {count} слотов инвентаря");
         }
     }
 
     private void CreateInventorySlots()
     {
-        if (inventoryGrid == null || itemSlotPrefab == null) return;
+        if (inventoryGrid == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "InventoryGrid не найден для создания слотов");
+            return;
+        }
+
+        if (itemSlotPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "itemSlotPrefab не назначен");
+            return;
+        }
 
         for (int i = 0; i < inventorySize; i++)
         {
@@ -165,13 +192,14 @@ public class InventoryUIManager : MonoBehaviour
         ItemData data = ItemDatabase.Instance.GetItemData(itemType);
         if (data == null)
         {
-            Debug.LogError($"No data for item: {itemType}");
+            Logger.LogError(LogModule.Inventory, $"Нет данных для предмета: {itemType}");
             return;
         }
 
         if (!data.canStack)
         {
             AddToEmptySlot(itemType, data);
+            Logger.Log(LogModule.Inventory, $"Добавлен нестекаемый предмет {itemType}");
             return;
         }
 
@@ -186,22 +214,36 @@ public class InventoryUIManager : MonoBehaviour
                     marker.AddCount(1);
                     InventorySlot slot = child.GetComponent<InventorySlot>();
                     if (slot != null) slot.UpdateSlotText();
+                    Logger.Log(LogModule.Inventory, $"Добавлен предмет {itemType} в существующий стек ({marker.count})");
                     return;
                 }
             }
         }
 
         AddToEmptySlot(itemType, data);
+        Logger.Log(LogModule.Inventory, $"Добавлен предмет {itemType} в пустой слот");
     }
 
     private void AddToEmptySlot(ItemType itemType, ItemData data)
     {
+        if (inventoryGrid == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "InventoryGrid не найден для добавления предмета");
+            return;
+        }
+
         foreach (Transform child in inventoryGrid.transform)
         {
             InventoryItemMarker marker = child.GetComponentInChildren<InventoryItemMarker>();
 
             if (marker == null)
             {
+                if (data.uiPrefab == null)
+                {
+                    Logger.LogWarning(LogModule.Inventory, $"uiPrefab для {itemType} не назначен");
+                    return;
+                }
+
                 GameObject newItem = Instantiate(data.uiPrefab, child);
                 newItem.transform.localPosition = Vector3.zero;
                 newItem.transform.localScale = Vector3.one;
@@ -220,6 +262,6 @@ public class InventoryUIManager : MonoBehaviour
             }
         }
 
-        Debug.Log("Inventory is full!");
+        Logger.Log(LogModule.Inventory, "Инвентарь полон");
     }
 }
