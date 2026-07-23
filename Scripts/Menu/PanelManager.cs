@@ -41,13 +41,15 @@ public class PanelManager : MonoBehaviour
         this.defaultFont = defaultFont;
         this.uiBuilder = uiBuilder;
         isInitialized = true;
+
+        Logger.Log(LogModule.Menu, "PanelManager инициализирован");
     }
 
     public void CreateAllPanels()
     {
         if (!isInitialized)
         {
-            Debug.LogError("PanelManager not initialized!");
+            Logger.LogError(LogModule.Menu, "PanelManager не инициализирован");
             return;
         }
 
@@ -56,13 +58,19 @@ public class PanelManager : MonoBehaviour
         CreateMemoriesPanel();
 
         CurrentPanel = MainPanel;
+
+        Logger.Log(LogModule.Menu, "Все панели созданы");
     }
 
     #region Create Panels
 
     private void CreateMainPanel()
     {
-        if (panelPrefab == null) return;
+        if (panelPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "panelPrefab не назначен, главная панель не создана");
+            return;
+        }
 
         MainPanel = Instantiate(panelPrefab, canvasTransform);
         MainPanel.name = "MainPanel";
@@ -83,11 +91,17 @@ public class PanelManager : MonoBehaviour
             img.color = config.panelBgColor;
             img.raycastTarget = false;
         }
+
+        Logger.Log(LogModule.Menu, "Главная панель создана");
     }
 
     private void CreateSettingsPanel()
     {
-        if (bigPanelPrefab == null) return;
+        if (bigPanelPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "bigPanelPrefab не назначен, панель настроек не создана");
+            return;
+        }
 
         SettingsPanel = Instantiate(bigPanelPrefab, canvasTransform);
         SettingsPanel.name = "SettingsPanel";
@@ -109,11 +123,17 @@ public class PanelManager : MonoBehaviour
             img.color = config.settingsPanelColor;
             img.raycastTarget = true;
         }
+
+        Logger.Log(LogModule.Menu, "Панель настроек создана");
     }
 
     private void CreateMemoriesPanel()
     {
-        if (panelPrefab == null) return;
+        if (panelPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "panelPrefab не назначен, панель воспоминаний не создана");
+            return;
+        }
 
         MemoriesPanel = Instantiate(panelPrefab, canvasTransform);
         MemoriesPanel.name = "MemoriesPanel";
@@ -135,6 +155,8 @@ public class PanelManager : MonoBehaviour
             img.color = config.panelBgColor;
             img.raycastTarget = true;
         }
+
+        Logger.Log(LogModule.Menu, "Панель воспоминаний создана");
     }
 
     #endregion
@@ -143,7 +165,11 @@ public class PanelManager : MonoBehaviour
 
     public void UpdateMainPanelSize()
     {
-        if (MainPanel == null) return;
+        if (MainPanel == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "MainPanel отсутствует, обновление размера невозможно");
+            return;
+        }
 
         RectTransform rt = MainPanel.GetComponent<RectTransform>();
         if (rt == null) return;
@@ -159,7 +185,11 @@ public class PanelManager : MonoBehaviour
             }
         }
 
-        if (buttons.Count == 0) return;
+        if (buttons.Count == 0)
+        {
+            Logger.Log(LogModule.Menu, "Нет кнопок для обновления размера панели");
+            return;
+        }
 
         float totalHeight = 0f;
         foreach (RectTransform btnRt in buttons) totalHeight += btnRt.sizeDelta.y;
@@ -176,6 +206,8 @@ public class PanelManager : MonoBehaviour
             float y = startY - i * (buttons[i].sizeDelta.y + config.buttonSpacing);
             buttons[i].anchoredPosition = new Vector2(0, y);
         }
+
+        Logger.Log(LogModule.Menu, $"Размер главной панели обновлён: {panelHeightFinal}");
     }
 
     public void SwitchPanel(GameObject targetPanel, System.Action onComplete = null)
@@ -186,6 +218,7 @@ public class PanelManager : MonoBehaviour
             {
                 CurrentPanel.SetActive(false);
                 CurrentPanel = null;
+                Logger.Log(LogModule.Menu, "Текущая панель скрыта");
             }
             onComplete?.Invoke();
             return;
@@ -200,17 +233,25 @@ public class PanelManager : MonoBehaviour
         CurrentPanel.SetActive(true);
         OnPanelChanged?.Invoke(targetPanel);
         onComplete?.Invoke();
+
+        Logger.Log(LogModule.Menu, $"Переключение на панель: {targetPanel.name}");
     }
 
     public void ShowPanel(GameObject panel)
     {
-        if (panel == null) return;
+        if (panel == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "Попытка показать null панель");
+            return;
+        }
 
         HideAllPanels();
 
         panel.SetActive(true);
         CurrentPanel = panel;
         OnPanelChanged?.Invoke(panel);
+
+        Logger.Log(LogModule.Menu, $"Показана панель: {panel.name}");
     }
 
     public void HideAllPanels()
@@ -218,6 +259,8 @@ public class PanelManager : MonoBehaviour
         if (MainPanel != null) MainPanel.SetActive(false);
         if (SettingsPanel != null) SettingsPanel.SetActive(false);
         if (MemoriesPanel != null) MemoriesPanel.SetActive(false);
+
+        Logger.Log(LogModule.Menu, "Все панели скрыты");
     }
 
     public void ResetPanelsPosition()
@@ -225,6 +268,8 @@ public class PanelManager : MonoBehaviour
         ResetPanelPosition(MainPanel);
         ResetPanelPosition(SettingsPanel);
         ResetPanelPosition(MemoriesPanel);
+
+        Logger.Log(LogModule.Menu, "Позиции всех панелей сброшены");
     }
 
     private void ResetPanelPosition(GameObject panel)
@@ -240,18 +285,28 @@ public class PanelManager : MonoBehaviour
 
     public void SetupSettingsContent(System.Action<Transform> setupTabs, System.Action<Transform> setupBackButton)
     {
-        if (SettingsPanel == null) return;
+        if (SettingsPanel == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "SettingsPanel отсутствует, настройка содержимого невозможна");
+            return;
+        }
 
         CreateTitle(SettingsPanel.transform, config.settingsTitleText);
 
         setupBackButton?.Invoke(SettingsPanel.transform);
 
         setupTabs?.Invoke(SettingsPanel.transform);
+
+        Logger.Log(LogModule.Menu, "Настроено содержимое панели настроек");
     }
 
     public void SetupMemoriesContent(System.Action<Transform> setupBackButton)
     {
-        if (MemoriesPanel == null) return;
+        if (MemoriesPanel == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "MemoriesPanel отсутствует, настройка содержимого невозможна");
+            return;
+        }
 
         CreateTitle(MemoriesPanel.transform, config.memoriesTitleText);
 
@@ -261,6 +316,8 @@ public class PanelManager : MonoBehaviour
         }
 
         setupBackButton?.Invoke(MemoriesPanel.transform);
+
+        Logger.Log(LogModule.Menu, "Настроено содержимое панели воспоминаний");
     }
 
     private void CreateTitle(Transform parent, string text)
@@ -283,6 +340,8 @@ public class PanelManager : MonoBehaviour
         tmp.raycastTarget = false;
         tmp.fontStyle = FontStyles.Bold;
         if (defaultFont != null) tmp.font = defaultFont;
+
+        Logger.Log(LogModule.Menu, $"Создан заголовок: {text}");
     }
 
     #endregion
@@ -292,5 +351,7 @@ public class PanelManager : MonoBehaviour
         if (MainPanel != null) Destroy(MainPanel);
         if (SettingsPanel != null) Destroy(SettingsPanel);
         if (MemoriesPanel != null) Destroy(MemoriesPanel);
+
+        Logger.Log(LogModule.Menu, "PanelManager очищен");
     }
 }
