@@ -1,5 +1,3 @@
-// QuestManager.cs - ИСПРАВЛЕННАЯ ВЕРСИЯ
-// ============================================================
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,9 +30,11 @@ public class QuestManager : MonoBehaviour
             Instance = this;
             DontDestroyOnLoad(gameObject);
             if (autoLoad) LoadAllQuests();
+            Logger.Log(LogModule.QuestSystem, "QuestManager инициализирован");
         }
         else
         {
+            Logger.Log(LogModule.QuestSystem, "Уничтожение дублирующего QuestManager");
             Destroy(gameObject);
         }
     }
@@ -58,7 +58,7 @@ public class QuestManager : MonoBehaviour
             }
         }
 
-        if (logQuests) Debug.Log($"Загружено квестов: {allQuestData.Count}");
+        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Загружено квестов: {allQuestData.Count}");
     }
 
     private void SubscribeToEvents()
@@ -66,6 +66,11 @@ public class QuestManager : MonoBehaviour
         if (EventManager.Instance != null)
         {
             EventManager.Instance.OnEventExecuted += OnEventExecuted;
+            Logger.Log(LogModule.QuestSystem, "Подписка на события EventManager выполнена");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "EventManager отсутствует");
         }
     }
 
@@ -89,19 +94,19 @@ public class QuestManager : MonoBehaviour
     {
         if (!allQuestData.TryGetValue(questID, out var data))
         {
-            Debug.LogWarning($"Квест {questID} не найден!");
+            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден");
             return;
         }
 
         if (activeQuests.Any(q => q.QuestID == questID))
         {
-            Debug.Log($"Квест {questID} уже активен");
+            Logger.Log(LogModule.QuestSystem, $"Квест {questID} уже активен");
             return;
         }
 
         if (!CanStartQuest(data))
         {
-            Debug.Log($"Не выполнены условия для квеста {questID}");
+            Logger.Log(LogModule.QuestSystem, $"Не выполнены условия для квеста {questID}");
             return;
         }
 
@@ -111,7 +116,7 @@ public class QuestManager : MonoBehaviour
         EventStateManager.Instance?.MarkExecuted($"Quest_{questID}_Started");
 
         OnQuestStarted?.Invoke(instance);
-        if (logQuests) Debug.Log($"Квест начат: {data.questName}");
+        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Квест начат: {data.questName}");
 
         QuestUI.Instance?.RefreshQuests();
 
@@ -127,11 +132,17 @@ public class QuestManager : MonoBehaviour
         foreach (var condition in data.startConditions)
         {
             if (!condition.IsMet())
+            {
+                Logger.Log(LogModule.QuestSystem, $"Условие для квеста {data.questName} не выполнено");
                 return false;
+            }
         }
 
         if (!data.repeatable && IsQuestCompleted(data.questID))
+        {
+            Logger.Log(LogModule.QuestSystem, $"Квест {data.questName} уже завершён и не повторяемый");
             return false;
+        }
 
         return true;
     }
@@ -139,12 +150,24 @@ public class QuestManager : MonoBehaviour
     public void UpdateQuest(string questID, string objectiveID, int progress = 1)
     {
         var instance = activeQuests.FirstOrDefault(q => q.QuestID == questID);
-        if (instance == null) return;
+        if (instance == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден в активных");
+            return;
+        }
 
         var objective = instance.GetObjective(objectiveID);
-        if (objective == null) return;
+        if (objective == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, $"Цель {objectiveID} не найдена в квесте {questID}");
+            return;
+        }
 
-        if (objective.isOptional) return;
+        if (objective.isOptional)
+        {
+            Logger.Log(LogModule.QuestSystem, $"Цель {objectiveID} опциональная, пропуск обновления");
+            return;
+        }
 
         int oldProgress = objective.currentCount;
         objective.currentCount += progress;
@@ -154,6 +177,7 @@ public class QuestManager : MonoBehaviour
 
         if (oldProgress != objective.currentCount)
         {
+            Logger.Log(LogModule.QuestSystem, $"Обновлена цель {objectiveID} в квесте {instance.QuestName}: {objective.currentCount}/{objective.requiredCount}");
             OnObjectiveUpdated?.Invoke(instance);
             CheckQuestCompletion(instance);
             QuestUI.Instance?.RefreshQuests();
@@ -170,6 +194,7 @@ public class QuestManager : MonoBehaviour
             {
                 if (obj.type == QuestObjectiveType.Collect && obj.targetItem == itemType)
                 {
+                    Logger.Log(LogModule.QuestSystem, $"Обновление квеста {instance.QuestName} по предмету {itemType}");
                     UpdateQuest(instance.QuestID, obj.objectiveID, count);
                 }
             }
@@ -186,6 +211,7 @@ public class QuestManager : MonoBehaviour
             {
                 if (obj.type == QuestObjectiveType.GoTo && obj.targetLocation == locationName)
                 {
+                    Logger.Log(LogModule.QuestSystem, $"Обновление квеста {instance.QuestName} по локации {locationName}");
                     UpdateQuest(instance.QuestID, obj.objectiveID, 1);
                 }
             }
@@ -202,6 +228,7 @@ public class QuestManager : MonoBehaviour
             {
                 if (obj.type == QuestObjectiveType.TalkTo && obj.targetNPC == npcName)
                 {
+                    Logger.Log(LogModule.QuestSystem, $"Обновление квеста {instance.QuestName} по NPC {npcName}");
                     UpdateQuest(instance.QuestID, obj.objectiveID, 1);
                 }
             }
@@ -212,6 +239,7 @@ public class QuestManager : MonoBehaviour
     {
         if (instance.IsComplete())
         {
+            Logger.Log(LogModule.QuestSystem, $"Квест {instance.QuestName} выполнен, запуск завершения");
             CompleteQuest(instance.QuestID);
         }
     }
@@ -219,7 +247,11 @@ public class QuestManager : MonoBehaviour
     public void CompleteQuest(string questID)
     {
         var instance = activeQuests.FirstOrDefault(q => q.QuestID == questID);
-        if (instance == null) return;
+        if (instance == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден в активных для завершения");
+            return;
+        }
 
         activeQuests.Remove(instance);
         completedQuests.Add(instance);
@@ -230,13 +262,13 @@ public class QuestManager : MonoBehaviour
         {
             if (!string.IsNullOrEmpty(reward.flagToSet))
             {
-                // ✅ ИСПРАВЛЕНО: GlobalFlagManager → FlagManager
                 FlagManager.Instance?.SetFlag(reward.flagToSet, true);
+                Logger.Log(LogModule.QuestSystem, $"Установлен флаг {reward.flagToSet} за завершение квеста {instance.QuestName}");
             }
         }
 
         OnQuestCompleted?.Invoke(instance);
-        if (logQuests) Debug.Log($"Квест завершён: {instance.QuestName}");
+        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Квест завершён: {instance.QuestName}");
 
         EventStateManager.Instance?.MarkExecuted($"Quest_{questID}_Completed");
 
@@ -260,15 +292,13 @@ public class QuestManager : MonoBehaviour
                     InventoryUIManager inventory = FindFirstObjectByType<InventoryUIManager>();
                     inventory?.AddItem(reward.item);
                 }
-                Debug.Log($"Награда: {reward.amount}x {reward.item}");
+                Logger.Log(LogModule.QuestSystem, $"Награда: {reward.amount}x {reward.item}");
             }
         }
     }
 
     private void OnEventExecuted(GameEvent evt, EventContext context)
     {
-        // 🔥 ВАЖНО: Обработка ДО проверки evt == null
-        // Прямые вызовы (без GameEvent) должны обрабатываться в первую очередь
         if (evt == null)
         {
             if (context != null)
@@ -276,52 +306,52 @@ public class QuestManager : MonoBehaviour
                 if (context.ItemType != ItemType.None)
                 {
                     UpdateQuestByItem(context.ItemType, 1);
-                    if (logQuests) Debug.Log($"✅ Прямой вызов: обновлён квест по предмету {context.ItemType}");
+                    if (logQuests) Logger.Log(LogModule.QuestSystem, $"Прямой вызов: обновлён квест по предмету {context.ItemType}");
                 }
 
                 if (!string.IsNullOrEmpty(context.LocationName))
                 {
                     UpdateQuestByLocation(context.LocationName);
-                    if (logQuests) Debug.Log($"✅ Прямой вызов: обновлён квест по локации {context.LocationName}");
+                    if (logQuests) Logger.Log(LogModule.QuestSystem, $"Прямой вызов: обновлён квест по локации {context.LocationName}");
                 }
 
                 if (!string.IsNullOrEmpty(context.DialogueID))
                 {
                     UpdateQuestByNPC(context.DialogueID);
-                    if (logQuests) Debug.Log($"✅ Прямой вызов: обновлён квест по NPC {context.DialogueID}");
+                    if (logQuests) Logger.Log(LogModule.QuestSystem, $"Прямой вызов: обновлён квест по NPC {context.DialogueID}");
                 }
             }
             return;
         }
+
         if (evt.triggerType == EventTriggerType.EnterLocation && context != null && !string.IsNullOrEmpty(context.LocationName))
         {
             UpdateQuestByLocation(context.LocationName);
-            if (logQuests) Debug.Log($"✅ GameEvent '{evt.eventName}': обновлён квест по локации {context.LocationName}");
+            if (logQuests) Logger.Log(LogModule.QuestSystem, $"GameEvent '{evt.eventName}': обновлён квест по локации {context.LocationName}");
         }
 
         if (evt.triggerType == EventTriggerType.DialogueEnd && context != null && !string.IsNullOrEmpty(context.DialogueID))
         {
             UpdateQuestByNPC(context.DialogueID);
-            if (logQuests) Debug.Log($"✅ GameEvent '{evt.eventName}': обновлён квест по NPC {context.DialogueID}");
+            if (logQuests) Logger.Log(LogModule.QuestSystem, $"GameEvent '{evt.eventName}': обновлён квест по NPC {context.DialogueID}");
         }
 
-        // Custom события
         if (evt.triggerType == EventTriggerType.Custom && context != null)
         {
             if (context.ItemType != ItemType.None)
             {
                 UpdateQuestByItem(context.ItemType, 1);
-                if (logQuests) Debug.Log($"✅ Custom event '{evt.eventName}': обновлён квест по предмету {context.ItemType}");
+                if (logQuests) Logger.Log(LogModule.QuestSystem, $"Custom event '{evt.eventName}': обновлён квест по предмету {context.ItemType}");
             }
             if (!string.IsNullOrEmpty(context.LocationName))
             {
                 UpdateQuestByLocation(context.LocationName);
-                if (logQuests) Debug.Log($"✅ Custom event '{evt.eventName}': обновлён квест по локации {context.LocationName}");
+                if (logQuests) Logger.Log(LogModule.QuestSystem, $"Custom event '{evt.eventName}': обновлён квест по локации {context.LocationName}");
             }
             if (!string.IsNullOrEmpty(context.DialogueID))
             {
                 UpdateQuestByNPC(context.DialogueID);
-                if (logQuests) Debug.Log($"✅ Custom event '{evt.eventName}': обновлён квест по NPC {context.DialogueID}");
+                if (logQuests) Logger.Log(LogModule.QuestSystem, $"Custom event '{evt.eventName}': обновлён квест по NPC {context.DialogueID}");
             }
         }
     }
@@ -396,6 +426,7 @@ public class QuestManager : MonoBehaviour
             }
         }
         QuestUI.Instance?.RefreshQuests();
+        Logger.Log(LogModule.QuestSystem, $"Загружено {data.Length} квестов");
     }
 
     public void CancelQuest(string questID)
@@ -403,7 +434,7 @@ public class QuestManager : MonoBehaviour
         var instance = activeQuests.FirstOrDefault(q => q.QuestID == questID);
         if (instance == null)
         {
-            Debug.LogWarning($"Квест {questID} не найден в активных!");
+            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден в активных");
             return;
         }
 
@@ -419,7 +450,7 @@ public class QuestManager : MonoBehaviour
 
         EventStateManager.Instance?.MarkExecuted($"Quest_{questID}_Canceled");
 
-        if (logQuests) Debug.Log($"❌ Квест отменён: {instance.QuestName}");
+        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Квест отменён: {instance.QuestName}");
 
         QuestUI.Instance?.RefreshQuests();
     }
