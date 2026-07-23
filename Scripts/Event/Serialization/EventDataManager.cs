@@ -1,4 +1,3 @@
-// EventDataManager.cs - ПОЛНАЯ ВЕРСИЯ С КОНТРОЛЕМ АВТОСОХРАНЕНИЙ
 using UnityEngine;
 using System.IO;
 using System.Collections.Generic;
@@ -18,7 +17,7 @@ public class EventDataManager : MonoBehaviour
                 _instance = FindObjectOfType<EventDataManager>();
                 if (_instance == null)
                 {
-                    Debug.LogError("❌ EventDataManager not found in scene!");
+                    Logger.LogError(LogModule.Event, "EventDataManager не найден на сцене");
                     return null;
                 }
             }
@@ -68,7 +67,6 @@ public class EventDataManager : MonoBehaviour
     private bool isCompiling = false;
 #endif
 
-    // ============ СВОЙСТВА ДЛЯ ДОСТУПА К НАСТРОЙКАМ ============
     public bool AutoSaveOnPlay
     {
         get => autoSaveOnPlay;
@@ -127,7 +125,7 @@ public class EventDataManager : MonoBehaviour
 
         _instance = this;
         DontDestroyOnLoad(gameObject);
-        Debug.Log("✅ EventDataManager initialized!");
+        Logger.Log(LogModule.Event, "EventDataManager инициализирован");
 
         Initialize();
 
@@ -138,7 +136,6 @@ public class EventDataManager : MonoBehaviour
 
     private void Update()
     {
-        // Автосохранение по интервалу
         if (autoSaveInterval > 0f && !isSaving && !Application.isPlaying)
         {
             if (Time.unscaledTime - lastAutoSaveTime >= autoSaveInterval)
@@ -152,20 +149,17 @@ public class EventDataManager : MonoBehaviour
 #if UNITY_EDITOR
     private void SetupAutoSaveListeners()
     {
-        // Сохранение при компиляции
         if (autoSaveOnCompile)
         {
             UnityEditor.Compilation.CompilationPipeline.compilationStarted += OnCompilationStarted;
             UnityEditor.Compilation.CompilationPipeline.compilationFinished += OnCompilationFinished;
         }
 
-        // Сохранение при сохранении сцены
         if (autoSaveOnSceneSave)
         {
             UnityEditor.SceneManagement.EditorSceneManager.sceneSaving += OnSceneSaving;
         }
 
-        // Сохранение при входе/выходе из Play Mode
         if (autoSaveOnPlay || autoSaveOnExitPlay)
         {
             UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
@@ -198,7 +192,6 @@ public class EventDataManager : MonoBehaviour
     {
         if (state == PlayModeStateChange.ExitingEditMode)
         {
-            // Вход в Play Mode
             if (autoSaveOnPlay && !isSaving && !Application.isPlaying)
             {
                 AutoSave("PlayModeEnter");
@@ -206,7 +199,6 @@ public class EventDataManager : MonoBehaviour
         }
         else if (state == PlayModeStateChange.ExitingPlayMode)
         {
-            // Выход из Play Mode
             if (autoSaveOnExitPlay && !isSaving)
             {
                 AutoSave("PlayModeExit");
@@ -221,7 +213,6 @@ public class EventDataManager : MonoBehaviour
             AutoSave("Quit");
         }
 
-        // Убираем листенеры при выходе
         UnityEditor.Compilation.CompilationPipeline.compilationStarted -= OnCompilationStarted;
         UnityEditor.Compilation.CompilationPipeline.compilationFinished -= OnCompilationFinished;
         UnityEditor.SceneManagement.EditorSceneManager.sceneSaving -= OnSceneSaving;
@@ -235,25 +226,24 @@ public class EventDataManager : MonoBehaviour
         if (!logAutoSave) return;
 
 #if UNITY_EDITOR
-        // Проверяем, есть ли изменения
         if (!UnityEditor.EditorApplication.isPlaying && !UnityEditor.EditorApplication.isCompiling)
         {
             var eventManager = Object.FindObjectOfType<EventManager>();
             if (eventManager != null && eventManager.registeredEvents.Count > 0)
             {
                 if (logAutoSave)
-                    Debug.Log($"🔄 Auto-saving events ({reason})...");
+                    Logger.Log(LogModule.Event, $"Автосохранение событий ({reason})...");
 
                 isSaving = true;
                 try
                 {
                     eventManager.SaveAllEventsFromProject();
                     if (logAutoSave)
-                        Debug.Log($"✅ Auto-save completed ({reason})");
+                        Logger.Log(LogModule.Event, $"Автосохранение завершено ({reason})");
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogError($"❌ Auto-save failed: {e.Message}");
+                    Logger.LogError(LogModule.Event, $"Ошибка автосохранения: {e.Message}");
                 }
                 finally
                 {
@@ -264,11 +254,6 @@ public class EventDataManager : MonoBehaviour
 #endif
     }
 
-    // ============ УПРАВЛЕНИЕ АВТОСОХРАНЕНИЯМИ ============
-
-    /// <summary>
-    /// Отключить ВСЕ автосохранения
-    /// </summary>
     public void DisableAllAutoSaves()
     {
         autoSaveOnPlay = false;
@@ -280,19 +265,15 @@ public class EventDataManager : MonoBehaviour
         logAutoSave = false;
 
 #if UNITY_EDITOR
-        // Удаляем все листенеры
         UnityEditor.Compilation.CompilationPipeline.compilationStarted -= OnCompilationStarted;
         UnityEditor.Compilation.CompilationPipeline.compilationFinished -= OnCompilationFinished;
         UnityEditor.SceneManagement.EditorSceneManager.sceneSaving -= OnSceneSaving;
         UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
 #endif
 
-        Debug.Log("🔴 ALL auto-saves DISABLED!");
+        Logger.Log(LogModule.Event, "ВСЕ автосохранения ОТКЛЮЧЕНЫ");
     }
 
-    /// <summary>
-    /// Включить ВСЕ автосохранения с настройками по умолчанию
-    /// </summary>
     public void EnableAllAutoSaves()
     {
         autoSaveOnPlay = true;
@@ -304,19 +285,15 @@ public class EventDataManager : MonoBehaviour
         logAutoSave = true;
 
 #if UNITY_EDITOR
-        // Переподписываемся на все события
         UnityEditor.Compilation.CompilationPipeline.compilationStarted += OnCompilationStarted;
         UnityEditor.Compilation.CompilationPipeline.compilationFinished += OnCompilationFinished;
         UnityEditor.SceneManagement.EditorSceneManager.sceneSaving += OnSceneSaving;
         UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 #endif
 
-        Debug.Log("🟢 ALL auto-saves ENABLED!");
+        Logger.Log(LogModule.Event, "ВСЕ автосохранения ВКЛЮЧЕНЫ");
     }
 
-    /// <summary>
-    /// Проверить, включено ли хоть одно автосохранение
-    /// </summary>
     public bool IsAnyAutoSaveEnabled()
     {
         return autoSaveOnPlay || autoSaveOnExitPlay || autoSaveOnCompile ||
@@ -336,19 +313,18 @@ public class EventDataManager : MonoBehaviour
         if (!Directory.Exists(dataPath))
         {
             Directory.CreateDirectory(dataPath);
-            Debug.Log($"📁 Created events folder: {dataPath}");
+            Logger.Log(LogModule.Event, $"Создана папка событий: {dataPath}");
         }
         else
         {
-            Debug.Log($"📁 Events folder exists: {dataPath}");
+            Logger.Log(LogModule.Event, $"Папка событий существует: {dataPath}");
         }
 
-        // Создаём папку для бэкапов
         backupPath = Path.Combine(dataPath, "Backups");
         if (createBackups && !Directory.Exists(backupPath))
         {
             Directory.CreateDirectory(backupPath);
-            Debug.Log($"📁 Created backups folder: {backupPath}");
+            Logger.Log(LogModule.Event, $"Создана папка резервных копий: {backupPath}");
         }
 
         isInitialized = true;
@@ -361,20 +337,19 @@ public class EventDataManager : MonoBehaviour
 
         if (string.IsNullOrEmpty(eventData.eventID))
         {
-            Debug.LogWarning("Cannot save event without ID");
+            Logger.LogWarning(LogModule.Event, "Невозможно сохранить событие без ID");
             return;
         }
 
         string filePath = Path.Combine(dataPath, $"{eventData.eventID}.json");
 
-        // ЗАЩИТА: Проверяем, не пытаемся ли мы перезаписать существующий файл пустыми данными
         if (File.Exists(filePath) && !forceSave)
         {
             if (eventDataCache.TryGetValue(eventData.eventID, out EventData existingData))
             {
                 if (eventData.actions.Count == 0 && existingData.actions.Count > 0)
                 {
-                    Debug.LogWarning($"🛡️ Защита: Пропущено сохранение '{eventData.eventID}' - новое событие не содержит действий, а старое содержит {existingData.actions.Count} действий");
+                    Logger.LogWarning(LogModule.Event, $"Защита: Пропущено сохранение '{eventData.eventID}' - новое событие не содержит действий, а старое содержит {existingData.actions.Count} действий");
                     return;
                 }
             }
@@ -386,15 +361,14 @@ public class EventDataManager : MonoBehaviour
                     EventData existingData2 = JsonUtility.FromJson<EventData>(existingJson);
                     if (existingData2 != null && existingData2.actions.Count > 0 && eventData.actions.Count == 0)
                     {
-                        Debug.LogWarning($"🛡️ Защита: Пропущено сохранение '{eventData.eventID}' - новое событие не содержит действий, а существующее содержит {existingData2.actions.Count} действий");
+                        Logger.LogWarning(LogModule.Event, $"Защита: Пропущено сохранение '{eventData.eventID}' - новое событие не содержит действий, а существующее содержит {existingData2.actions.Count} действий");
                         return;
                     }
                 }
-                catch { /* Игнорируем ошибки чтения */ }
+                catch { }
             }
         }
 
-        // СОЗДАЁМ БЭКАП ПЕРЕД СОХРАНЕНИЕМ
         if (createBackups && File.Exists(filePath) && forceSave)
         {
             CreateBackup(eventData.eventID);
@@ -405,7 +379,7 @@ public class EventDataManager : MonoBehaviour
 
         eventDataCache[eventData.eventID] = eventData;
 
-        Debug.Log($"💾 Event '{eventData.eventID}' saved to: {filePath}");
+        Logger.Log(LogModule.Event, $"Событие '{eventData.eventID}' сохранено в: {filePath}");
     }
 
     public void CreateBackup(string eventID)
@@ -421,13 +395,13 @@ public class EventDataManager : MonoBehaviour
         try
         {
             File.Copy(sourcePath, backupFile, true);
-            Debug.Log($"📦 Backup created: {backupFile}");
+            Logger.Log(LogModule.Event, $"Создана резервная копия: {backupFile}");
 
             CleanupOldBackups(eventID);
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"❌ Failed to create backup: {e.Message}");
+            Logger.LogError(LogModule.Event, $"Ошибка создания резервной копии: {e.Message}");
         }
     }
 
@@ -444,12 +418,12 @@ public class EventDataManager : MonoBehaviour
             for (int i = 0; i < toDelete; i++)
             {
                 File.Delete(backupFiles[i]);
-                Debug.Log($"🗑️ Deleted old backup: {Path.GetFileName(backupFiles[i])}");
+                Logger.Log(LogModule.Event, $"Удалена старая резервная копия: {Path.GetFileName(backupFiles[i])}");
             }
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"Failed to cleanup backups: {e.Message}");
+            Logger.LogWarning(LogModule.Event, $"Ошибка очистки резервных копий: {e.Message}");
         }
     }
 
@@ -463,7 +437,7 @@ public class EventDataManager : MonoBehaviour
             backupFiles = Directory.GetFiles(backupPath, $"{eventID}_*.json");
             if (backupFiles.Length == 0)
             {
-                Debug.LogWarning($"No backups found for {eventID}");
+                Logger.LogWarning(LogModule.Event, $"Нет резервных копий для {eventID}");
                 return false;
             }
 
@@ -475,7 +449,7 @@ public class EventDataManager : MonoBehaviour
             backupFileName = Path.Combine(backupPath, backupFileName);
             if (!File.Exists(backupFileName))
             {
-                Debug.LogWarning($"Backup file not found: {backupFileName}");
+                Logger.LogWarning(LogModule.Event, $"Файл резервной копии не найден: {backupFileName}");
                 return false;
             }
         }
@@ -489,13 +463,13 @@ public class EventDataManager : MonoBehaviour
                 string targetPath = Path.Combine(dataPath, $"{eventID}.json");
                 File.Copy(backupFileName, targetPath, true);
                 eventDataCache[eventID] = data;
-                Debug.Log($"🔄 Restored {eventID} from backup: {Path.GetFileName(backupFileName)}");
+                Logger.Log(LogModule.Event, $"Восстановлен {eventID} из резервной копии: {Path.GetFileName(backupFileName)}");
                 return true;
             }
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Failed to restore from backup: {e.Message}");
+            Logger.LogError(LogModule.Event, $"Ошибка восстановления из резервной копии: {e.Message}");
         }
 
         return false;
@@ -533,14 +507,14 @@ public class EventDataManager : MonoBehaviour
 
         if (!Directory.Exists(dataPath))
         {
-            Debug.LogWarning($"Directory not found: {dataPath}");
+            Logger.LogWarning(LogModule.Event, $"Директория не найдена: {dataPath}");
             return new List<EventData>();
         }
 
         string[] files = Directory.GetFiles(dataPath, "*.json");
         List<EventData> events = new List<EventData>();
 
-        Debug.Log($"📂 Found {files.Length} JSON files in {dataPath}");
+        Logger.Log(LogModule.Event, $"Найдено {files.Length} JSON файлов в {dataPath}");
 
         foreach (string file in files)
         {
@@ -555,20 +529,20 @@ public class EventDataManager : MonoBehaviour
                 {
                     eventDataCache[data.eventID] = data;
                     events.Add(data);
-                    Debug.Log($"  ✅ Loaded: {data.eventID} with {data.actions.Count} actions");
+                    Logger.Log(LogModule.Event, $"Загружено: {data.eventID} с {data.actions.Count} действиями");
                 }
                 else
                 {
-                    Debug.LogWarning($"  ⚠️ Invalid data in: {Path.GetFileName(file)}");
+                    Logger.LogWarning(LogModule.Event, $"Некорректные данные в: {Path.GetFileName(file)}");
                 }
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"Error loading {file}: {e.Message}");
+                Logger.LogError(LogModule.Event, $"Ошибка загрузки {file}: {e.Message}");
             }
         }
 
-        Debug.Log($"📂 Loaded {events.Count} events from JSON");
+        Logger.Log(LogModule.Event, $"Загружено {events.Count} событий из JSON");
         return events;
     }
 
@@ -600,7 +574,7 @@ public class EventDataManager : MonoBehaviour
                 EventConverter.RestoreToExistingGameEvent(evt, data);
                 EditorUtility.SetDirty(evt);
                 restoredCount++;
-                Debug.Log($"✅ Restored: {data.eventID} with {data.actions.Count} actions");
+                Logger.Log(LogModule.Event, $"Восстановлено: {data.eventID} с {data.actions.Count} действиями");
             }
             else
             {
@@ -614,7 +588,7 @@ public class EventDataManager : MonoBehaviour
 
                     AssetDatabase.CreateAsset(newEvent, newPath);
                     restoredCount++;
-                    Debug.Log($"📄 Created new event: {data.eventID}");
+                    Logger.Log(LogModule.Event, $"Создано новое событие: {data.eventID}");
                 }
             }
         }
@@ -622,10 +596,10 @@ public class EventDataManager : MonoBehaviour
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        Debug.Log($"✅ Restored {restoredCount} events to SO files");
+        Logger.Log(LogModule.Event, $"Восстановлено {restoredCount} событий в SO файлы");
         return restoredCount;
 #else
-        Debug.LogWarning("RestoreEventsToSO is only available in Editor");
+        Logger.LogWarning(LogModule.Event, "RestoreEventsToSO доступно только в редакторе");
         return 0;
 #endif
     }
@@ -640,7 +614,7 @@ public class EventDataManager : MonoBehaviour
         if (File.Exists(filePath))
         {
             File.Delete(filePath);
-            Debug.Log($"🗑️ Event '{eventID}' deleted");
+            Logger.Log(LogModule.Event, $"Событие '{eventID}' удалено");
         }
     }
 
