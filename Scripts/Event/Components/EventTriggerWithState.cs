@@ -1,4 +1,3 @@
-// EventTriggerWithState.cs
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -24,10 +23,15 @@ public class EventTriggerWithState : MonoBehaviour
         if (resetOnSceneLoad)
         {
             hasTriggered = false;
+            Logger.Log(LogModule.Event, $"Триггер '{triggerID}' сброшен при загрузке сцены");
         }
         else
         {
             hasTriggered = EventStateManager.Instance?.IsExecuted($"Trigger_{triggerID}") ?? false;
+            if (hasTriggered)
+            {
+                Logger.Log(LogModule.Event, $"Триггер '{triggerID}' уже был выполнен ранее");
+            }
         }
     }
 
@@ -35,7 +39,7 @@ public class EventTriggerWithState : MonoBehaviour
     {
         if (triggerOnlyOnce && hasTriggered)
         {
-            Debug.Log($"⛔ Trigger '{triggerID}' already executed once");
+            Logger.Log(LogModule.Event, $"Триггер '{triggerID}' уже выполнен, пропуск");
             return;
         }
 
@@ -43,7 +47,7 @@ public class EventTriggerWithState : MonoBehaviour
         {
             if (!req.Check(new EventContext()))
             {
-                Debug.Log($"⛔ Trigger '{triggerID}' requirements not met");
+                Logger.Log(LogModule.Event, $"Триггер '{triggerID}' не соответствует требованиям");
                 return;
             }
         }
@@ -61,19 +65,21 @@ public class EventTriggerWithState : MonoBehaviour
             }
         }
 
-        Debug.Log($"✅ Trigger '{triggerID}' executed with {eventsToTrigger.Count} events");
+        Logger.Log(LogModule.Event, $"Триггер '{triggerID}' выполнен, запущено {eventsToTrigger.Count} событий");
     }
 
     public void ResetTrigger()
     {
         hasTriggered = false;
         EventStateManager.Instance?.ResetEvent($"Trigger_{triggerID}");
+        Logger.Log(LogModule.Event, $"Триггер '{triggerID}' сброшен");
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player") && triggerType == EventTriggerType.EnterLocation)
         {
+            Logger.Log(LogModule.Event, $"Игрок вошёл в триггер '{triggerID}'");
             Trigger();
         }
     }
@@ -82,12 +88,14 @@ public class EventTriggerWithState : MonoBehaviour
     {
         if (triggerType == EventTriggerType.Custom)
         {
+            Logger.Log(LogModule.Event, $"Клик по триггеру '{triggerID}'");
             Trigger();
         }
     }
 
     public void TriggerCustom()
     {
+        Logger.Log(LogModule.Event, $"Ручной вызов триггера '{triggerID}'");
         Trigger();
     }
 }
