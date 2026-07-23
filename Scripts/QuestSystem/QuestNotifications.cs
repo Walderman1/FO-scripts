@@ -1,4 +1,3 @@
-// QuestNotifications.cs - ПАССИВНАЯ ВЕРСИЯ
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -21,15 +20,21 @@ public class QuestNotifications : MonoBehaviour
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            Logger.Log(LogModule.QuestSystem, "QuestNotifications инициализирован");
+        }
         else
+        {
+            Logger.Log(LogModule.QuestSystem, "Уничтожение дублирующего QuestNotifications");
             Destroy(gameObject);
+        }
 
         if (config == null)
         {
             config = Resources.Load<QuestConfigSO>("Configs/QuestConfig");
             if (config == null)
-                Debug.LogError("QuestConfig не найден!");
+                Logger.LogError(LogModule.QuestSystem, "QuestConfig не найден");
         }
 
         FindCanvas();
@@ -54,6 +59,8 @@ public class QuestNotifications : MonoBehaviour
             scaler.referenceResolution = new Vector2(1920, 1080);
 
             canvasGO.AddComponent<GraphicRaycaster>();
+
+            Logger.Log(LogModule.QuestSystem, "Создан Canvas для уведомлений");
         }
     }
 
@@ -65,7 +72,7 @@ public class QuestNotifications : MonoBehaviour
 
         if (notificationPrefab == null)
         {
-            Debug.LogWarning($"Префаб не найден: {config.NotificationPrefabPath}");
+            Logger.LogWarning(LogModule.QuestSystem, $"Префаб не найден: {config.NotificationPrefabPath}");
             notificationPrefab = CreateNotificationPrefab();
         }
     }
@@ -93,10 +100,11 @@ public class QuestNotifications : MonoBehaviour
             rt.anchoredPosition = new Vector2(-20, -100);
             rt.sizeDelta = new Vector2(500, 0);
 
+            Logger.Log(LogModule.QuestSystem, "Родительский объект для уведомлений найден");
             return;
         }
 
-        Debug.LogError($"Объект с тегом '{config.NotificationsTag}' не найден!");
+        Logger.LogError(LogModule.QuestSystem, $"Объект с тегом '{config.NotificationsTag}' не найден");
     }
 
     private GameObject CreateNotificationPrefab()
@@ -146,58 +154,81 @@ public class QuestNotifications : MonoBehaviour
         iconImage.raycastTarget = false;
         iconImage.preserveAspect = true;
 
+        Logger.Log(LogModule.QuestSystem, "Создан префаб уведомления по умолчанию");
         return prefab;
     }
 
     private void Initialize()
     {
         if (isInitialized) return;
-        if (notificationPrefab == null) return;
-        if (notificationsParent == null) return;
+        if (notificationPrefab == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "notificationPrefab отсутствует, инициализация отложена");
+            return;
+        }
+        if (notificationsParent == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "notificationsParent отсутствует, инициализация отложена");
+            return;
+        }
 
         isInitialized = true;
+        Logger.Log(LogModule.QuestSystem, "QuestNotifications инициализирован");
     }
-
-    // ============ ПУБЛИЧНЫЕ МЕТОДЫ ============
 
     public void ShowQuestStarted(string questName)
     {
         if (config == null) return;
         ShowNotification($"Начат квест: {questName}", config.StartNotifyColor, config.StartIcon);
+        Logger.Log(LogModule.QuestSystem, $"Показано уведомление о начале квеста: {questName}");
     }
 
     public void ShowQuestCompleted(string questName)
     {
         if (config == null) return;
-        ShowNotification($"✅ Квест завершён: {questName}", config.CompleteNotifyColor, config.CompleteIcon);
+        ShowNotification($"Квест завершён: {questName}", config.CompleteNotifyColor, config.CompleteIcon);
+        Logger.Log(LogModule.QuestSystem, $"Показано уведомление о завершении квеста: {questName}");
     }
 
     public void ShowQuestUpdated(string questName, string objectiveName, int current, int required)
     {
         if (config == null) return;
         ShowNotification($"{objectiveName}: {current}/{required}", config.UpdateNotifyColor, config.UpdateIcon);
+        Logger.Log(LogModule.QuestSystem, $"Показано уведомление об обновлении квеста: {questName} - {objectiveName}");
     }
 
     public void ShowObjectiveCompleted(string objectiveName)
     {
         if (config == null) return;
-        ShowNotification($"✅ {objectiveName}", config.CompleteNotifyColor, config.ObjectiveIcon);
+        ShowNotification($"Выполнено: {objectiveName}", config.CompleteNotifyColor, config.ObjectiveIcon);
+        Logger.Log(LogModule.QuestSystem, $"Показано уведомление о выполнении цели: {objectiveName}");
     }
 
     public void ShowCustom(string message, Color color, Sprite icon = null)
     {
         if (config == null) return;
         ShowNotification(message, color, icon ?? config.StartIcon);
+        Logger.Log(LogModule.QuestSystem, $"Показано пользовательское уведомление: {message}");
     }
-
-    // ============ ПРИВАТНЫЙ МЕТОД ============
 
     private void ShowNotification(string message, Color color, Sprite icon)
     {
         if (!isInitialized) Initialize();
-        if (notificationPrefab == null) return;
-        if (notificationsParent == null) return;
-        if (config == null) return;
+        if (notificationPrefab == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "notificationPrefab отсутствует, уведомление не показано");
+            return;
+        }
+        if (notificationsParent == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "notificationsParent отсутствует, уведомление не показано");
+            return;
+        }
+        if (config == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "config отсутствует, уведомление не показано");
+            return;
+        }
 
         GameObject notification = Instantiate(notificationPrefab, notificationsParent);
         notification.SetActive(true);
