@@ -85,12 +85,13 @@ public class GlobalControl : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            Debug.Log("GlobalControl Awake - Instance set");
+            Logger.Log(LogModule.Core, "GlobalControl инициализирован");
 
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
         else
         {
+            Logger.Log(LogModule.Core, "Уничтожение дублирующего GlobalControl");
             Destroy(gameObject);
             return;
         }
@@ -106,15 +107,15 @@ public class GlobalControl : MonoBehaviour
             {
                 textBeginner = FindObjectOfType<TextBeginner>();
             }
-            Debug.Log($"TextBeginner found: {textBeginner != null}");
+            Logger.Log(LogModule.Core, $"TextBeginner найден: {textBeginner != null}");
         }
 
         int sceneIndex = SceneManager.GetActiveScene().buildIndex;
-        Debug.Log($"Current scene index: {sceneIndex}");
+        Logger.Log(LogModule.Core, $"Текущая сцена: {sceneIndex}");
 
         if (sceneIndex == 0)
         {
-            Debug.Log("Menu scene - adding MenuUIManager");
+            Logger.Log(LogModule.Core, "Сцена меню - добавление MenuUIManager");
             EnsureMenuUIManager();
         }
     }
@@ -128,7 +129,7 @@ public class GlobalControl : MonoBehaviour
         }
 
         gameObject.AddComponent<MenuUIManager>();
-        Debug.Log("MenuUIManager added to GlobalControl");
+        Logger.Log(LogModule.Core, "MenuUIManager добавлен в GlobalControl");
     }
 
     private void OnDestroy()
@@ -147,20 +148,20 @@ public class GlobalControl : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        Debug.Log($"Scene loaded: {scene.name} (index: {scene.buildIndex})");
+        Logger.Log(LogModule.Core, $"Загружена сцена: {scene.name} (индекс: {scene.buildIndex})");
 
         isSceneInitialized = false;
         currentSceneIndex = scene.buildIndex;
 
         if (scene.buildIndex == 0)
         {
-            Debug.Log("Menu scene loaded - adding MenuUIManager");
+            Logger.Log(LogModule.Core, "Загружена сцена меню - добавление MenuUIManager");
             EnsureMenuUIManager();
             CleanupGameComponents();
         }
         else
         {
-            Debug.Log("Game scene loaded - initializing game components");
+            Logger.Log(LogModule.Core, "Загружена игровая сцена - инициализация игровых компонентов");
             CleanupComponents();
 
             MenuUIManager menuManager = GetComponent<MenuUIManager>();
@@ -175,7 +176,7 @@ public class GlobalControl : MonoBehaviour
 
     private void CleanupComponents()
     {
-        Debug.Log("Cleaning up components on GlobalControl object...");
+        Logger.Log(LogModule.Core, "Очистка компонентов на объекте GlobalControl");
 
         Component[] allComponents = GetComponents<Component>();
         List<Component> toDestroy = new List<Component>();
@@ -203,7 +204,7 @@ public class GlobalControl : MonoBehaviour
 
         foreach (Component comp in toDestroy)
         {
-            Debug.Log($"Destroying component: {comp.GetType().Name}");
+            Logger.Log(LogModule.Core, $"Уничтожение компонента: {comp.GetType().Name}");
             Destroy(comp);
         }
 
@@ -235,7 +236,7 @@ public class GlobalControl : MonoBehaviour
             equipmentFadeCoroutine = null;
         }
 
-        Debug.Log($"Destroyed {toDestroy.Count} components on GlobalControl object.");
+        Logger.Log(LogModule.Core, $"Уничтожено {toDestroy.Count} компонентов на объекте GlobalControl");
     }
 
     private void CleanupGameComponents()
@@ -272,13 +273,13 @@ public class GlobalControl : MonoBehaviour
         if (radialMenu != null)
         {
             radialMenu.onButtonClick += OnRadialButtonClick;
-            Debug.Log("RadialMenu subscribed after scene load");
+            Logger.Log(LogModule.Core, "RadialMenu подписан после загрузки сцены");
         }
 
         CheckForSaveFile();
 
         isSceneInitialized = true;
-        Debug.Log("Game scene initialization complete!");
+        Logger.Log(LogModule.Core, "Инициализация игровой сцены завершена");
     }
 
     #endregion
@@ -293,16 +294,16 @@ public class GlobalControl : MonoBehaviour
             inventoryManager = inventoryPanel.GetComponent<InventoryUIManager>();
             if (inventoryManager != null)
             {
-                Debug.Log("InventoryManager found!");
+                Logger.Log(LogModule.UI, "InventoryManager найден");
             }
             else
             {
-                Debug.LogWarning("InventoryUIManager component not found on InventoryPanel!");
+                Logger.LogWarning(LogModule.UI, "InventoryUIManager не найден на InventoryPanel");
             }
         }
         else
         {
-            Debug.LogWarning($"InventoryPanel with tag '{inventoryPanelTag}' not found!");
+            Logger.LogWarning(LogModule.UI, $"InventoryPanel с тегом '{inventoryPanelTag}' не найден");
         }
     }
 
@@ -318,16 +319,16 @@ public class GlobalControl : MonoBehaviour
                 equipmentCanvasGroup.blocksRaycasts = false;
                 equipmentCanvasGroup.interactable = false;
                 isEquipmentOpen = false;
-                Debug.Log("EquipmentPanel found and hidden!");
+                Logger.Log(LogModule.UI, "EquipmentPanel найден и скрыт");
             }
             else
             {
-                Debug.LogWarning("CanvasGroup component not found on EquipmentPanel!");
+                Logger.LogWarning(LogModule.UI, "CanvasGroup не найден на EquipmentPanel");
             }
         }
         else
         {
-            Debug.LogWarning($"EquipmentPanel with tag '{equipmentPanelTag}' not found!");
+            Logger.LogWarning(LogModule.UI, $"EquipmentPanel с тегом '{equipmentPanelTag}' не найден");
         }
     }
 
@@ -343,24 +344,24 @@ public class GlobalControl : MonoBehaviour
                     radialMenu = radialMenuObj.GetComponent<RadialMenu>();
                     if (radialMenu != null)
                     {
-                        Debug.Log("RadialMenu found by tag!");
+                        Logger.Log(LogModule.UI, "RadialMenu найден по тегу");
                         return;
                     }
                 }
             }
             catch (UnityException)
             {
-                Debug.Log($"Tag '{radialMenuTag}' is not defined, trying to find by name...");
+                Logger.Log(LogModule.UI, $"Тег '{radialMenuTag}' не определен, поиск по имени...");
             }
 
             radialMenu = FindObjectOfType<RadialMenu>();
             if (radialMenu != null)
             {
-                Debug.Log("RadialMenu found by type!");
+                Logger.Log(LogModule.UI, "RadialMenu найден по типу");
             }
             else
             {
-                Debug.LogWarning("RadialMenu not found!");
+                Logger.LogWarning(LogModule.UI, "RadialMenu не найден");
             }
         }
     }
@@ -370,7 +371,7 @@ public class GlobalControl : MonoBehaviour
         if (textBeginner == null)
         {
             textBeginner = FindObjectOfType<TextBeginner>();
-            Debug.Log($"TextBeginner found: {textBeginner != null}");
+            Logger.Log(LogModule.Core, $"TextBeginner найден: {textBeginner != null}");
         }
     }
 
@@ -384,13 +385,13 @@ public class GlobalControl : MonoBehaviour
             if (foundSources.Length > 0)
             {
                 audioSources.AddRange(foundSources);
-                Debug.Log($"Found {audioSources.Count} audio sources with tag 'ASO'");
+                Logger.Log(LogModule.Audio, $"Найдено {audioSources.Count} источников звука с тегом 'ASO'");
                 return;
             }
         }
         catch (UnityException)
         {
-            Debug.Log("Tag 'ASO' is not defined");
+            Logger.Log(LogModule.Audio, "Тег 'ASO' не определен");
         }
 
         AudioSource[] allAudioSources = FindObjectsOfType<AudioSource>();
@@ -401,7 +402,7 @@ public class GlobalControl : MonoBehaviour
                 audioSources.Add(source.gameObject);
             }
         }
-        Debug.Log($"Found {audioSources.Count} audio sources by component");
+        Logger.Log(LogModule.Audio, $"Найдено {audioSources.Count} источников звука по компоненту");
     }
 
     private void FindAbilityManager()
@@ -409,7 +410,7 @@ public class GlobalControl : MonoBehaviour
         if (abilityManager == null)
         {
             abilityManager = FindObjectOfType<AbilityManager>();
-            Debug.Log($"AbilityManager found: {abilityManager != null}");
+            Logger.Log(LogModule.Core, $"AbilityManager найден: {abilityManager != null}");
         }
     }
 
@@ -425,7 +426,7 @@ public class GlobalControl : MonoBehaviour
             magicLightAbility = abilityManager.GetAbility<MagicLightAbility>();
             if (magicLightAbility != null)
             {
-                Debug.Log("MagicLightAbility found!");
+                Logger.Log(LogModule.Core, "MagicLightAbility найден");
 
                 magicLightAbility.OnStateChanged -= OnMagicLightStateChanged;
                 magicLightAbility.OnStateChanged += OnMagicLightStateChanged;
@@ -434,19 +435,19 @@ public class GlobalControl : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning("MagicLightAbility not found in AbilityManager!");
+                Logger.LogWarning(LogModule.Core, "MagicLightAbility не найден в AbilityManager");
             }
         }
         else
         {
-            Debug.LogWarning("AbilityManager not found!");
+            Logger.LogWarning(LogModule.Core, "AbilityManager не найден");
         }
     }
 
     private void OnMagicLightStateChanged(bool isActive)
     {
         isMagicLightActive = isActive;
-        Debug.Log($"Magic light state changed via event: {isActive}");
+        Logger.Log(LogModule.Core, $"Состояние магического света изменено: {isActive}");
     }
 
     private void FindSettingsPanel()
@@ -463,7 +464,7 @@ public class GlobalControl : MonoBehaviour
                 }
                 catch (UnityException)
                 {
-                    Debug.Log("Tag 'SettingsPanel' is not defined, searching by name only");
+                    Logger.Log(LogModule.UI, "Тег 'SettingsPanel' не определен, поиск по имени");
                 }
             }
 
@@ -480,7 +481,7 @@ public class GlobalControl : MonoBehaviour
                 }
             }
 
-            Debug.Log($"SettingsPanel found: {settingsPanel != null}");
+            Logger.Log(LogModule.UI, $"SettingsPanel найден: {settingsPanel != null}");
         }
     }
 
@@ -489,7 +490,7 @@ public class GlobalControl : MonoBehaviour
         if (volumeSlider == null)
         {
             volumeSlider = FindObjectOfType<Slider>();
-            Debug.Log($"VolumeSlider found: {volumeSlider != null}");
+            Logger.Log(LogModule.Audio, $"VolumeSlider найден: {volumeSlider != null}");
         }
     }
 
@@ -498,7 +499,7 @@ public class GlobalControl : MonoBehaviour
         if (continueButton == null)
         {
             continueButton = FindObjectOfType<Button>();
-            Debug.Log($"ContinueButton found: {continueButton != null}");
+            Logger.Log(LogModule.UI, $"ContinueButton найден: {continueButton != null}");
         }
     }
 
@@ -507,7 +508,7 @@ public class GlobalControl : MonoBehaviour
         if (cursorDropdown == null)
         {
             cursorDropdown = FindObjectOfType<Dropdown>();
-            Debug.Log($"CursorDropdown found: {cursorDropdown != null}");
+            Logger.Log(LogModule.UI, $"CursorDropdown найден: {cursorDropdown != null}");
         }
     }
 
@@ -520,7 +521,7 @@ public class GlobalControl : MonoBehaviour
             {
                 postProcessProfile = volume.profile;
             }
-            Debug.Log($"PostProcessProfile found: {postProcessProfile != null}");
+            Logger.Log(LogModule.UI, $"PostProcessProfile найден: {postProcessProfile != null}");
         }
     }
 
@@ -529,7 +530,7 @@ public class GlobalControl : MonoBehaviour
         if (transitionAnimator == null)
         {
             transitionAnimator = FindObjectOfType<Animator>();
-            Debug.Log($"TransitionAnimator found: {transitionAnimator != null}");
+            Logger.Log(LogModule.Animation, $"TransitionAnimator найден: {transitionAnimator != null}");
         }
     }
 
@@ -625,7 +626,7 @@ public class GlobalControl : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("QuestUI.Instance не найден!");
+            Logger.LogWarning(LogModule.UI, "QuestUI.Instance не найден");
         }
     }
 
@@ -635,36 +636,36 @@ public class GlobalControl : MonoBehaviour
 
     private void OnRadialButtonClick(RadialMenu.RadialAction action, string buttonName, int buttonIndex)
     {
-        Debug.Log($"Нажата кнопка: {buttonName}, действие: {action}");
+        Logger.Log(LogModule.UI, $"Нажата кнопка: {buttonName}, действие: {action}");
 
         switch (action)
         {
             case RadialMenu.RadialAction.Talk:
                 if (textBeginner != null && !textBeginner.IsInDialogue)
                 {
-                    Debug.Log("Начинаем диалог");
+                    Logger.Log(LogModule.UI, "Начинаем диалог");
                 }
                 break;
 
             case RadialMenu.RadialAction.Take:
-                Debug.Log("Взять предмет");
+                Logger.Log(LogModule.UI, "Взять предмет");
                 break;
 
             case RadialMenu.RadialAction.Use:
-                Debug.Log("Использовать предмет");
+                Logger.Log(LogModule.UI, "Использовать предмет");
                 break;
 
             case RadialMenu.RadialAction.Examine:
-                Debug.Log("Осмотреть");
+                Logger.Log(LogModule.UI, "Осмотреть");
                 break;
 
             case RadialMenu.RadialAction.UseMagic:
-                Debug.Log("Использовать магию");
+                Logger.Log(LogModule.UI, "Использовать магию");
                 UseMagicLight();
                 break;
 
             case RadialMenu.RadialAction.OpenInventory:
-                Debug.Log("Открыть инвентарь");
+                Logger.Log(LogModule.UI, "Открыть инвентарь");
                 if (inventoryManager == null)
                 {
                     FindInventoryManager();
@@ -672,26 +673,26 @@ public class GlobalControl : MonoBehaviour
                 if (inventoryManager != null)
                 {
                     inventoryManager.ToggleInventory();
-                    Debug.Log("Inventory toggled!");
+                    Logger.Log(LogModule.UI, "Инвентарь переключен");
                 }
                 else
                 {
-                    Debug.LogError("InventoryManager still null!");
+                    Logger.LogError(LogModule.UI, "InventoryManager все еще null");
                 }
                 break;
 
             case RadialMenu.RadialAction.OpenEquipment:
-                Debug.Log("Открыть экипировку");
+                Logger.Log(LogModule.UI, "Открыть экипировку");
                 ToggleEquipment();
                 break;
 
             case RadialMenu.RadialAction.Cancel:
-                Debug.Log("Выход в главное меню");
+                Logger.Log(LogModule.UI, "Выход в главное меню");
                 LoadScene(0);
                 break;
 
             case RadialMenu.RadialAction.Settings:
-                Debug.Log("Открыть настройки");
+                Logger.Log(LogModule.UI, "Открыть настройки");
                 if (settingsPanel != null)
                 {
                     settingsPanel.SetActive(true);
@@ -700,16 +701,16 @@ public class GlobalControl : MonoBehaviour
                 break;
 
             case RadialMenu.RadialAction.Menu:
-                Debug.Log("Открыть меню");
+                Logger.Log(LogModule.UI, "Открыть меню");
                 break;
 
             case RadialMenu.RadialAction.Exit:
-                Debug.Log("Выход из игры");
+                Logger.Log(LogModule.UI, "Выход из игры");
                 QuitGame();
                 break;
 
             default:
-                Debug.LogWarning($"Неизвестное действие: {action}");
+                Logger.LogWarning(LogModule.UI, $"Неизвестное действие: {action}");
                 break;
         }
     }
@@ -725,7 +726,7 @@ public class GlobalControl : MonoBehaviour
             FindMagicLightAbility();
             if (magicLightAbility == null)
             {
-                Debug.LogWarning("MagicLightAbility not available!");
+                Logger.LogWarning(LogModule.Core, "MagicLightAbility недоступен");
                 return;
             }
         }
@@ -772,7 +773,7 @@ public class GlobalControl : MonoBehaviour
 
         PlayerPrefs.SetInt(CURSOR_PREF_KEY, cursorDropdown.value);
         PlayerPrefs.Save();
-        Debug.Log($"Cursor changed to: {PlayerPrefs.GetInt(CURSOR_PREF_KEY)}");
+        Logger.Log(LogModule.Core, $"Курсор изменен на: {PlayerPrefs.GetInt(CURSOR_PREF_KEY)}");
     }
 
     #endregion
@@ -1003,13 +1004,11 @@ public class GlobalControl : MonoBehaviour
             InitializeGameScene();
         }
 
-        // Обработка нажатия E для открытия экипировки
         if (Input.GetKeyDown(equipmentKey))
         {
             ToggleEquipment();
         }
 
-        // Обработка нажатия J для открытия квестов
         if (Input.GetKeyDown(questKey))
         {
             ToggleQuestUI();
@@ -1024,20 +1023,20 @@ public class GlobalControl : MonoBehaviour
 
             if (hit.collider != null)
             {
-                Debug.Log($"Клик по: {hit.collider.name}");
+                Logger.Log(LogModule.Core, $"Клик по: {hit.collider.name}");
 
                 DialogueTrigger trigger = hit.collider.GetComponent<DialogueTrigger>();
-                Debug.Log($"DialogueTrigger found: {trigger != null}");
+                Logger.Log(LogModule.Core, $"DialogueTrigger найден: {trigger != null}");
 
                 if (trigger != null && textBeginner != null)
                 {
-                    Debug.Log($"✅ ВЫЗЫВАЕМ StartDialogueWithFile({trigger.dialogueFileIndex})");
+                    Logger.Log(LogModule.Core, $"Запуск диалога с файлом {trigger.dialogueFileIndex}");
                     textBeginner.StartDialogueWithFile(trigger.dialogueFileIndex);
                 }
                 else
                 {
-                    if (trigger == null) Debug.LogWarning("❌ DialogueTrigger is NULL!");
-                    if (textBeginner == null) Debug.LogWarning("❌ TextBeginner is NULL!");
+                    if (trigger == null) Logger.LogWarning(LogModule.Core, "DialogueTrigger отсутствует");
+                    if (textBeginner == null) Logger.LogWarning(LogModule.Core, "TextBeginner отсутствует");
                 }
             }
         }
@@ -1098,7 +1097,6 @@ public class GlobalControl : MonoBehaviour
     {
         if (!Input.GetKeyDown(KeyCode.Escape)) return;
 
-        // Сначала закрываем квесты
         if (QuestUI.Instance != null && QuestUI.Instance.IsOpen)
         {
             QuestUI.Instance.CloseQuestPanel();
