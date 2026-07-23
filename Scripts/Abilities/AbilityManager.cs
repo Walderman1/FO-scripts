@@ -19,6 +19,7 @@ public class AbilityManager : MonoBehaviour
     {
         RegisterAbilities();
         SetupUI();
+        Logger.Log(LogModule.Abilities, $"AbilityManager инициализирован. Найдено способностей: {abilities.Count}");
     }
 
     private void RegisterAbilities()
@@ -30,19 +31,30 @@ public class AbilityManager : MonoBehaviour
             if (!abilityMap.ContainsKey(ability.activationKey))
             {
                 abilityMap.Add(ability.activationKey, ability);
+                Logger.Log(LogModule.Abilities, $"Способность {ability.abilityName} зарегистрирована с клавишей {ability.activationKey}");
+            }
+            else
+            {
+                Logger.LogWarning(LogModule.Abilities, $"Клавиша {ability.activationKey} уже используется другой способностью");
             }
         }
     }
 
     private void SetupUI()
     {
-        if (abilitySlotPrefab == null) return;
+        if (abilitySlotPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Abilities, "AbilitySlotPrefab не назначен, UI не будет создан");
+            return;
+        }
 
-        for (int i = 0; i < abilities.Count && i < maxAbilities; i++)
+        int slotsToCreate = Mathf.Min(abilities.Count, maxAbilities);
+        for (int i = 0; i < slotsToCreate; i++)
         {
             GameObject slot = Instantiate(abilitySlotPrefab, abilitySlotsParent);
-            // Настройка UI слота
         }
+
+        Logger.Log(LogModule.Abilities, $"Создано {slotsToCreate} слотов способностей");
     }
 
     public T GetAbility<T>() where T : Ability
@@ -51,9 +63,12 @@ public class AbilityManager : MonoBehaviour
         {
             if (ability is T)
             {
+                Logger.Log(LogModule.Abilities, $"Найдена способность {ability.abilityName} типа {typeof(T).Name}");
                 return ability as T;
             }
         }
+
+        Logger.LogWarning(LogModule.Abilities, $"Способность типа {typeof(T).Name} не найдена");
         return null;
     }
 
@@ -63,12 +78,24 @@ public class AbilityManager : MonoBehaviour
         {
             abilities.Add(ability);
             RegisterAbilities();
+            Logger.Log(LogModule.Abilities, $"Способность {ability.abilityName} добавлена");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Abilities, $"Способность {ability.abilityName} уже существует");
         }
     }
 
     public void RemoveAbility(Ability ability)
     {
-        abilities.Remove(ability);
-        RegisterAbilities();
+        if (abilities.Remove(ability))
+        {
+            RegisterAbilities();
+            Logger.Log(LogModule.Abilities, $"Способность {ability.abilityName} удалена");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Abilities, $"Способность {ability.abilityName} не найдена для удаления");
+        }
     }
 }
