@@ -47,6 +47,7 @@ public abstract class Ability : MonoBehaviour
         {
             isOnCooldown = true;
             currentCooldown = cooldown;
+            Logger.Log(LogModule.Abilities, $"Способность {abilityName} перешла в режим перезарядки на {cooldown} секунд");
         }
     }
 }
