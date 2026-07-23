@@ -1,4 +1,3 @@
-// QuestUI.cs - УПРАВЛЯЕТ УВЕДОМЛЕНИЯМИ С КОНФИГОМ
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -48,15 +47,21 @@ public class QuestUI : MonoBehaviour
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            Logger.Log(LogModule.QuestSystem, "QuestUI инициализирован");
+        }
         else
+        {
+            Logger.Log(LogModule.QuestSystem, "Уничтожение дублирующего QuestUI");
             Destroy(gameObject);
+        }
 
         if (config == null)
         {
             config = Resources.Load<QuestConfigSO>("Configs/QuestConfig");
             if (config == null)
-                Debug.LogError("QuestConfig не найден! Создайте его в Resources/Configs/");
+                Logger.LogError(LogModule.QuestSystem, "QuestConfig не найден");
         }
 
         LoadPrefabs();
@@ -105,7 +110,11 @@ public class QuestUI : MonoBehaviour
 
     private void CacheComponents()
     {
-        if (questPanel == null) return;
+        if (questPanel == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "questPanel отсутствует");
+            return;
+        }
 
         Transform list = questPanel.transform.Find("QuestList");
         if (list != null)
@@ -180,20 +189,28 @@ public class QuestUI : MonoBehaviour
 
     private void LoadPrefabs()
     {
-        if (config == null) return;
+        if (config == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "config отсутствует, загрузка префабов невозможна");
+            return;
+        }
 
         questItemPrefab = Resources.Load<GameObject>(config.QuestItemPrefabPath);
         if (questItemPrefab == null)
-            Debug.LogWarning($"Префаб не найден: {config.QuestItemPrefabPath}");
+            Logger.LogWarning(LogModule.QuestSystem, $"Префаб не найден: {config.QuestItemPrefabPath}");
 
         objectivePrefab = Resources.Load<GameObject>(config.ObjectivePrefabPath);
         if (objectivePrefab == null)
-            Debug.LogWarning($"Префаб не найден: {config.ObjectivePrefabPath}");
+            Logger.LogWarning(LogModule.QuestSystem, $"Префаб не найден: {config.ObjectivePrefabPath}");
     }
 
     private void LoadItemPrefabs()
     {
-        if (config == null) return;
+        if (config == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "config отсутствует, загрузка префабов предметов невозможна");
+            return;
+        }
 
         itemPrefabs.Clear();
         string itemsPath = config.InventoryItemsPath;
@@ -220,7 +237,7 @@ public class QuestUI : MonoBehaviour
         }
         if (questPanel == null)
         {
-            Debug.LogError("QuestPanel не найден!");
+            Logger.LogError(LogModule.QuestSystem, "QuestPanel не найден");
             return;
         }
         canvasGroup = questPanel.GetComponent<CanvasGroup>();
@@ -230,9 +247,13 @@ public class QuestUI : MonoBehaviour
 
     private void SetupReferences()
     {
-        if (questPanel == null) return;
+        if (questPanel == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "questPanel отсутствует, настройка ссылок невозможна");
+            return;
+        }
 
-        Debug.Log("🔍 SetupReferences: Поиск вкладок...");
+        Logger.Log(LogModule.QuestSystem, "Настройка ссылок...");
 
         if (tabsContainer != null)
         {
@@ -251,7 +272,7 @@ public class QuestUI : MonoBehaviour
                 {
                     activeTabBtn.onClick.RemoveAllListeners();
                     activeTabBtn.onClick.AddListener(() => SwitchTab(0));
-                    Debug.Log("✅ ActiveTab привязан");
+                    Logger.Log(LogModule.QuestSystem, "ActiveTab привязан");
                 }
             }
 
@@ -266,7 +287,7 @@ public class QuestUI : MonoBehaviour
                 {
                     completedTabBtn.onClick.RemoveAllListeners();
                     completedTabBtn.onClick.AddListener(() => SwitchTab(1));
-                    Debug.Log("✅ CompletedTab привязан");
+                    Logger.Log(LogModule.QuestSystem, "CompletedTab привязан");
                 }
             }
 
@@ -281,13 +302,13 @@ public class QuestUI : MonoBehaviour
                 {
                     failedTabBtn.onClick.RemoveAllListeners();
                     failedTabBtn.onClick.AddListener(() => SwitchTab(2));
-                    Debug.Log("✅ FailedTab привязан");
+                    Logger.Log(LogModule.QuestSystem, "FailedTab привязан");
                 }
             }
         }
         else
         {
-            Debug.LogWarning("⚠️ TabsContainer не найден!");
+            Logger.LogWarning(LogModule.QuestSystem, "TabsContainer не найден");
         }
 
         if (detailTransform != null)
@@ -329,7 +350,7 @@ public class QuestUI : MonoBehaviour
             detailPanel.SetActive(false);
 
         UpdateTabVisuals();
-        Debug.Log("✅ SetupReferences завершён");
+        Logger.Log(LogModule.QuestSystem, "Настройка ссылок завершена");
     }
 
     private void SetupButtons()
@@ -341,7 +362,7 @@ public class QuestUI : MonoBehaviour
 
     private void SwitchTab(int tabIndex)
     {
-        Debug.Log($"🔄 SwitchTab: переключение на вкладку {tabIndex}");
+        Logger.Log(LogModule.QuestSystem, $"Переключение на вкладку {tabIndex}");
         currentTab = tabIndex;
 
         if (detailPanel != null)
@@ -407,6 +428,7 @@ public class QuestUI : MonoBehaviour
         if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
         fadeCoroutine = StartCoroutine(FadeCanvasGroup(1f));
         RefreshQuests();
+        Logger.Log(LogModule.QuestSystem, "Панель квестов открыта");
     }
 
     public void CloseQuestPanel()
@@ -415,6 +437,7 @@ public class QuestUI : MonoBehaviour
         isOpen = false;
         if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
         fadeCoroutine = StartCoroutine(FadeCanvasGroup(0f));
+        Logger.Log(LogModule.QuestSystem, "Панель квестов закрыта");
     }
 
     private IEnumerator FadeCanvasGroup(float targetAlpha)
@@ -477,11 +500,11 @@ public class QuestUI : MonoBehaviour
     public void RefreshQuests()
     {
         if (config != null && config.EnableLogging)
-            Debug.Log($"🔄 RefreshQuests: currentTab={currentTab}, isOpen={isOpen}");
+            Logger.Log(LogModule.QuestSystem, $"Обновление квестов: currentTab={currentTab}, isOpen={isOpen}");
 
         if (questListContainer == null)
         {
-            Debug.LogWarning("⚠️ RefreshQuests: questListContainer == null");
+            Logger.LogWarning(LogModule.QuestSystem, "questListContainer отсутствует");
             return;
         }
 
@@ -546,7 +569,11 @@ public class QuestUI : MonoBehaviour
 
     private GameObject CreateQuestItem(QuestInstance quest)
     {
-        if (questListContainer == null) return null;
+        if (questListContainer == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "questListContainer отсутствует");
+            return null;
+        }
 
         GameObject item;
 
@@ -672,7 +699,12 @@ public class QuestUI : MonoBehaviour
     {
         selectedQuest = quest;
 
-        if (detailPanel == null) return;
+        if (detailPanel == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "detailPanel отсутствует");
+            return;
+        }
+
         detailPanel.SetActive(true);
 
         if (detailTitle != null)
@@ -733,7 +765,7 @@ public class QuestUI : MonoBehaviour
         {
             if (IsFailed(quest))
             {
-                trackButtonText.text = config != null ? config.FailedQuestText : "❌ Провален";
+                trackButtonText.text = config != null ? config.FailedQuestText : "Провален";
                 trackButtonText.color = config != null ? config.FailedColor : Color.red;
                 if (trackButton != null) trackButton.interactable = false;
                 if (cancelButton != null) cancelButton.interactable = false;
@@ -815,7 +847,11 @@ public class QuestUI : MonoBehaviour
 
         string slotPath = config != null ? config.SlotPrefabPath : "Slot";
         GameObject slotPrefab = Resources.Load<GameObject>(slotPath);
-        if (slotPrefab == null) return;
+        if (slotPrefab == null)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, $"Слот префаб не найден: {slotPath}");
+            return;
+        }
 
         int count = 0;
         foreach (var obj in quest.Objectives)
@@ -888,23 +924,37 @@ public class QuestUI : MonoBehaviour
 
     public void CancelSelectedQuest()
     {
-        if (selectedQuest == null || currentTab != 0) return;
+        if (selectedQuest == null || currentTab != 0)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "Нет выбранного квеста или неактивная вкладка для отмены");
+            return;
+        }
 
-        Debug.Log($"🗑️ CancelSelectedQuest: {selectedQuest.QuestName}");
+        Logger.Log(LogModule.QuestSystem, $"Отмена квеста: {selectedQuest.QuestName}");
         QuestManager.Instance?.CancelQuest(selectedQuest.QuestID);
         CloseQuestPanel();
     }
 
     public void ToggleTrackQuest()
     {
-        if (selectedQuest == null || currentTab != 0) return;
-        if (IsFailed(selectedQuest)) return;
+        if (selectedQuest == null || currentTab != 0)
+        {
+            Logger.LogWarning(LogModule.QuestSystem, "Нет выбранного квеста или неактивная вкладка для отслеживания");
+            return;
+        }
+
+        if (IsFailed(selectedQuest))
+        {
+            Logger.Log(LogModule.QuestSystem, $"Квест {selectedQuest.QuestName} провален, отслеживание невозможно");
+            return;
+        }
 
         if (trackedQuest == selectedQuest)
         {
             trackedQuest = null;
             if (trackButtonText != null)
                 trackButtonText.text = config != null ? config.TrackBtnText : "Отслеживать";
+            Logger.Log(LogModule.QuestSystem, $"Отмена отслеживания квеста {selectedQuest.QuestName}");
             RefreshQuests();
         }
         else
@@ -912,16 +962,15 @@ public class QuestUI : MonoBehaviour
             trackedQuest = selectedQuest;
             if (trackButtonText != null)
                 trackButtonText.text = config != null ? config.UntrackBtnText : "Отменить отслеживание";
+            Logger.Log(LogModule.QuestSystem, $"Начато отслеживание квеста {selectedQuest.QuestName}");
             RefreshQuests();
         }
     }
 
-    // ============ ОБРАБОТЧИКИ СОБЫТИЙ ============
-
     private void OnQuestStarted(QuestInstance quest)
     {
         if (config != null && config.EnableLogging)
-            Debug.Log($"📢 OnQuestStarted: {quest?.QuestName}");
+            Logger.Log(LogModule.QuestSystem, $"Событие: квест начат - {quest?.QuestName}");
 
         QuestNotifications.Instance?.ShowQuestStarted(quest.QuestName);
         if (isOpen) RefreshQuests();
@@ -930,7 +979,7 @@ public class QuestUI : MonoBehaviour
     private void OnQuestUpdated(QuestInstance quest)
     {
         if (config != null && config.EnableLogging)
-            Debug.Log($"📢 OnQuestUpdated: {quest?.QuestName}");
+            Logger.Log(LogModule.QuestSystem, $"Событие: квест обновлён - {quest?.QuestName}");
 
         if (isOpen) RefreshQuests();
     }
@@ -938,7 +987,7 @@ public class QuestUI : MonoBehaviour
     private void OnObjectiveUpdated(QuestInstance quest)
     {
         if (config != null && config.EnableLogging)
-            Debug.Log($"📢 OnObjectiveUpdated: {quest?.QuestName}");
+            Logger.Log(LogModule.QuestSystem, $"Событие: цель обновлена - {quest?.QuestName}");
 
         if (trackedQuest == quest)
         {
@@ -963,7 +1012,7 @@ public class QuestUI : MonoBehaviour
     private void OnQuestCompleted(QuestInstance quest)
     {
         if (config != null && config.EnableLogging)
-            Debug.Log($"✅ OnQuestCompleted: {quest?.QuestName}");
+            Logger.Log(LogModule.QuestSystem, $"Событие: квест завершён - {quest?.QuestName}");
 
         QuestNotifications.Instance?.ShowQuestCompleted(quest.QuestName);
 
