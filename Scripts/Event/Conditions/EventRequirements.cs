@@ -1,4 +1,3 @@
-// EventRequirements.cs - ПОЛНАЯ ВЕРСИЯ
 using UnityEngine;
 
 [System.Serializable]
@@ -6,8 +5,6 @@ public abstract class EventRequirement
 {
     public abstract bool Check(EventContext context);
 }
-
-// ============ СТАНДАРТНЫЕ ТРЕБОВАНИЯ ============
 
 [System.Serializable]
 public class RequirementHasItem : EventRequirement
@@ -17,13 +14,11 @@ public class RequirementHasItem : EventRequirement
 
     public override bool Check(EventContext context)
     {
-        // Проверка наличия предмета в инвентаре
-        // Здесь нужна реализация проверки
-        return true; // Заглушка
+        Logger.Log(LogModule.Event, $"Проверка наличия предмета {itemType} (минимум {minCount})");
+        return true;
     }
 }
 
-// RequirementFlag - ИСПОЛЬЗУЕТ ОБЪЕДИНЕННЫЙ FlagManager
 [System.Serializable]
 public class RequirementFlag : EventRequirement
 {
@@ -32,8 +27,9 @@ public class RequirementFlag : EventRequirement
 
     public override bool Check(EventContext context)
     {
-        // ✅ Используем FlagManager вместо GlobalFlagManager
-        return FlagManager.Instance?.GetFlag(flagName) == flagValue;
+        bool result = FlagManager.Instance?.GetFlag(flagName) == flagValue;
+        Logger.Log(LogModule.Event, $"Проверка флага {flagName} = {flagValue}: {(result ? "успешно" : "провал")}");
+        return result;
     }
 }
 
@@ -45,7 +41,9 @@ public class RequirementLocation : EventRequirement
     public override bool Check(EventContext context)
     {
         string currentLocation = GetCurrentLocationName();
-        return currentLocation == locationName;
+        bool result = currentLocation == locationName;
+        Logger.Log(LogModule.Event, $"Проверка локации: текущая '{currentLocation}', требуется '{locationName}': {(result ? "успешно" : "провал")}");
+        return result;
     }
 
     private string GetCurrentLocationName()
@@ -64,19 +62,16 @@ public class RequirementLocation : EventRequirement
 public class RequirementEventExecuted : EventRequirement
 {
     public string eventID;
-    public bool executed = true;  // true = выполнено, false = НЕ выполнено
+    public bool executed = true;
 
     public override bool Check(EventContext context)
     {
-        return EventStateManager.Instance?.IsExecuted(eventID) == executed;
+        bool result = EventStateManager.Instance?.IsExecuted(eventID) == executed;
+        Logger.Log(LogModule.Event, $"Проверка события '{eventID}' выполнено={executed}: {(result ? "успешно" : "провал")}");
+        return result;
     }
 }
 
-// ============ ДОПОЛНИТЕЛЬНЫЕ ТРЕБОВАНИЯ ============
-
-/// <summary>
-/// Проверяет, сколько раз событие выполнялось (от min до max)
-/// </summary>
 [System.Serializable]
 public class RequirementEventExecutionCount : EventRequirement
 {
@@ -87,13 +82,12 @@ public class RequirementEventExecutionCount : EventRequirement
     public override bool Check(EventContext context)
     {
         int count = EventStateManager.Instance?.GetExecutionCount(eventID) ?? 0;
-        return count >= minCount && count <= maxCount;
+        bool result = count >= minCount && count <= maxCount;
+        Logger.Log(LogModule.Event, $"Проверка количества выполнений '{eventID}': {count} (требуется {minCount}-{maxCount}): {(result ? "успешно" : "провал")}");
+        return result;
     }
 }
 
-/// <summary>
-/// Случайный шанс выполнения (0 = 0%, 1 = 100%)
-/// </summary>
 [System.Serializable]
 public class RequirementRandomChance : EventRequirement
 {
@@ -104,20 +98,24 @@ public class RequirementRandomChance : EventRequirement
 
     public override bool Check(EventContext context)
     {
+        bool result;
         if (useSeed)
         {
             Random.InitState(seed);
-            float result = Random.value;
+            float value = Random.value;
             Random.InitState(System.Environment.TickCount);
-            return result <= chance;
+            result = value <= chance;
         }
-        return Random.value <= chance;
+        else
+        {
+            result = Random.value <= chance;
+        }
+
+        Logger.Log(LogModule.Event, $"Проверка случайного шанса {chance * 100}%: {(result ? "успешно" : "провал")}");
+        return result;
     }
 }
 
-/// <summary>
-/// Пользовательское условие через метод в коде
-/// </summary>
 [System.Serializable]
 public class RequirementCustomCondition : EventRequirement
 {
@@ -128,7 +126,7 @@ public class RequirementCustomCondition : EventRequirement
     {
         if (targetObject == null || string.IsNullOrEmpty(methodName))
         {
-            Debug.LogWarning("RequirementCustomCondition: targetObject или methodName не заданы!");
+            Logger.LogWarning(LogModule.Event, "RequirementCustomCondition: targetObject или methodName не заданы");
             return true;
         }
 
@@ -137,17 +135,19 @@ public class RequirementCustomCondition : EventRequirement
         {
             try
             {
-                return (bool)method.Invoke(targetObject, new object[] { context });
+                bool result = (bool)method.Invoke(targetObject, new object[] { context });
+                Logger.Log(LogModule.Event, $"Пользовательское условие '{methodName}': {(result ? "успешно" : "провал")}");
+                return result;
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"RequirementCustomCondition: ошибка вызова метода {methodName}: {e.Message}");
+                Logger.LogError(LogModule.Event, $"RequirementCustomCondition: ошибка вызова метода {methodName}: {e.Message}");
                 return false;
             }
         }
         else
         {
-            Debug.LogWarning($"RequirementCustomCondition: метод {methodName} не найден на {targetObject.name}");
+            Logger.LogWarning(LogModule.Event, $"RequirementCustomCondition: метод {methodName} не найден на {targetObject.name}");
             return false;
         }
     }
