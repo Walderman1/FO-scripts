@@ -422,21 +422,6 @@ finding-oneself/
 **Ключевые файлы:** `LocationNeighbors`, `NavigationArrow`, `SceneSlideTransition`
 </details>
 
-### 🐞 Отладка
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-- ✅ Панель с логами (F12)
-- ✅ Отслеживание старта, обновления, завершения квестов
-- ✅ Отслеживание выполнения событий
-- ✅ Проверка прогресс-баров
-
-**Ключевые файлы:** `QuestDebugger`
-</details>
-
----
-
 ## 🛠 Редакторские инструменты
 
 <details>
@@ -458,7 +443,7 @@ finding-oneself/
 
 ---
 
-## 🐞 Система отладки (Logger & DebuggerWindow)
+## 🐞 Система отладки
 
 <details>
 <summary><b>📖 Развернуть описание</b></summary>
