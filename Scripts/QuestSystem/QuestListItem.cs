@@ -1,6 +1,3 @@
-// ============================================================
-// QuestListItem.cs
-// ============================================================
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -22,9 +19,13 @@ public class QuestListItem : MonoBehaviour
 
         if (titleText != null)
             titleText.text = questInstance.QuestName;
+        else
+            Logger.LogWarning(LogModule.QuestSystem, "titleText не назначен в QuestListItem");
 
         if (progressText != null)
             progressText.text = questInstance.GetProgressText();
+        else
+            Logger.LogWarning(LogModule.QuestSystem, "progressText не назначен в QuestListItem");
 
         if (iconImage != null && questInstance.Icon != null)
             iconImage.sprite = questInstance.Icon;
@@ -34,5 +35,7 @@ public class QuestListItem : MonoBehaviour
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener(() => onSelect?.Invoke());
         }
+
+        Logger.Log(LogModule.QuestSystem, $"Инициализирован элемент списка квеста: {questInstance.QuestName}");
     }
 }
