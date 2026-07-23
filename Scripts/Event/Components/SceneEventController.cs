@@ -1,4 +1,3 @@
-// SceneEventController.cs
 using UnityEngine;
 
 public class SceneEventController : MonoBehaviour
@@ -22,7 +21,8 @@ public class SceneEventController : MonoBehaviour
 
     private void Awake()
     {
-        // Выполняем события при загрузке сцены
+        Logger.Log(LogModule.Event, $"Инициализация контроллера событий сцены: {gameObject.scene.name}");
+
         foreach (var evt in eventsOnAwake)
         {
             if (evt != null)
@@ -31,13 +31,15 @@ public class SceneEventController : MonoBehaviour
                     .WithLocation(gameObject.scene.name)
                     .WithValue("Awake");
                 evt.Execute(context);
+                Logger.Log(LogModule.Event, $"Выполнено событие Awake: {evt.name}");
             }
         }
     }
 
     private void Start()
     {
-        // Выполняем события при входе в сцену
+        Logger.Log(LogModule.Event, $"Запуск событий сцены: {gameObject.scene.name}");
+
         foreach (var evt in eventsOnEnter)
         {
             if (evt != null)
@@ -46,26 +48,31 @@ public class SceneEventController : MonoBehaviour
                     .WithLocation(gameObject.scene.name)
                     .WithValue("Start");
                 evt.Execute(context);
+                Logger.Log(LogModule.Event, $"Выполнено событие Start: {evt.name}");
             }
         }
 
-        // Проверяем уникальные события
         foreach (var unique in uniqueEvents)
         {
             if (unique.gameEvent != null)
             {
-                if (!EventStateManager.Instance?.IsExecuted(unique.eventID) ?? false)
+                bool isExecuted = EventStateManager.Instance?.IsExecuted(unique.eventID) ?? false;
+                if (!isExecuted)
                 {
                     unique.gameEvent.Execute(new EventContext()
                         .WithLocation(gameObject.scene.name));
+                    Logger.Log(LogModule.Event, $"Выполнено уникальное событие '{unique.eventID}' в сцене {gameObject.scene.name}");
+                }
+                else
+                {
+                    Logger.Log(LogModule.Event, $"Уникальное событие '{unique.eventID}' уже было выполнено ранее");
                 }
             }
         }
     }
 
-    // Вызов при выходе из сцены
     private void OnDestroy()
     {
-        // Можно сохранить состояния перед выходом
+        Logger.Log(LogModule.Event, $"Уничтожение контроллера событий сцены: {gameObject.scene.name}");
     }
 }
