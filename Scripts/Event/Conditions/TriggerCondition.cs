@@ -1,4 +1,3 @@
-// TriggerCondition.cs
 using UnityEngine;
 
 [System.Serializable]
@@ -7,7 +6,6 @@ public abstract class TriggerCondition
     public abstract bool Check(EventContext context);
 }
 
-// Конкретные условия
 [System.Serializable]
 public class TriggerConditionItem : TriggerCondition
 {
@@ -16,12 +14,21 @@ public class TriggerConditionItem : TriggerCondition
 
     public override bool Check(EventContext context)
     {
-        if (context.ItemType != targetItem) return false;
+        if (context.ItemType != targetItem)
+        {
+            Logger.Log(LogModule.Event, $"Условие предмета: {targetItem} не совпадает с контекстом");
+            return false;
+        }
 
         if (requireNotEquipped)
         {
-            return !EquipmentSystem.Instance?.IsEquipped(targetItem) ?? true;
+            bool isEquipped = EquipmentSystem.Instance?.IsEquipped(targetItem) ?? false;
+            bool result = !isEquipped;
+            Logger.Log(LogModule.Event, $"Условие предмета: {targetItem} {(result ? "не экипирован" : "экипирован")}");
+            return result;
         }
+
+        Logger.Log(LogModule.Event, $"Условие предмета: {targetItem} выполнено");
         return true;
     }
 }
@@ -34,24 +41,29 @@ public class TriggerConditionLocation : TriggerCondition
 
     public override bool Check(EventContext context)
     {
-        if (string.IsNullOrEmpty(locationName)) return true;
+        if (string.IsNullOrEmpty(locationName))
+        {
+            Logger.Log(LogModule.Event, "Условие локации: имя локации пустое, условие пропущено");
+            return true;
+        }
 
-        // ✅ БЕРЁМ ИЗ TEXTBEGINNER
         string currentLocation = GetCurrentLocationFromTextBeginner();
 
-        // Если не нашли в TextBeginner, пробуем через контекст
         if (string.IsNullOrEmpty(currentLocation))
         {
             currentLocation = context.LocationName ?? GetCurrentLocationName();
         }
 
+        bool result;
         if (exactMatch)
-            return currentLocation == locationName;
+            result = currentLocation == locationName;
         else
-            return currentLocation.Contains(locationName);
+            result = currentLocation.Contains(locationName);
+
+        Logger.Log(LogModule.Event, $"Условие локации: текущая '{currentLocation}', требуется '{locationName}' (точное={exactMatch}): {(result ? "успешно" : "провал")}");
+        return result;
     }
 
-    // ✅ БЕРЁТ ЛОКАЦИЮ ИЗ TEXTBEGINNER
     private string GetCurrentLocationFromTextBeginner()
     {
         TextBeginner textBeginner = Object.FindObjectOfType<TextBeginner>();
@@ -73,7 +85,6 @@ public class TriggerConditionLocation : TriggerCondition
         return string.Empty;
     }
 
-    // Запасной метод (если TextBeginner не найден)
     private string GetCurrentLocationName()
     {
         GameObject[] locations = GameObject.FindGameObjectsWithTag("Location");
@@ -86,7 +97,6 @@ public class TriggerConditionLocation : TriggerCondition
     }
 }
 
-// TriggerConditionFlag.cs - ИСПОЛЬЗУЕТ ОБЪЕДИНЕННЫЙ FlagManager
 [System.Serializable]
 public class TriggerConditionFlag : TriggerCondition
 {
@@ -95,8 +105,9 @@ public class TriggerConditionFlag : TriggerCondition
 
     public override bool Check(EventContext context)
     {
-        // ✅ Используем FlagManager вместо GameStateManager
-        return FlagManager.Instance?.GetFlag(flagName) == flagValue;
+        bool result = FlagManager.Instance?.GetFlag(flagName) == flagValue;
+        Logger.Log(LogModule.Event, $"Условие флага: {flagName} = {flagValue}: {(result ? "успешно" : "провал")}");
+        return result;
     }
 }
 
@@ -107,6 +118,7 @@ public class TriggerConditionCustom : TriggerCondition
 
     public override bool Check(EventContext context)
     {
+        Logger.Log(LogModule.Event, $"Пользовательское условие: {customMethodName} - всегда выполняется");
         return true;
     }
 }
