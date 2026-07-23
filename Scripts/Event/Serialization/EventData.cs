@@ -1,4 +1,3 @@
-// EventData.cs
 using System;
 using System.Collections.Generic;
 
@@ -42,29 +41,23 @@ public class EventActionData
     public float delay;
     public string actionName;
 
-    // Диалог
     public int dialogueFileIndex;
     public string dialogueID;
 
-    // Предметы
     public string itemType;
     public int amount;
 
-    // Флаги
     public string flagName;
     public bool flagValue;
 
-    // Телепорт
     public string locationName;
     public float targetX;
     public float targetY;
     public bool usePositionOverride;
 
-    // Звук
     public string soundClipPath;
     public float volume;
 
-    // Объекты
     public string prefabPath;
     public float spawnX;
     public float spawnY;
@@ -74,16 +67,13 @@ public class EventActionData
     public float destroyDelay;
     public bool enable;
 
-    // События
     public string eventID;
     public bool requiredState;
     public List<EventActionData> subActions = new List<EventActionData>();
 
-    // Для CheckEvent - вложенные действия
     public EventActionData actionIfTrue;
     public EventActionData actionIfFalse;
 
-    // Сохранение
     public string customKey;
     public string value;
 }
@@ -93,30 +83,23 @@ public class RequirementData
 {
     public string type;
 
-    // Для HasItem
     public string itemType;
     public int minCount;
 
-    // Для Flag
     public string flagName;
     public bool flagValue;
 
-    // Для Location
     public string locationName;
 
-    // Для EventExecuted
     public string eventID;
     public bool executed;
 
-    // Для EventExecutionCount
     public int maxCount;
 
-    // Для RandomChance
     public float chance;
     public bool useSeed;
     public int seed;
 
-    // Для CustomCondition
     public string methodName;
     public string targetObjectPath;
 }
