@@ -5,44 +5,42 @@ public class EquipmentSystem : MonoBehaviour
 {
     public static EquipmentSystem Instance;
 
-    // Храним экипированные предметы
     private Dictionary<EquipmentType, GameObject> equippedItems = new Dictionary<EquipmentType, GameObject>();
     private Dictionary<EquipmentType, ItemType> equippedTypes = new Dictionary<EquipmentType, ItemType>();
 
-    // Кэш для найденных пивотов
     private Dictionary<EquipmentType, Transform> pivotCache = new Dictionary<EquipmentType, Transform>();
 
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            Logger.Log(LogModule.Inventory, "EquipmentSystem инициализирован");
+        }
         else
+        {
+            Logger.Log(LogModule.Inventory, "Уничтожение дублирующего EquipmentSystem");
             Destroy(gameObject);
+        }
     }
 
-    // ========== ПОИСК ПИВОТА В ДОЧЕРНИХ ОБЪЕКТАХ ==========
     private Transform FindPivotByTag(EquipmentType slotType)
     {
-        // Проверяем кэш
         if (pivotCache.ContainsKey(slotType))
         {
             return pivotCache[slotType];
         }
 
-        // Ищем ВСЕ объекты с тегом "EquipmentSlot"
         GameObject[] taggedObjects = GameObject.FindGameObjectsWithTag("EquipmentSlot");
 
-        // Если ничего не нашли с тегом
         if (taggedObjects.Length == 0)
         {
-            Debug.LogWarning($"⚠️ No objects with tag 'EquipmentSlot' found!");
+            Logger.LogWarning(LogModule.Inventory, "Объекты с тегом 'EquipmentSlot' не найдены");
             return null;
         }
 
-        // Проходим по всем объектам с тегом
         foreach (GameObject parentObj in taggedObjects)
         {
-            // Ищем среди ДОЧЕРНИХ объектов
             foreach (Transform child in parentObj.transform)
             {
                 string childName = child.name;
@@ -83,57 +81,60 @@ public class EquipmentSystem : MonoBehaviour
 
                 if (found != null)
                 {
-                    Debug.Log($"✅ Found pivot for {slotType}: {found.name} (child of {parentObj.name})");
+                    Logger.Log(LogModule.Inventory, $"Найден пивот для {slotType}: {found.name} (дочерний от {parentObj.name})");
                     pivotCache[slotType] = found;
                     return found;
                 }
             }
         }
 
-        Debug.LogWarning($"⚠️ No pivot found for {slotType} in children of objects with tag 'EquipmentSlot'");
+        Logger.LogWarning(LogModule.Inventory, $"Пивот для {slotType} не найден в дочерних объектах с тегом 'EquipmentSlot'");
         return null;
     }
 
-    // ========== ПОЛУЧИТЬ ПИВОТ ДЛЯ СЛОТА ==========
     private Transform GetPivotForSlot(EquipmentType slotType)
     {
         Transform pivot = FindPivotByTag(slotType);
 
         if (pivot == null)
         {
-            Debug.LogError($"❌ Pivot for {slotType} not found! Make sure there is an object with tag 'EquipmentSlot' and a child named '{slotType}Pivot'");
+            Logger.LogError(LogModule.Inventory, $"Пивот для {slotType} не найден");
         }
 
         return pivot;
     }
 
-    // ========== ЭКИПИРОВКА ==========
     public bool EquipItem(InventoryItemMarker item)
     {
-        if (item == null) return false;
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "Попытка экипировать null предмет");
+            return false;
+        }
 
         ItemData data = ItemDatabase.Instance?.GetItemData(item.itemType);
         if (data == null || !data.isEquippable)
         {
-            Debug.Log($"Item {item.itemType} is not equippable!");
+            Logger.Log(LogModule.Inventory, $"Предмет {item.itemType} нельзя экипировать");
             return false;
         }
 
         if (equippedItems.ContainsKey(data.equipmentType) && equippedItems[data.equipmentType] != null)
         {
+            Logger.Log(LogModule.Inventory, $"Слот {data.equipmentType} занят, снятие текущего предмета");
             UnequipItem(data.equipmentType);
         }
 
         Transform pivot = GetPivotForSlot(data.equipmentType);
         if (pivot == null)
         {
-            Debug.LogError($"Cannot equip {item.itemType}: pivot for {data.equipmentType} not found!");
+            Logger.LogError(LogModule.Inventory, $"Невозможно экипировать {item.itemType}: пивот для {data.equipmentType} не найден");
             return false;
         }
 
         if (data.worldPrefab == null)
         {
-            Debug.LogError($"World prefab for {item.itemType} not found!");
+            Logger.LogError(LogModule.Inventory, $"World префаб для {item.itemType} не найден");
             return false;
         }
 
@@ -150,13 +151,17 @@ public class EquipmentSystem : MonoBehaviour
         EventManager.Instance?.TriggerEvent(EventTriggerType.EquipItem,
             new EventContext().WithItem(item.itemType).WithEquipmentType(data.equipmentType));
 
-        Debug.Log($"✅ Equipped: {item.itemType} in {data.equipmentType}");
+        Logger.Log(LogModule.Inventory, $"Экипирован предмет: {item.itemType} в слот {data.equipmentType}");
         return true;
     }
 
     public void UnequipItem(EquipmentType slotType)
     {
-        if (!equippedItems.ContainsKey(slotType)) return;
+        if (!equippedItems.ContainsKey(slotType))
+        {
+            Logger.Log(LogModule.Inventory, $"Слот {slotType} уже пуст");
+            return;
+        }
 
         GameObject item = equippedItems[slotType];
         if (item != null)
@@ -167,7 +172,7 @@ public class EquipmentSystem : MonoBehaviour
         equippedItems.Remove(slotType);
         equippedTypes.Remove(slotType);
 
-        Debug.Log($"Unequipped from {slotType}");
+        Logger.Log(LogModule.Inventory, $"Предмет снят со слота {slotType}");
     }
 
     public void UnequipCurrent()
@@ -176,7 +181,12 @@ public class EquipmentSystem : MonoBehaviour
         {
             var first = equippedItems.GetEnumerator();
             first.MoveNext();
+            Logger.Log(LogModule.Inventory, $"Снятие предмета со слота {first.Current.Key}");
             UnequipItem(first.Current.Key);
+        }
+        else
+        {
+            Logger.Log(LogModule.Inventory, "Нет экипированных предметов для снятия");
         }
     }
 
@@ -267,6 +277,7 @@ public class EquipmentSystem : MonoBehaviour
                 }
             }
         }
+        Logger.Log(LogModule.Inventory, "Визуальное отображение экипировки обновлено");
     }
 
     private void OnDestroy()
@@ -277,5 +288,6 @@ public class EquipmentSystem : MonoBehaviour
         }
         equippedItems.Clear();
         equippedTypes.Clear();
+        Logger.Log(LogModule.Inventory, "EquipmentSystem уничтожен, экипировка очищена");
     }
 }
