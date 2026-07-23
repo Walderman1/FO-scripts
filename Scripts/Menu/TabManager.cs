@@ -31,11 +31,17 @@ public class TabManager : MonoBehaviour
         this.onFullscreenToggle = onFullscreenToggle;
         this.onResetProgress = onResetProgress;
         isInitialized = true;
+
+        Logger.Log(LogModule.Menu, "TabManager инициализирован");
     }
 
     public void CreateTabs(Transform parent)
     {
-        if (!isInitialized || uiBuilder == null) return;
+        if (!isInitialized || uiBuilder == null)
+        {
+            Logger.LogWarning(LogModule.Menu, "TabManager не инициализирован или uiBuilder отсутствует");
+            return;
+        }
 
         GameObject container = uiBuilder.CreateTabContainer(parent, config.tabSize, new Vector2(0, -80));
 
@@ -43,6 +49,7 @@ public class TabManager : MonoBehaviour
         {
             GameObject tab = uiBuilder.CreateTabButton(container.transform, name, () => SwitchTab(name));
             tabButtons[name] = tab;
+            Logger.Log(LogModule.Menu, $"Создана вкладка: {name}");
         }
 
         GameObject contentContainer = uiBuilder.CreateTabContentContainer(parent);
@@ -56,17 +63,28 @@ public class TabManager : MonoBehaviour
         {
             SwitchTab(config.tabNames[0]);
         }
+
+        Logger.Log(LogModule.Menu, $"Создано {config.tabNames.Length} вкладок");
     }
 
     public void SwitchTab(string name)
     {
-        if (!isInitialized) return;
+        if (!isInitialized)
+        {
+            Logger.LogWarning(LogModule.Menu, "TabManager не инициализирован, переключение вкладки невозможно");
+            return;
+        }
 
         foreach (var kvp in tabContent) kvp.Value.SetActive(false);
         if (tabContent.TryGetValue(name, out GameObject tab))
         {
             tab.SetActive(true);
             activeTab = name;
+            Logger.Log(LogModule.Menu, $"Переключение на вкладку: {name}");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Menu, $"Вкладка '{name}' не найдена");
         }
         UpdateTabVisuals(name);
         OnTabSwitched?.Invoke(name);
@@ -108,6 +126,8 @@ public class TabManager : MonoBehaviour
         uiBuilder.CreateSettingLabel(tab.transform, config.vsyncLabel, new Vector2(labelX, -100));
         GameObject vsyncToggle = uiBuilder.CreateToggle(tab.transform, new Vector2(toggleX, -100), config.vsyncDefault);
         vsyncToggle.name = "VSyncToggle";
+
+        Logger.Log(LogModule.Menu, "Создана вкладка 'Графика'");
     }
 
     private void CreateAudioTab(Transform parent)
@@ -132,6 +152,8 @@ public class TabManager : MonoBehaviour
         uiBuilder.CreateSettingLabel(tab.transform, config.voiceLabel, new Vector2(labelX, -130));
         GameObject voiceSlider = uiBuilder.CreateSlider(tab.transform, new Vector2(sliderX, -130), 0f, 10f, config.voiceDefault * 10f);
         voiceSlider.name = "VoiceSlider";
+
+        Logger.Log(LogModule.Menu, "Создана вкладка 'Звук'");
     }
 
     private void CreateControlsTab(Transform parent)
@@ -157,6 +179,8 @@ public class TabManager : MonoBehaviour
         uiBuilder.CreateSettingLabel(tab.transform, config.vibrationLabel, new Vector2(labelX, -100));
         GameObject vibrationToggle = uiBuilder.CreateToggle(tab.transform, new Vector2(controlX, -100), config.vibrationDefault);
         vibrationToggle.name = "VibrationToggle";
+
+        Logger.Log(LogModule.Menu, "Создана вкладка 'Управление'");
     }
 
     private void CreateGameTab(Transform parent)
@@ -187,6 +211,8 @@ public class TabManager : MonoBehaviour
             resetRt.anchoredPosition = new Vector2(0, -130);
             resetRt.sizeDelta = new Vector2(250, 45);
         }
+
+        Logger.Log(LogModule.Menu, "Создана вкладка 'Игра'");
     }
 
     #endregion
@@ -195,5 +221,6 @@ public class TabManager : MonoBehaviour
     {
         tabContent.Clear();
         tabButtons.Clear();
+        Logger.Log(LogModule.Menu, "TabManager очищен");
     }
 }
