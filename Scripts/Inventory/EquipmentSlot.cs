@@ -11,7 +11,6 @@ public class EquipmentSlot : MonoBehaviour, IDropHandler, IPointerClickHandler, 
     private Color originalColor;
     private InventoryItemMarker currentItem;
 
-    // Для двойного клика
     private float lastClickTime = 0f;
     private const float DOUBLE_CLICK_DELAY = 0.3f;
 
@@ -27,67 +26,67 @@ public class EquipmentSlot : MonoBehaviour, IDropHandler, IPointerClickHandler, 
         color.a = 0.1f;
         slotImage.color = color;
         slotImage.raycastTarget = true;
+
+        Logger.Log(LogModule.Inventory, $"Слот экипировки {slotType} инициализирован");
     }
 
-    // ========== DROP ==========
     public void OnDrop(PointerEventData eventData)
     {
         GameObject dropped = eventData.pointerDrag;
-        if (dropped == null) return;
+        if (dropped == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "Попытка бросить null объект в слот экипировки");
+            return;
+        }
 
         InventoryItemMarker draggedItem = dropped.GetComponent<InventoryItemMarker>();
-        if (draggedItem == null) return;
+        if (draggedItem == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "Брошенный объект не является предметом инвентаря");
+            return;
+        }
 
         ItemData data = ItemDatabase.Instance?.GetItemData(draggedItem.itemType);
         if (data == null || !data.isEquippable)
         {
-            Debug.Log($"Item {draggedItem.itemType} is not equippable!");
+            Logger.Log(LogModule.Inventory, $"Предмет {draggedItem.itemType} нельзя экипировать");
             return;
         }
 
-        // Проверяем соответствие типа
         if (data.equipmentType != slotType)
         {
-            Debug.Log($"Item {draggedItem.itemType} ({data.equipmentType}) doesn't match slot {slotType}!");
+            Logger.Log(LogModule.Inventory, $"Предмет {draggedItem.itemType} ({data.equipmentType}) не подходит для слота {slotType}");
             return;
         }
 
-        // Если слот занят - снимаем
         if (isOccupied)
         {
+            Logger.Log(LogModule.Inventory, $"Слот {slotType} занят, снятие текущего предмета");
             UnequipCurrent();
         }
 
-        // Экипируем новый предмет
         EquipItem(draggedItem);
     }
 
-    // ========== ЭКИПИРОВКА ==========
     private void EquipItem(InventoryItemMarker item)
     {
-        // ✅ Удаляем dragVisual у предмета
         item.DestroyDragClone();
 
-        // Сохраняем ссылку
         currentItem = item;
 
-        // Перемещаем предмет в слот
         item.transform.SetParent(transform);
         item.transform.localPosition = Vector3.zero;
         item.transform.localScale = Vector3.one;
 
-        // Отключаем взаимодействие с предметом
         CanvasGroup cg = item.GetComponent<CanvasGroup>();
         if (cg == null) cg = item.gameObject.AddComponent<CanvasGroup>();
         cg.blocksRaycasts = false;
         cg.interactable = false;
 
-        // Отключаем скрипт InventoryItemMarker
         item.enabled = false;
 
         isOccupied = true;
 
-        // Удаляем из инвентаря (освобождаем слот)
         InventorySlot originalSlot = item.GetComponentInParent<InventorySlot>();
         if (originalSlot != null)
         {
@@ -95,57 +94,56 @@ public class EquipmentSlot : MonoBehaviour, IDropHandler, IPointerClickHandler, 
             originalSlot.UpdateSlotText();
         }
 
-        // Создаем предмет в мире через EquipmentSystem
         EquipmentSystem.Instance?.EquipItem(item);
 
-        Debug.Log($"✅ Equipped: {item.itemType} in {slotType}");
+        Logger.Log(LogModule.Inventory, $"Экипирован предмет: {item.itemType} в слот {slotType}");
     }
 
-    // ========== СНЯТИЕ ==========
     public void UnequipCurrent()
     {
-        if (!isOccupied || currentItem == null) return;
+        if (!isOccupied || currentItem == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, $"Попытка снять предмет с пустого слота {slotType}");
+            return;
+        }
 
         ItemType itemType = currentItem.itemType;
 
-        // Снимаем с мира
         EquipmentSystem.Instance?.UnequipItem(slotType);
 
-        // Возвращаем предмет в инвентарь
         InventoryUIManager uiManager = FindFirstObjectByType<InventoryUIManager>();
         if (uiManager != null)
         {
             uiManager.AddItem(itemType);
+            Logger.Log(LogModule.Inventory, $"Предмет {itemType} возвращён в инвентарь");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Inventory, "InventoryUIManager не найден, предмет не возвращён в инвентарь");
         }
 
-        // Удаляем предмет из слота
         Destroy(currentItem.gameObject);
 
         isOccupied = false;
         currentItem = null;
 
-        Debug.Log($"Unequipped from {slotType}");
+        Logger.Log(LogModule.Inventory, $"Предмет снят со слота {slotType}");
     }
 
-    // ========== КЛИК ==========
     public void OnPointerClick(PointerEventData eventData)
     {
         if (!isOccupied) return;
 
-        // ✅ ПКМ - открываем контекстное меню
         if (eventData.button == PointerEventData.InputButton.Right)
         {
-            // Создаем временный InventoryItemMarker для контекстного меню
-            // Используем currentItem как основу
             if (currentItem != null)
             {
-                // Открываем контекстное меню для этого предмета
                 MenuManager.Instance?.OpenContextMenu(currentItem, Input.mousePosition);
+                Logger.Log(LogModule.Inventory, $"Открыто контекстное меню для предмета в слоте {slotType}");
             }
             return;
         }
 
-        // ЛКМ - проверяем двойной клик
         if (eventData.button == PointerEventData.InputButton.Left)
         {
             float timeSinceLastClick = Time.time - lastClickTime;
@@ -153,14 +151,12 @@ public class EquipmentSlot : MonoBehaviour, IDropHandler, IPointerClickHandler, 
 
             if (timeSinceLastClick < DOUBLE_CLICK_DELAY)
             {
-                // ДВОЙНОЙ КЛИК - СНИМАЕМ ПРЕДМЕТ
                 UnequipCurrent();
-                Debug.Log($"Double click on {slotType} - unequipped");
+                Logger.Log(LogModule.Inventory, $"Двойной клик по слоту {slotType} - предмет снят");
             }
         }
     }
 
-    // ========== HOVER ЭФФЕКТЫ ==========
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (slotImage != null)
@@ -170,7 +166,6 @@ public class EquipmentSlot : MonoBehaviour, IDropHandler, IPointerClickHandler, 
             slotImage.color = color;
         }
 
-        // Показываем тултип с названием предмета
         if (isOccupied && currentItem != null)
         {
             ItemData data = ItemDatabase.Instance?.GetItemData(currentItem.itemType);
@@ -199,7 +194,6 @@ public class EquipmentSlot : MonoBehaviour, IDropHandler, IPointerClickHandler, 
         TooltipManager.Instance?.HideTooltip();
     }
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
     public bool IsEquipped()
     {
         return isOccupied;
