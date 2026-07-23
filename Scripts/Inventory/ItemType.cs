@@ -1,4 +1,3 @@
-// ItemType.cs
 public enum ItemType
 {
     None,
@@ -9,5 +8,5 @@ public enum ItemType
     Sword,
     Shield,
     GoldCoin,
-    Lamp  // ← добавить
+    Lamp
 }
