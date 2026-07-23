@@ -34,6 +34,7 @@ public class DialogueFileManager
     public DialogueFileManager(DialogueData config = null)
     {
         this.config = config;
+        Logger.Log(LogModule.Dialogue, "DialogueFileManager создан");
     }
 
     #endregion
@@ -50,7 +51,7 @@ public class DialogueFileManager
             {
                 filePaths.Add(path);
             }
-            Debug.Log($"✅ Загружено {filePaths.Count} путей из переданного списка");
+            Logger.Log(LogModule.Dialogue, $"Загружено {filePaths.Count} путей из переданного списка");
         }
         else if (config != null && config.filePaths != null && config.filePaths.Count > 0)
         {
@@ -58,15 +59,15 @@ public class DialogueFileManager
             {
                 string fullPath = Application.dataPath + "/" + path;
                 filePaths.Add(fullPath);
-                Debug.Log($"📂 Добавлен путь: {fullPath}");
+                Logger.Log(LogModule.Dialogue, $"Добавлен путь: {fullPath}");
             }
-            Debug.Log($"✅ Загружено {filePaths.Count} путей из конфига");
+            Logger.Log(LogModule.Dialogue, $"Загружено {filePaths.Count} путей из конфига");
         }
         else
         {
             string defaultPath = Application.dataPath + "/Texts/ReplicProlouge.txt";
             filePaths.Add(defaultPath);
-            Debug.LogWarning($"⚠️ Используется путь по умолчанию: {defaultPath}");
+            Logger.LogWarning(LogModule.Dialogue, $"Используется путь по умолчанию: {defaultPath}");
         }
     }
 
@@ -74,14 +75,14 @@ public class DialogueFileManager
     {
         if (fileIndex < 0 || fileIndex >= filePaths.Count)
         {
-            string error = $"Invalid file index: {fileIndex}. Available: 0-{filePaths.Count - 1}";
-            Debug.LogError(error);
+            string error = $"Неверный индекс файла: {fileIndex}. Доступно: 0-{filePaths.Count - 1}";
+            Logger.LogError(LogModule.Dialogue, error);
             OnError?.Invoke(error);
             return false;
         }
 
         string filePath = filePaths[fileIndex];
-        Debug.Log($"📂 Загрузка файла [{fileIndex}]: {filePath}");
+        Logger.Log(LogModule.Dialogue, $"Загрузка файла {fileIndex}: {filePath}");
         return LoadDialogueFromPath(filePath, fileIndex);
     }
 
@@ -89,8 +90,8 @@ public class DialogueFileManager
     {
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
         {
-            string error = $"File not found: {filePath}";
-            Debug.LogError(error);
+            string error = $"Файл не найден: {filePath}";
+            Logger.LogError(LogModule.Dialogue, error);
             OnError?.Invoke(error);
             return false;
         }
@@ -115,13 +116,13 @@ public class DialogueFileManager
             currentFileIndex = fileIndex >= 0 ? fileIndex : filePaths.IndexOf(filePath);
             isFileLoaded = true;
 
-            Debug.Log($"✅ Загружено {dialogueLines.Count} строк из: {filePath}");
+            Logger.Log(LogModule.Dialogue, $"Загружено {dialogueLines.Count} строк из: {filePath}");
 
             if (config != null && config.enableDebugLogs && config.logLoadedLines)
             {
                 for (int i = 0; i < Mathf.Min(dialogueLines.Count, 20); i++)
                 {
-                    Debug.Log($"Line {i}: {dialogueLines[i]}");
+                    Logger.Log(LogModule.Dialogue, $"Строка {i}: {dialogueLines[i]}");
                 }
             }
 
@@ -130,8 +131,8 @@ public class DialogueFileManager
         }
         catch (System.Exception e)
         {
-            string error = $"Error loading file: {e.Message}";
-            Debug.LogError(error);
+            string error = $"Ошибка загрузки файла: {e.Message}";
+            Logger.LogError(LogModule.Dialogue, error);
             OnError?.Invoke(error);
             return false;
         }
@@ -141,6 +142,7 @@ public class DialogueFileManager
     {
         if (index < 0 || index >= dialogueLines.Count)
         {
+            Logger.LogWarning(LogModule.Dialogue, $"Запрос строки {index}, доступно {dialogueLines.Count}");
             return null;
         }
         return dialogueLines[index];
@@ -151,6 +153,7 @@ public class DialogueFileManager
         if (startIndex <= 0 || dialogueLines.Count == 0) return;
         int removeCount = Mathf.Min(startIndex, dialogueLines.Count);
         dialogueLines.RemoveRange(0, removeCount);
+        Logger.Log(LogModule.Dialogue, $"Удалено {removeCount} строк из начала диалога");
     }
 
     public void Clear()
@@ -160,6 +163,7 @@ public class DialogueFileManager
         currentFilePath = null;
         currentFileIndex = -1;
         isFileLoaded = false;
+        Logger.Log(LogModule.Dialogue, "DialogueFileManager очищен");
     }
 
     public List<string> GetFilePaths()
@@ -171,17 +175,17 @@ public class DialogueFileManager
     {
         if (config != null && !config.enableDebugLogs) return;
 
-        Debug.Log("=== DIALOGUE FILE MANAGER ===");
-        Debug.Log($"File loaded: {isFileLoaded}");
-        Debug.Log($"Current file: {currentFilePath}");
-        Debug.Log($"File index: {currentFileIndex}");
-        Debug.Log($"Lines count: {dialogueLines.Count}");
-        Debug.Log($"Total files: {filePaths.Count}");
+        Logger.Log(LogModule.Dialogue, "=== DIALOGUE FILE MANAGER ===");
+        Logger.Log(LogModule.Dialogue, $"Файл загружен: {isFileLoaded}");
+        Logger.Log(LogModule.Dialogue, $"Текущий файл: {currentFilePath}");
+        Logger.Log(LogModule.Dialogue, $"Индекс файла: {currentFileIndex}");
+        Logger.Log(LogModule.Dialogue, $"Количество строк: {dialogueLines.Count}");
+        Logger.Log(LogModule.Dialogue, $"Всего файлов: {filePaths.Count}");
         for (int i = 0; i < filePaths.Count; i++)
         {
-            Debug.Log($"  [{i}] {filePaths[i]}");
+            Logger.Log(LogModule.Dialogue, $"  {i}: {filePaths[i]}");
         }
-        Debug.Log("=============================");
+        Logger.Log(LogModule.Dialogue, "=============================");
     }
 
     #endregion
