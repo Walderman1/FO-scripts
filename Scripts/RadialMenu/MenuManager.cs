@@ -17,9 +17,15 @@ public class MenuManager : MonoBehaviour
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            Logger.Log(LogModule.RadialMenu, "MenuManager инициализирован");
+        }
         else
+        {
+            Logger.Log(LogModule.RadialMenu, "Уничтожение дублирующего MenuManager");
             Destroy(gameObject);
+        }
     }
 
     private void Start()
@@ -32,19 +38,31 @@ public class MenuManager : MonoBehaviour
         if (mainRadialMenu == null)
         {
             GameObject obj = GameObject.FindGameObjectWithTag("RadialMenu");
-            if (obj != null) mainRadialMenu = obj.GetComponent<RadialMenu>();
+            if (obj != null)
+            {
+                mainRadialMenu = obj.GetComponent<RadialMenu>();
+                Logger.Log(LogModule.RadialMenu, "RadialMenu найден автоматически");
+            }
         }
 
         if (contextMenu == null)
         {
             GameObject obj = GameObject.FindGameObjectWithTag("ContextMenu");
-            if (obj != null) contextMenu = obj.GetComponent<RadialMenu>();
+            if (obj != null)
+            {
+                contextMenu = obj.GetComponent<RadialMenu>();
+                Logger.Log(LogModule.RadialMenu, "ContextMenu найден автоматически");
+            }
         }
 
         if (inventory == null)
         {
             GameObject obj = GameObject.FindGameObjectWithTag("InventoryPanel");
-            if (obj != null) inventory = obj.GetComponent<InventoryUIManager>();
+            if (obj != null)
+            {
+                inventory = obj.GetComponent<InventoryUIManager>();
+                Logger.Log(LogModule.RadialMenu, "Inventory найден автоматически");
+            }
         }
     }
 
@@ -55,6 +73,11 @@ public class MenuManager : MonoBehaviour
         {
             mainRadialMenu.RestoreDefaultMenu();
             mainRadialMenu.ShowAtPosition(Input.mousePosition);
+            Logger.Log(LogModule.RadialMenu, "Открыто главное меню");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "mainRadialMenu отсутствует");
         }
     }
 
@@ -64,6 +87,11 @@ public class MenuManager : MonoBehaviour
         if (mainRadialMenu != null)
         {
             mainRadialMenu.SetChoiceMode(choices, onChoiceSelected);
+            Logger.Log(LogModule.RadialMenu, $"Открыто меню выбора с {choices.Count} вариантами");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "mainRadialMenu отсутствует");
         }
     }
 
@@ -81,15 +109,29 @@ public class MenuManager : MonoBehaviour
             contextMenu.SetContextMenu(buttons, actions);
             contextMenu.SetCurrentItem(item);
             contextMenu.ShowAtPosition(position);
+
+            Logger.Log(LogModule.RadialMenu, $"Открыто контекстное меню для предмета {item.itemType}");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "contextMenu отсутствует или item null");
         }
     }
 
     public void OpenContextMenuForEquipment(EquipmentSlot slot, Vector2 position)
     {
-        if (slot == null || !slot.IsEquipped()) return;
+        if (slot == null || !slot.IsEquipped())
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "Слот пуст или null");
+            return;
+        }
 
         InventoryItemMarker item = slot.GetCurrentItem();
-        if (item == null) return;
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "В слоте нет предмета");
+            return;
+        }
 
         CloseAllMenus();
         if (contextMenu != null)
@@ -103,6 +145,8 @@ public class MenuManager : MonoBehaviour
             contextMenu.SetContextMenu(buttons, actions);
             contextMenu.SetCurrentItem(item);
             contextMenu.ShowAtPosition(position);
+
+            Logger.Log(LogModule.RadialMenu, $"Открыто контекстное меню для экипировки {item.itemType} в слоте {slot.slotType}");
         }
     }
 
@@ -111,6 +155,11 @@ public class MenuManager : MonoBehaviour
         if (item != null)
         {
             ItemViewPanel.Instance?.ShowItem(item);
+            Logger.Log(LogModule.RadialMenu, $"Открыт просмотр предмета {item.itemType}");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "item null для просмотра");
         }
     }
 
@@ -119,12 +168,14 @@ public class MenuManager : MonoBehaviour
         if (mainRadialMenu != null) mainRadialMenu.Hide();
         if (contextMenu != null) contextMenu.Hide();
         currentEquipmentSlot = null;
+        Logger.Log(LogModule.RadialMenu, "Все меню закрыты");
     }
 
     public void CloseContextMenu()
     {
         if (contextMenu != null) contextMenu.Hide();
         currentEquipmentSlot = null;
+        Logger.Log(LogModule.RadialMenu, "Контекстное меню закрыто");
     }
 
     public bool IsAnyMenuOpen()
@@ -149,16 +200,25 @@ public class MenuManager : MonoBehaviour
         if (inventory != null && inventory.IsInventoryOpen)
             inventory.CloseInventory();
         CloseAllMenus();
+        Logger.Log(LogModule.RadialMenu, "Инвентарь и меню закрыты");
     }
 
     public InventoryItemMarker GetCurrentContextItem() => currentContextItem;
 
     private List<string> GetContextButtons(InventoryItemMarker item)
     {
-        if (item == null) return new List<string> { "Осмотреть", "Выбросить" };
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "item null при получении кнопок контекстного меню");
+            return new List<string> { "Осмотреть", "Выбросить" };
+        }
 
         ItemData data = ItemDatabase.Instance?.GetItemData(item.itemType);
-        if (data == null) return new List<string> { "Осмотреть", "Выбросить" };
+        if (data == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, $"Нет данных для предмета {item.itemType}");
+            return new List<string> { "Осмотреть", "Выбросить" };
+        }
 
         List<string> buttons = new List<string>();
 
@@ -186,16 +246,24 @@ public class MenuManager : MonoBehaviour
 
     private List<RadialMenu.RadialAction> GetContextActions(InventoryItemMarker item)
     {
-        if (item == null) return new List<RadialMenu.RadialAction> {
-            RadialMenu.RadialAction.Examine,
-            RadialMenu.RadialAction.Exit
-        };
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "item null при получении действий контекстного меню");
+            return new List<RadialMenu.RadialAction> {
+                RadialMenu.RadialAction.Examine,
+                RadialMenu.RadialAction.Exit
+            };
+        }
 
         ItemData data = ItemDatabase.Instance?.GetItemData(item.itemType);
-        if (data == null) return new List<RadialMenu.RadialAction> {
-            RadialMenu.RadialAction.Examine,
-            RadialMenu.RadialAction.Exit
-        };
+        if (data == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, $"Нет данных для предмета {item.itemType}");
+            return new List<RadialMenu.RadialAction> {
+                RadialMenu.RadialAction.Examine,
+                RadialMenu.RadialAction.Exit
+            };
+        }
 
         List<RadialMenu.RadialAction> actions = new List<RadialMenu.RadialAction>();
 
@@ -222,7 +290,11 @@ public class MenuManager : MonoBehaviour
 
     private List<string> GetEquipmentContextButtons(InventoryItemMarker item)
     {
-        if (item == null) return new List<string> { "Осмотреть", "Выбросить" };
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "item null при получении кнопок для экипировки");
+            return new List<string> { "Осмотреть", "Выбросить" };
+        }
 
         List<string> buttons = new List<string>();
         buttons.Add("Снять");
@@ -234,10 +306,14 @@ public class MenuManager : MonoBehaviour
 
     private List<RadialMenu.RadialAction> GetEquipmentContextActions(InventoryItemMarker item)
     {
-        if (item == null) return new List<RadialMenu.RadialAction> {
-            RadialMenu.RadialAction.Examine,
-            RadialMenu.RadialAction.Exit
-        };
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "item null при получении действий для экипировки");
+            return new List<RadialMenu.RadialAction> {
+                RadialMenu.RadialAction.Examine,
+                RadialMenu.RadialAction.Exit
+            };
+        }
 
         List<RadialMenu.RadialAction> actions = new List<RadialMenu.RadialAction>();
         actions.Add(RadialMenu.RadialAction.Examine);
@@ -278,7 +354,13 @@ public class MenuManager : MonoBehaviour
 
     public void HandleContextAction(InventoryItemMarker item, RadialMenu.RadialAction action)
     {
-        if (item == null) return;
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "item null при обработке действия контекстного меню");
+            return;
+        }
+
+        Logger.Log(LogModule.RadialMenu, $"Обработка действия {action} для предмета {item.itemType}");
 
         switch (action)
         {
@@ -298,14 +380,14 @@ public class MenuManager : MonoBehaviour
                 DropItem(item);
                 break;
             default:
-                Debug.Log($"Unknown action: {action}");
+                Logger.LogWarning(LogModule.RadialMenu, $"Неизвестное действие: {action}");
                 break;
         }
     }
 
     private void UseItem(InventoryItemMarker item)
     {
-        Debug.Log($"Used: {item.itemType}");
+        Logger.Log(LogModule.RadialMenu, $"Использован предмет: {item.itemType}");
 
         item.count--;
         if (item.count <= 0)
@@ -331,12 +413,16 @@ public class MenuManager : MonoBehaviour
 
     private void ToggleEquipItem(InventoryItemMarker item)
     {
-        if (item == null) return;
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "item null при экипировке");
+            return;
+        }
 
         ItemData data = ItemDatabase.Instance?.GetItemData(item.itemType);
         if (data == null || !data.isEquippable)
         {
-            Debug.Log($"Item {item.itemType} is not equippable!");
+            Logger.Log(LogModule.RadialMenu, $"Предмет {item.itemType} нельзя экипировать");
             CloseContextMenu();
             return;
         }
@@ -351,7 +437,7 @@ public class MenuManager : MonoBehaviour
                 if (slot.isOccupied && slot.slotType == data.equipmentType)
                 {
                     slot.UnequipCurrent();
-                    Debug.Log($"Unequipped: {item.itemType} from {data.equipmentType}");
+                    Logger.Log(LogModule.RadialMenu, $"Снят предмет: {item.itemType} из {data.equipmentType}");
                     break;
                 }
             }
@@ -372,7 +458,6 @@ public class MenuManager : MonoBehaviour
 
             if (targetSlot != null)
             {
-                // ✅ Удаляем dragVisual перед экипировкой
                 item.DestroyDragClone();
 
                 PointerEventData pointerData = new PointerEventData(EventSystem.current)
@@ -380,11 +465,11 @@ public class MenuManager : MonoBehaviour
                     pointerDrag = item.gameObject
                 };
                 targetSlot.OnDrop(pointerData);
-                Debug.Log($"✅ Equipped: {item.itemType} in {data.equipmentType}");
+                Logger.Log(LogModule.RadialMenu, $"Экипирован предмет: {item.itemType} в {data.equipmentType}");
             }
             else
             {
-                Debug.Log($"❌ No free slot for {data.equipmentType}!");
+                Logger.LogWarning(LogModule.RadialMenu, $"Нет свободного слота для {data.equipmentType}");
             }
         }
 
@@ -401,7 +486,7 @@ public class MenuManager : MonoBehaviour
             if (slot.IsEquipped() && slot.GetCurrentItem() == item)
             {
                 slot.UnequipCurrent();
-                Debug.Log($"Unequipped: {item.itemType} from {slot.slotType}");
+                Logger.Log(LogModule.RadialMenu, $"Снят предмет: {item.itemType} из {slot.slotType}");
                 break;
             }
         }
@@ -411,10 +496,18 @@ public class MenuManager : MonoBehaviour
 
     private void SplitItem(InventoryItemMarker item)
     {
-        if (item == null || item.count <= 1) return;
+        if (item == null || item.count <= 1)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "Невозможно разделить предмет");
+            return;
+        }
 
         int half = item.count / 2;
-        if (half <= 0) return;
+        if (half <= 0)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "Некорректное разделение");
+            return;
+        }
 
         Transform emptySlot = null;
         if (inventory != null && inventory.inventoryGrid != null)
@@ -432,7 +525,7 @@ public class MenuManager : MonoBehaviour
 
         if (emptySlot == null)
         {
-            Debug.Log("No empty slot for split!");
+            Logger.Log(LogModule.RadialMenu, "Нет свободного слота для разделения");
             CloseContextMenu();
             return;
         }
@@ -470,6 +563,8 @@ public class MenuManager : MonoBehaviour
             }
 
             if (inventory != null) inventory.UpdateAllSlots();
+
+            Logger.Log(LogModule.RadialMenu, $"Разделён предмет {item.itemType}: {half} в новом слоте");
         }
 
         CloseContextMenu();
@@ -479,6 +574,7 @@ public class MenuManager : MonoBehaviour
     {
         OpenItemView(item);
         CloseContextMenu();
+        Logger.Log(LogModule.RadialMenu, $"Осмотрен предмет: {item.itemType}");
     }
 
     private void DropItem(InventoryItemMarker item)
@@ -495,6 +591,7 @@ public class MenuManager : MonoBehaviour
                 if (slot.IsEquipped() && slot.GetCurrentItem() == item)
                 {
                     slot.UnequipCurrent();
+                    Logger.Log(LogModule.RadialMenu, $"Предмет снят перед выбросом: {item.itemType}");
                     break;
                 }
             }
@@ -511,6 +608,8 @@ public class MenuManager : MonoBehaviour
             {
                 pickup.itemType = item.itemType;
             }
+
+            Logger.Log(LogModule.RadialMenu, $"Предмет выброшен в мир: {item.itemType}");
         }
 
         if (!isEquipped)
