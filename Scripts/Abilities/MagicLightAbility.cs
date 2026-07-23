@@ -30,7 +30,6 @@ public class MagicLightAbility : Ability
     [Header("Character Effects")]
     [SerializeField] private GameObject characterParticlesObject;
 
-    // Событие для оповещения об изменении состояния
     public System.Action<bool> OnStateChanged;
 
     private GameObject currentLightBeam;
@@ -53,6 +52,8 @@ public class MagicLightAbility : Ability
         abilityName = "Magic Light";
         activationKey = KeyCode.L;
         cooldown = 0.5f;
+
+        Logger.Log(LogModule.Abilities, "MagicLightAbility инициализирован");
     }
 
     private void Start()
@@ -65,7 +66,9 @@ public class MagicLightAbility : Ability
         if (characterParticlesObject != null)
         {
             characterParticlesObject.SetActive(false);
+            Logger.Log(LogModule.Abilities, "CharacterParticles найден и скрыт");
         }
+
         InvokeRepeating(nameof(SearchForParticles), 0f, 0.5f);
     }
 
@@ -81,7 +84,7 @@ public class MagicLightAbility : Ability
             {
                 characterParticlesObject.SetActive(false);
                 CancelInvoke(nameof(SearchForParticles));
-                Debug.Log("Character particles found!");
+                Logger.Log(LogModule.Abilities, "CharacterParticles найден и скрыт");
             }
         }
     }
@@ -157,9 +160,8 @@ public class MagicLightAbility : Ability
             audioSource.PlayOneShot(lightSound);
         }
 
-        Debug.Log($"{abilityName} activated!");
+        Logger.Log(LogModule.Abilities, $"Магический свет активирован");
 
-        // Оповещаем об изменении состояния
         OnStateChanged?.Invoke(true);
     }
 
@@ -186,9 +188,8 @@ public class MagicLightAbility : Ability
 
         ClearDetectedObjects();
 
-        Debug.Log($"{abilityName} deactivated!");
+        Logger.Log(LogModule.Abilities, $"Магический свет деактивирован");
 
-        // Оповещаем об изменении состояния
         OnStateChanged?.Invoke(false);
     }
 
@@ -268,7 +269,7 @@ public class MagicLightAbility : Ability
                 Destroy(indicator, pulseInterval);
             }
 
-            Debug.Log($"Detected: {hit.gameObject.name}");
+            Logger.Log(LogModule.Abilities, $"Обнаружен объект: {hit.gameObject.name}");
             OnObjectDetected(hit.gameObject);
         }
 
