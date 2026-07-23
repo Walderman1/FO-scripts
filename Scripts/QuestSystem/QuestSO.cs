@@ -1,5 +1,3 @@
-// QuestSO.cs - ИСПРАВЛЕННАЯ ВЕРСИЯ
-// ============================================================
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -83,7 +81,6 @@ public class QuestCondition
 
     public bool IsMet()
     {
-        // ✅ ИСПРАВЛЕНО: GlobalFlagManager → FlagManager
         if (!string.IsNullOrEmpty(flagName))
         {
             bool currentValue = FlagManager.Instance?.GetFlag(flagName) ?? false;
