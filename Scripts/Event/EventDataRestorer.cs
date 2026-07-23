@@ -1,4 +1,3 @@
-// EventDataRestorer.cs - С УЧЕТОМ НАСТРОЕК АВТОСОХРАНЕНИЯ
 #if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
@@ -72,7 +71,6 @@ public static class EventDataRestorer
     {
         if (isRestoring) return;
 
-        // ✅ ПРОВЕРЯЕМ, ВКЛЮЧЕНО ЛИ АВТО-ВОССТАНОВЛЕНИЕ
         if (!EditorPrefs.GetBool("EventDataAutoRestore", true))
         {
             return;
@@ -111,10 +109,10 @@ public static class EventDataRestorer
 
                 if (restored > 0)
                 {
-                    Debug.Log($"🔄 Auto-restored {restored} events from JSON");
+                    Logger.Log(LogModule.Event, $"Автоматически восстановлено {restored} событий из JSON");
                     if (hasBackups)
                     {
-                        Debug.Log($"📦 Backups available in: {backupPath}");
+                        Logger.Log(LogModule.Event, $"Резервные копии доступны в: {backupPath}");
                     }
                 }
             }
@@ -123,17 +121,17 @@ public static class EventDataRestorer
                 int restored = dataManager.RestoreEventsToSO();
                 if (restored > 0)
                 {
-                    Debug.Log($"🔄 Auto-restored {restored} events from JSON");
+                    Logger.Log(LogModule.Event, $"Автоматически восстановлено {restored} событий из JSON");
                     if (hasBackups)
                     {
-                        Debug.Log($"📦 Backups available in: {backupPath}");
+                        Logger.Log(LogModule.Event, $"Резервные копии доступны в: {backupPath}");
                     }
                 }
             }
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"❌ Error restoring events: {e.Message}");
+            Logger.LogError(LogModule.Event, $"Ошибка восстановления событий: {e.Message}");
         }
         finally
         {
@@ -141,9 +139,7 @@ public static class EventDataRestorer
         }
     }
 
-    // ============ МЕНЮ ============
-
-    [MenuItem("Tools/Event System/🔄 Restore Events to SO (Auto)")]
+    [MenuItem("Tools/Event System/Восстановить события в SO (Авто)")]
     public static void RestoreEventsMenu()
     {
         isRestoring = false;
@@ -151,7 +147,7 @@ public static class EventDataRestorer
         RestoreEvents();
     }
 
-    [MenuItem("Tools/Event System/🔄 Restore Events to SO (Force)")]
+    [MenuItem("Tools/Event System/Восстановить события в SO (Принудительно)")]
     public static void ForceRestoreEvents()
     {
         isRestoring = false;
@@ -163,24 +159,24 @@ public static class EventDataRestorer
             dataManager.Initialize();
             int restored = dataManager.RestoreEventsToSO();
             EditorUtility.DisplayDialog("Event System",
-                $"✅ Restored {restored} events to SO files!\n\nCheck Console for details.", "OK");
+                $"Восстановлено {restored} событий в SO файлы\n\nПроверьте консоль для деталей.", "OK");
         }
         else
         {
-            EditorUtility.DisplayDialog("Error", "EventDataManager not found!", "OK");
+            EditorUtility.DisplayDialog("Error", "EventDataManager не найден!", "OK");
         }
     }
 
-    [MenuItem("Tools/Event System/⚙️ Toggle Auto-Restore on Compile")]
+    [MenuItem("Tools/Event System/Переключить авто-восстановление при компиляции")]
     public static void ToggleAutoRestore()
     {
         bool isEnabled = EditorPrefs.GetBool("EventDataAutoRestore", true);
         EditorPrefs.SetBool("EventDataAutoRestore", !isEnabled);
-        Debug.Log($"🔄 Auto-restore on compile: {(!isEnabled ? "ENABLED" : "DISABLED")}");
+        Logger.Log(LogModule.Event, $"Авто-восстановление при компиляции: {(isEnabled ? "ВЫКЛЮЧЕНО" : "ВКЛЮЧЕНО")}");
 
         EditorUtility.DisplayDialog("Event System",
-            $"Auto-restore is now: {(isEnabled ? "DISABLED" : "ENABLED")}\n\n" +
-            "This setting is saved globally in Unity Editor preferences.", "OK");
+            $"Авто-восстановление теперь: {(isEnabled ? "ВЫКЛЮЧЕНО" : "ВКЛЮЧЕНО")}\n\n" +
+            "Эта настройка сохраняется глобально в настройках редактора Unity.", "OK");
     }
 }
 #endif
