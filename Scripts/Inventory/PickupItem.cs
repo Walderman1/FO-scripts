@@ -1,4 +1,3 @@
-// PickupItem.cs (ПОЛНАЯ ВЕРСИЯ)
 using UnityEngine;
 using System.Collections;
 
@@ -29,7 +28,6 @@ public class PickupItem : MonoBehaviour
 
     private void Awake()
     {
-        // Загружаем данные из ItemSO
         cachedItemData = ItemDatabase.Instance?.GetItem(itemType);
         if (cachedItemData != null)
         {
@@ -51,6 +49,8 @@ public class PickupItem : MonoBehaviour
         }
 
         LoadEffects();
+
+        Logger.Log(LogModule.Inventory, $"Предмет {itemType} инициализирован в мире");
     }
 
     private void ApplyItemData(ItemSO data)
@@ -70,7 +70,7 @@ public class PickupItem : MonoBehaviour
             hoverEffectPrefab = Resources.Load<GameObject>(hoverEffectPath);
             if (hoverEffectPrefab == null)
             {
-                Debug.LogWarning($"Hover effect not found at Resources/{hoverEffectPath}");
+                Logger.LogWarning(LogModule.Inventory, $"Эффект наведения не найден по пути: Resources/{hoverEffectPath}");
             }
         }
 
@@ -79,7 +79,7 @@ public class PickupItem : MonoBehaviour
             pickupEffectPrefab = Resources.Load<GameObject>(pickupEffectPath);
             if (pickupEffectPrefab == null)
             {
-                Debug.LogWarning($"Pickup effect not found at Resources/{pickupEffectPath}");
+                Logger.LogWarning(LogModule.Inventory, $"Эффект подбора не найден по пути: Resources/{pickupEffectPath}");
             }
         }
     }
@@ -114,6 +114,8 @@ public class PickupItem : MonoBehaviour
             currentEffect.transform.localPosition = Vector3.zero;
             currentEffect.transform.localScale = Vector3.one;
         }
+
+        Logger.Log(LogModule.Inventory, $"Наведение на предмет {itemType}");
     }
 
     private void OnMouseExit()
@@ -133,6 +135,8 @@ public class PickupItem : MonoBehaviour
             spriteRenderer.color = originalColor;
         }
         transform.localScale = originalScale;
+
+        Logger.Log(LogModule.Inventory, $"Убрано наведение с предмета {itemType}");
     }
 
     private void OnMouseDown()
@@ -143,7 +147,12 @@ public class PickupItem : MonoBehaviour
 
     public void PickUp()
     {
-        if (isBeingPickedUp) return;
+        if (isBeingPickedUp)
+        {
+            Logger.Log(LogModule.Inventory, $"Предмет {itemType} уже подбирается");
+            return;
+        }
+
         isBeingPickedUp = true;
         this.enabled = false;
 
@@ -169,8 +178,8 @@ public class PickupItem : MonoBehaviour
         if (inventory != null)
         {
             inventory.AddItem(itemType);
+            Logger.Log(LogModule.Inventory, $"Предмет {itemType} подобран и добавлен в инвентарь");
 
-            // Отправляем событие в EventManager
             EventManager.Instance?.TriggerEvent(EventTriggerType.PickupItem,
                 new EventContext().WithItem(itemType));
 
@@ -178,13 +187,12 @@ public class PickupItem : MonoBehaviour
         }
         else
         {
-            Debug.LogError("InventoryUIManager not found!");
+            Logger.LogError(LogModule.Inventory, "InventoryUIManager не найден");
             isBeingPickedUp = false;
             this.enabled = true;
         }
     }
 
-    // ✅ ===== ВОТ ЭТОТ МЕТОД БЫЛ ПРОПУЩЕН =====
     private IEnumerator FadeAndDestroy(float duration)
     {
         float elapsed = 0f;
@@ -208,13 +216,14 @@ public class PickupItem : MonoBehaviour
             yield return null;
         }
 
+        Logger.Log(LogModule.Inventory, $"Предмет {itemType} удалён из мира");
         Destroy(gameObject);
     }
-    // ========================================
 
     public void CancelPickup()
     {
         isBeingPickedUp = false;
         this.enabled = true;
+        Logger.Log(LogModule.Inventory, $"Подбор предмета {itemType} отменён");
     }
 }
