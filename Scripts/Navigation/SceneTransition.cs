@@ -13,21 +13,32 @@ public class SceneTransition : MonoBehaviour
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            Logger.Log(LogModule.Navigation, "SceneTransition инициализирован");
+        }
         else
+        {
+            Logger.Log(LogModule.Navigation, "Уничтожение дублирующего SceneTransition");
             Destroy(gameObject);
+        }
     }
 
-    // ✅ Затемнение (Fade Out)
     public IEnumerator FadeOut(float duration)
     {
-        if (fadePanel == null) yield break;
+        if (fadePanel == null)
+        {
+            Logger.LogWarning(LogModule.Navigation, "fadePanel не назначен, затемнение невозможно");
+            yield break;
+        }
 
         float elapsed = 0f;
         float startAlpha = fadePanel.alpha;
 
         fadePanel.blocksRaycasts = true;
         fadePanel.interactable = true;
+
+        Logger.Log(LogModule.Navigation, $"Начало затемнения на {duration} секунд");
 
         while (elapsed < duration)
         {
@@ -38,15 +49,21 @@ public class SceneTransition : MonoBehaviour
         }
 
         fadePanel.alpha = 1f;
+        Logger.Log(LogModule.Navigation, "Затемнение завершено");
     }
 
-    // ✅ Просветление (Fade In)
     public IEnumerator FadeIn(float duration)
     {
-        if (fadePanel == null) yield break;
+        if (fadePanel == null)
+        {
+            Logger.LogWarning(LogModule.Navigation, "fadePanel не назначен, просветление невозможно");
+            yield break;
+        }
 
         float elapsed = 0f;
         float startAlpha = fadePanel.alpha;
+
+        Logger.Log(LogModule.Navigation, $"Начало просветления на {duration} секунд");
 
         while (elapsed < duration)
         {
@@ -59,45 +76,58 @@ public class SceneTransition : MonoBehaviour
         fadePanel.alpha = 0f;
         fadePanel.blocksRaycasts = false;
         fadePanel.interactable = false;
+
+        Logger.Log(LogModule.Navigation, "Просветление завершено");
     }
 
-    // ✅ Затемнение → действие → просветление
     public IEnumerator FadeOutAndIn(float duration, System.Action onMiddleAction = null)
     {
+        Logger.Log(LogModule.Navigation, "Начало последовательности затемнение-действие-просветление");
+
         yield return StartCoroutine(FadeOut(duration));
         yield return new WaitForSeconds(holdDuration);
 
         onMiddleAction?.Invoke();
+        Logger.Log(LogModule.Navigation, "Выполнено промежуточное действие");
 
         yield return new WaitForSeconds(0.1f);
         yield return StartCoroutine(FadeIn(duration));
+
+        Logger.Log(LogModule.Navigation, "Последовательность затемнение-действие-просветление завершена");
     }
 
-    // ✅ Затемнение → загрузка сцены → просветление
     public IEnumerator TransitionToScene(string sceneName, float duration)
     {
+        Logger.Log(LogModule.Navigation, $"Начало перехода на сцену {sceneName}");
+
         yield return StartCoroutine(FadeOut(duration));
         yield return new WaitForSeconds(holdDuration);
 
         UnityEngine.SceneManagement.SceneManager.LoadScene(sceneName);
+        Logger.Log(LogModule.Navigation, $"Загружена сцена {sceneName}");
 
         yield return new WaitForSeconds(0.1f);
         yield return StartCoroutine(FadeIn(duration));
+
+        Logger.Log(LogModule.Navigation, $"Переход на сцену {sceneName} завершён");
     }
 
-    // ✅ Затемнение → загрузка сцены по индексу → просветление
     public IEnumerator TransitionToScene(int sceneIndex, float duration)
     {
+        Logger.Log(LogModule.Navigation, $"Начало перехода на сцену с индексом {sceneIndex}");
+
         yield return StartCoroutine(FadeOut(duration));
         yield return new WaitForSeconds(holdDuration);
 
         UnityEngine.SceneManagement.SceneManager.LoadScene(sceneIndex);
+        Logger.Log(LogModule.Navigation, $"Загружена сцена с индексом {sceneIndex}");
 
         yield return new WaitForSeconds(0.1f);
         yield return StartCoroutine(FadeIn(duration));
+
+        Logger.Log(LogModule.Navigation, $"Переход на сцену с индексом {sceneIndex} завершён");
     }
 
-    // ✅ Мгновенное затемнение (без анимации)
     public void SetBlack()
     {
         if (fadePanel != null)
@@ -105,10 +135,14 @@ public class SceneTransition : MonoBehaviour
             fadePanel.alpha = 1f;
             fadePanel.blocksRaycasts = true;
             fadePanel.interactable = true;
+            Logger.Log(LogModule.Navigation, "Установлен чёрный экран (мгновенно)");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Navigation, "fadePanel не назначен, установка чёрного экрана невозможна");
         }
     }
 
-    // ✅ Мгновенное просветление (без анимации)
     public void SetTransparent()
     {
         if (fadePanel != null)
@@ -116,6 +150,11 @@ public class SceneTransition : MonoBehaviour
             fadePanel.alpha = 0f;
             fadePanel.blocksRaycasts = false;
             fadePanel.interactable = false;
+            Logger.Log(LogModule.Navigation, "Установлен прозрачный экран (мгновенно)");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Navigation, "fadePanel не назначен, установка прозрачного экрана невозможна");
         }
     }
 }
