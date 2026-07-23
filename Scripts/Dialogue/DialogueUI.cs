@@ -20,37 +20,43 @@ public class DialogueUI : MonoBehaviour
 
     private void Awake()
     {
-        // Получаем CanvasGroup только для PanelDialogue
         if (panelDialogue != null)
         {
             panelDialogueCG = panelDialogue.GetComponent<CanvasGroup>();
             if (panelDialogueCG == null)
             {
                 panelDialogueCG = panelDialogue.AddComponent<CanvasGroup>();
+                Logger.Log(LogModule.Dialogue, "CanvasGroup добавлен на PanelDialogue");
             }
         }
 
-        // Изначально PanelDialogue скрыт
         SetPanelDialogueActive(false);
+        Logger.Log(LogModule.Dialogue, "DialogueUI инициализирован");
     }
 
-    #region Panel Dialogue (CanvasGroup) - ТОЛЬКО ЭТОТ МЕТОД УПРАВЛЯЕТ ВИДИМОСТЬЮ
+    #region Panel Dialogue (CanvasGroup)
 
     public void SetPanelDialogueActive(bool active)
     {
-        if (panelDialogueCG == null) return;
+        if (panelDialogueCG == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, "panelDialogueCG не найден");
+            return;
+        }
 
         if (active)
         {
             panelDialogueCG.alpha = 1f;
             panelDialogueCG.blocksRaycasts = true;
             panelDialogueCG.interactable = true;
+            Logger.Log(LogModule.Dialogue, "Панель диалога показана");
         }
         else
         {
             panelDialogueCG.alpha = 0f;
             panelDialogueCG.blocksRaycasts = false;
             panelDialogueCG.interactable = false;
+            Logger.Log(LogModule.Dialogue, "Панель диалога скрыта");
         }
     }
 
@@ -61,11 +67,11 @@ public class DialogueUI : MonoBehaviour
 
     #endregion
 
-    #region Dialogue Panel - НЕ ИСПОЛЬЗУЕТ SetActive
+    #region Dialogue Panel
 
     public void ShowDialoguePanel(bool show)
     {
-        // Ничего не делаем - управление через PanelDialogue CanvasGroup
+        // Управление через PanelDialogue CanvasGroup
         // Оставляем для обратной совместимости
     }
 
@@ -76,11 +82,11 @@ public class DialogueUI : MonoBehaviour
 
     #endregion
 
-    #region Choice Panel - НЕ ИСПОЛЬЗУЕТ SetActive
+    #region Choice Panel
 
     public void ShowChoicePanel(bool show)
     {
-        // Ничего не делаем - управление через PanelDialogue CanvasGroup
+        // Управление через PanelDialogue CanvasGroup
         // Оставляем для обратной совместимости
     }
 
@@ -97,8 +103,15 @@ public class DialogueUI : MonoBehaviour
     {
         if (dialogueText != null)
             dialogueText.text = text;
+        else
+            Logger.LogWarning(LogModule.Dialogue, "dialogueText не назначен");
+
         if (speakerNameText != null)
             speakerNameText.text = speakerName;
+        else
+            Logger.LogWarning(LogModule.Dialogue, "speakerNameText не назначен");
+
+        Logger.Log(LogModule.Dialogue, $"Установлен текст диалога: {text?.Length ?? 0} символов, спикер: {speakerName}");
     }
 
     public void ClearDialogueText()
@@ -107,6 +120,7 @@ public class DialogueUI : MonoBehaviour
             dialogueText.text = "";
         if (speakerNameText != null)
             speakerNameText.text = "";
+        Logger.Log(LogModule.Dialogue, "Текст диалога очищен");
     }
 
     #endregion
@@ -126,6 +140,11 @@ public class DialogueUI : MonoBehaviour
                 }
             }
             radialMenu.SetChoiceMode(choicesList, onChoiceSelected);
+            Logger.Log(LogModule.Dialogue, $"Настроено {choicesList.Count} вариантов выбора");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Dialogue, "RadialMenu не назначен, настройка выбора невозможна");
         }
     }
 
@@ -136,7 +155,14 @@ public class DialogueUI : MonoBehaviour
     public void SetContinueButtonEnabled(bool enabled)
     {
         if (continueButton != null)
+        {
             continueButton.enabled = enabled;
+            Logger.Log(LogModule.Dialogue, $"Кнопка продолжения установлена в состояние: {(enabled ? "включена" : "отключена")}");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Dialogue, "continueButton не назначен");
+        }
     }
 
     #endregion
@@ -175,7 +201,6 @@ public class DialogueUI : MonoBehaviour
         this.continueButton = continueBtn;
         this.radialMenu = radialMenu;
 
-        // Получаем CanvasGroup только для PanelDialogue
         if (panelDialogue != null)
         {
             panelDialogueCG = panelDialogue.GetComponent<CanvasGroup>();
@@ -185,8 +210,8 @@ public class DialogueUI : MonoBehaviour
             }
         }
 
-        // Скрываем PanelDialogue
         SetPanelDialogueActive(false);
+        Logger.Log(LogModule.Dialogue, "DialogueUI настроен через SetupReferences");
     }
 
     #endregion
