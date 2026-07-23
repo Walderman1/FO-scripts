@@ -23,11 +23,12 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
         slotImage.raycastTarget = true;
 
         FindEquipmentVisual();
+
+        Logger.Log(LogModule.Inventory, "Слот инвентаря инициализирован");
     }
 
     private void FindEquipmentVisual()
     {
-        // Ищем дочерний объект по имени
         Transform child = transform.Find("EquipmentVisual");
         if (child != null)
         {
@@ -36,7 +37,6 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
             return;
         }
 
-        // Создаем новый визуальный элемент
         GameObject newVisual = new GameObject("EquipmentVisual");
         newVisual.transform.SetParent(transform);
         newVisual.transform.localPosition = Vector3.zero;
@@ -62,12 +62,16 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
 
     public void EquipItem(InventoryItemMarker item)
     {
-        if (item == null) return;
+        if (item == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "Попытка экипировать null предмет");
+            return;
+        }
 
         ItemData data = ItemDatabase.Instance?.GetItemData(item.itemType);
         if (data == null || !data.isEquippable)
         {
-            Debug.Log($"Item {item.itemType} is not equippable!");
+            Logger.Log(LogModule.Inventory, $"Предмет {item.itemType} нельзя экипировать");
             return;
         }
 
@@ -83,7 +87,7 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
             }
         }
 
-        Debug.Log($"Equipped: {item.itemType} in slot {gameObject.name}");
+        Logger.Log(LogModule.Inventory, $"Экипирован предмет: {item.itemType} в слот {gameObject.name}");
     }
 
     public void UnequipItem()
@@ -92,7 +96,7 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
         {
             equipmentVisual.SetActive(false);
         }
-        Debug.Log($"Unequipped from slot {gameObject.name}");
+        Logger.Log(LogModule.Inventory, $"Предмет снят со слота {gameObject.name}");
     }
 
     public bool IsEquipped()
@@ -103,10 +107,18 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
     public void OnDrop(PointerEventData eventData)
     {
         GameObject dropped = eventData.pointerDrag;
-        if (dropped == null) return;
+        if (dropped == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "Попытка бросить null объект в слот");
+            return;
+        }
 
         InventoryItemMarker draggedItem = dropped.GetComponent<InventoryItemMarker>();
-        if (draggedItem == null) return;
+        if (draggedItem == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "Брошенный объект не является предметом инвентаря");
+            return;
+        }
 
         InventoryItemMarker existingItem = GetComponentInChildren<InventoryItemMarker>();
 
@@ -120,6 +132,8 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
             isOccupied = true;
             UpdateSlotText();
             UpdateAllSlots();
+
+            Logger.Log(LogModule.Inventory, $"Предмет {draggedItem.itemType} помещён в слот {gameObject.name}");
             return;
         }
 
@@ -142,6 +156,8 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
                     Destroy(draggedItem.gameObject);
                     UpdateSlotText();
                     UpdateAllSlots();
+
+                    Logger.Log(LogModule.Inventory, $"Стеки {draggedItem.itemType} объединены: {total} предметов");
                     return;
                 }
                 else
@@ -154,6 +170,8 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
 
                     UpdateSlotText();
                     UpdateAllSlots();
+
+                    Logger.Log(LogModule.Inventory, $"Стек {draggedItem.itemType} заполнен до {data.maxStack}, осталось {draggedItem.count}");
                     return;
                 }
             }
@@ -188,7 +206,7 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
         UpdateSlotText();
         UpdateAllSlots();
 
-        Debug.Log($"✅ SWAP: {existingItem.itemType} <-> {draggedItem.itemType}");
+        Logger.Log(LogModule.Inventory, $"Обмен предметами: {existingItem.itemType} <-> {draggedItem.itemType}");
     }
 
     public void UpdateSlotText()
@@ -256,6 +274,7 @@ public class InventorySlot : MonoBehaviour, IDropHandler, IPointerClickHandler
         }
 
         MenuManager.Instance?.OpenContextMenu(item, Input.mousePosition);
+        Logger.Log(LogModule.Inventory, $"Открыто контекстное меню для предмета {item.itemType}");
 
         isProcessingRightClick = false;
     }
