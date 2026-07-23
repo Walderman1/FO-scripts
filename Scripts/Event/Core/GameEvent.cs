@@ -1,4 +1,3 @@
-// GameEvent.cs
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -38,13 +37,12 @@ public class GameEvent : ScriptableObject
 
     public bool CanExecute(EventContext context)
     {
-        // Проверка политики выполнения
         if (executionPolicy == ExecutionPolicy.ExecuteOnce)
         {
             if (EventStateManager.Instance?.IsExecuted(eventID) ?? hasBeenExecuted)
             {
                 if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                    Debug.Log($"⛔ Event '{eventID}' already executed once");
+                    Logger.Log(LogModule.Event, $"Событие '{eventID}' уже было выполнено один раз");
                 return false;
             }
         }
@@ -54,7 +52,7 @@ public class GameEvent : ScriptableObject
             if (count >= maxExecutions)
             {
                 if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                    Debug.Log($"⛔ Event '{eventID}' reached max executions ({maxExecutions})");
+                    Logger.Log(LogModule.Event, $"Событие '{eventID}' достигло максимума выполнений ({maxExecutions})");
                 return false;
             }
         }
@@ -63,51 +61,47 @@ public class GameEvent : ScriptableObject
             if (EventStateManager.Instance?.WasExecutedInSession(eventID) ?? false)
             {
                 if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                    Debug.Log($"⛔ Event '{eventID}' already executed in this session");
+                    Logger.Log(LogModule.Event, $"Событие '{eventID}' уже было выполнено в этой сессии");
                 return false;
             }
         }
 
-        // Проверка зависимости от другого события
         if (!string.IsNullOrEmpty(dependsOnEventID))
         {
             bool dependsExecuted = EventStateManager.Instance?.IsExecuted(dependsOnEventID) ?? false;
             if (!dependsExecuted)
             {
                 if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                    Debug.Log($"⛔ Event '{eventID}' depends on '{dependsOnEventID}' which is not executed");
+                    Logger.Log(LogModule.Event, $"Событие '{eventID}' зависит от '{dependsOnEventID}', которое не выполнено");
                 return false;
             }
         }
 
-        // Проверка взаимоисключения
         if (!string.IsNullOrEmpty(mutuallyExclusiveWithEventID))
         {
             bool exclusiveExecuted = EventStateManager.Instance?.IsExecuted(mutuallyExclusiveWithEventID) ?? false;
             if (exclusiveExecuted)
             {
                 if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                    Debug.Log($"⛔ Event '{eventID}' is mutually exclusive with '{mutuallyExclusiveWithEventID}' which is already executed");
+                    Logger.Log(LogModule.Event, $"Событие '{eventID}' взаимоисключающее с '{mutuallyExclusiveWithEventID}', которое уже выполнено");
                 return false;
             }
         }
 
-        // Проверка требований
         foreach (var req in requirements)
         {
             if (req != null && !req.Check(context))
             {
                 if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                    Debug.Log($"⛔ Event '{eventID}' requirement not met");
+                    Logger.Log(LogModule.Event, $"Событие '{eventID}' не соответствует требованиям");
                 return false;
             }
         }
 
-        // Проверка триггера
         if (triggerCondition != null && !triggerCondition.Check(context))
         {
             if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                Debug.Log($"⛔ Event '{eventID}' trigger condition not met");
+                Logger.Log(LogModule.Event, $"Событие '{eventID}' не соответствует условию триггера");
             return false;
         }
 
@@ -138,7 +132,6 @@ public class GameEvent : ScriptableObject
         if (!CanExecute(context))
             return;
 
-        // Помечаем как выполненное
         hasBeenExecuted = true;
 
         if (EventStateManager.Instance != null)
@@ -147,12 +140,11 @@ public class GameEvent : ScriptableObject
         }
         else
         {
-            Debug.LogWarning($"EventStateManager.Instance is null! Event '{eventID}' state not saved.");
+            Logger.LogWarning(LogModule.Event, $"EventStateManager.Instance отсутствует! Состояние события '{eventID}' не сохранено");
         }
 
-        Debug.Log($"✅ Executing event: {eventID} - {eventName}");
+        Logger.Log(LogModule.Event, $"Выполняется событие: {eventID} - {eventName}");
 
-        // Выполняем все действия
         foreach (var action in actions)
         {
             if (action != null)
@@ -163,12 +155,11 @@ public class GameEvent : ScriptableObject
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogError($"Error executing action '{action.actionName}' in event '{eventID}': {e.Message}");
+                    Logger.LogError(LogModule.Event, $"Ошибка выполнения действия '{action.actionName}' в событии '{eventID}': {e.Message}");
                 }
             }
         }
 
-        // Оповещаем систему
         if (EventManager.Instance != null)
         {
             EventManager.Instance.OnEventExecuted?.Invoke(this, context);
@@ -179,7 +170,7 @@ public class GameEvent : ScriptableObject
     {
         hasBeenExecuted = false;
         EventStateManager.Instance?.ResetEvent(eventID);
-        Debug.Log($"🔄 Event '{eventID}' reset");
+        Logger.Log(LogModule.Event, $"Событие '{eventID}' сброшено");
     }
 
     public bool IsExecuted()
