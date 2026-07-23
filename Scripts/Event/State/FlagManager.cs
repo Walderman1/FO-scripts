@@ -1,4 +1,3 @@
-// FlagManager.cs - ОБЪЕДИНЕННЫЙ МЕНЕДЖЕР ФЛАГОВ
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -28,6 +27,7 @@ public class FlagManager : MonoBehaviour
         }
         else
         {
+            Logger.Log(LogModule.Core, "Уничтожение дублирующего FlagManager");
             Destroy(gameObject);
         }
     }
@@ -38,17 +38,14 @@ public class FlagManager : MonoBehaviour
         {
             flags[entry.flagName] = entry.value;
         }
-        Debug.Log($"🚩 FlagManager initialized with {initialFlags.Count} flags");
+        Logger.Log(LogModule.Core, $"FlagManager инициализирован с {initialFlags.Count} флагами");
     }
-
-    // ============ ОСНОВНЫЕ МЕТОДЫ ============
 
     public void SetFlag(string flagName, bool value)
     {
         flags[flagName] = value;
-        Debug.Log($"🚩 Flag {flagName} = {value}");
+        Logger.Log(LogModule.Core, $"Флаг {flagName} = {value}");
 
-        // Оповещаем EventManager об изменении флага
         if (EventManager.Instance != null)
         {
             EventManager.Instance.OnFlagChanged(flagName, value);
@@ -67,27 +64,25 @@ public class FlagManager : MonoBehaviour
         return flags.ContainsKey(flagName);
     }
 
-    // ============ ДОПОЛНИТЕЛЬНЫЕ МЕТОДЫ ============
-
     public void ToggleFlag(string flagName)
     {
         bool currentValue = GetFlag(flagName);
         SetFlag(flagName, !currentValue);
-        Debug.Log($"🔄 Flag {flagName} toggled to {!currentValue}");
+        Logger.Log(LogModule.Core, $"Флаг {flagName} переключен на {!currentValue}");
     }
 
     public void RemoveFlag(string flagName)
     {
         if (flags.Remove(flagName))
         {
-            Debug.Log($"🗑️ Flag {flagName} removed");
+            Logger.Log(LogModule.Core, $"Флаг {flagName} удалён");
         }
     }
 
     public void ClearAllFlags()
     {
         flags.Clear();
-        Debug.Log($"🗑️ All flags cleared");
+        Logger.Log(LogModule.Core, "Все флаги очищены");
     }
 
     public Dictionary<string, bool> GetAllFlags()
@@ -97,14 +92,12 @@ public class FlagManager : MonoBehaviour
 
     public void PrintAllFlags()
     {
-        Debug.Log("=== ALL FLAGS ===");
+        Logger.Log(LogModule.Core, "=== ВСЕ ФЛАГИ ===");
         foreach (var kvp in flags)
         {
-            Debug.Log($"  {kvp.Key} = {kvp.Value}");
+            Logger.Log(LogModule.Core, $"  {kvp.Key} = {kvp.Value}");
         }
     }
-
-    // ============ СОХРАНЕНИЕ/ЗАГРУЗКА ============
 
     public string SerializeFlags()
     {
@@ -117,7 +110,7 @@ public class FlagManager : MonoBehaviour
         if (data != null)
         {
             flags = data.flags;
-            Debug.Log($"📂 Flags restored from save");
+            Logger.Log(LogModule.Core, "Флаги восстановлены из сохранения");
         }
     }
 
