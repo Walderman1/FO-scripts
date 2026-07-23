@@ -12,11 +12,9 @@ public class DialogueCharacterManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private DialogueData dialogueConfig;
 
-    // Эти поля устанавливаются из TextBeginner
     private GameObject FirstCharactersArea;
     private GameObject SecondCharactersArea;
 
-    // State
     private bool isCharacterSpawned;
     private string currentCharacterName;
     private bool isAnimating;
@@ -43,19 +41,22 @@ public class DialogueCharacterManager : MonoBehaviour
         {
             interactions = new GameObject[0];
         }
+
+        Logger.Log(LogModule.Dialogue, "DialogueCharacterManager инициализирован");
     }
 
     public void SetCharacterAreas(GameObject firstArea, GameObject secondArea)
     {
         FirstCharactersArea = firstArea;
         SecondCharactersArea = secondArea;
-        Debug.Log($"Character areas set: First={FirstCharactersArea?.name}, Second={SecondCharactersArea?.name}");
+        Logger.Log(LogModule.Dialogue, $"Области персонажей установлены: First={FirstCharactersArea?.name}, Second={SecondCharactersArea?.name}");
     }
 
     public void LoadCharacters()
     {
         string folder = dialogueConfig != null ? dialogueConfig.charactersFolder : "Characters";
         characters = Resources.LoadAll<GameObject>(folder).ToList();
+        Logger.Log(LogModule.Dialogue, $"Загружено персонажей: {characters.Count} из папки {folder}");
     }
 
     #endregion
@@ -64,10 +65,15 @@ public class DialogueCharacterManager : MonoBehaviour
 
     public void ActivateCharacter(string characterName)
     {
-        if (isCharacterSpawned) return;
+        if (isCharacterSpawned)
+        {
+            Logger.Log(LogModule.Dialogue, $"Персонаж уже активен, пропуск активации {characterName}");
+            return;
+        }
+
         if (FirstCharactersArea == null)
         {
-            Debug.LogError("FirstCharactersArea is null! Cannot activate character.");
+            Logger.LogError(LogModule.Dialogue, "FirstCharactersArea не найден! Невозможно активировать персонажа");
             return;
         }
 
@@ -84,19 +90,25 @@ public class DialogueCharacterManager : MonoBehaviour
                 {
                     character = newCharacter;
                     isCharacterSpawned = true;
+                    Logger.Log(LogModule.Dialogue, $"Персонаж {characterName} активирован");
 
                     Animator animator = newCharacter.GetComponent<Animator>();
                     if (animator != null)
                     {
                         animator.Play("Speak");
+                        isAnimating = true;
+                        Logger.Log(LogModule.Dialogue, $"Анимация Speak запущена для {characterName}");
                     }
-                    isAnimating = true;
                 }
+            }
+            else
+            {
+                Logger.LogWarning(LogModule.Dialogue, $"Персонаж {characterName} не найден в списке");
             }
         }
         else
         {
-            Debug.LogError($"Target '{parentName}' not found in FirstCharactersArea!");
+            Logger.LogError(LogModule.Dialogue, $"Целевой объект '{parentName}' не найден в FirstCharactersArea");
         }
     }
 
@@ -115,12 +127,14 @@ public class DialogueCharacterManager : MonoBehaviour
     public void SetCurrentCharacter(string characterName)
     {
         currentCharacterName = characterName;
+        Logger.Log(LogModule.Dialogue, $"Текущий персонаж установлен: {characterName}");
     }
 
     public void ClearCharacter()
     {
         if (character != null)
         {
+            Logger.Log(LogModule.Dialogue, $"Уничтожение персонажа: {character.name}");
             Destroy(character);
             character = null;
         }
@@ -133,7 +147,7 @@ public class DialogueCharacterManager : MonoBehaviour
     {
         if (FirstCharactersArea == null)
         {
-            Debug.LogWarning("FirstCharactersArea is null, cannot clear characters.");
+            Logger.LogWarning(LogModule.Dialogue, "FirstCharactersArea не найден, очистка невозможна");
             return;
         }
 
@@ -141,11 +155,14 @@ public class DialogueCharacterManager : MonoBehaviour
         Transform target = FirstCharactersArea.transform.Find(parentName);
         if (target != null)
         {
+            int count = target.childCount;
             foreach (Transform child in target)
             {
                 Destroy(child.gameObject);
             }
+            Logger.Log(LogModule.Dialogue, $"Очищено {count} персонажей");
         }
+
         character = null;
         isCharacterSpawned = false;
         isAnimating = false;
@@ -160,13 +177,13 @@ public class DialogueCharacterManager : MonoBehaviour
     {
         if (character == null)
         {
-            Debug.LogWarning("Character is null, cannot move to speaker area!");
+            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден, перемещение невозможно");
             return;
         }
 
         if (FirstCharactersArea == null)
         {
-            Debug.LogError("FirstCharactersArea is null!");
+            Logger.LogError(LogModule.Dialogue, "FirstCharactersArea не найден");
             return;
         }
 
@@ -174,7 +191,7 @@ public class DialogueCharacterManager : MonoBehaviour
         Transform target = FirstCharactersArea.transform.Find(parentName);
         if (target == null)
         {
-            Debug.LogError($"Target '{parentName}' not found in FirstCharactersArea!");
+            Logger.LogError(LogModule.Dialogue, $"Целевой объект '{parentName}' не найден в FirstCharactersArea");
             return;
         }
 
@@ -195,12 +212,16 @@ public class DialogueCharacterManager : MonoBehaviour
             animator.Play("Speak");
         }
 
-        Debug.Log($"Character moved to speaker area: {target.name}");
+        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в область диалога: {target.name}");
     }
 
     public void MoveCharacterToLocation(GameObject location)
     {
-        if (character == null || location == null) return;
+        if (character == null || location == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, $"Невозможно переместить персонажа: character={character != null}, location={location != null}");
+            return;
+        }
 
         if (character.TryGetComponent(out Animator an))
         {
@@ -218,11 +239,17 @@ public class DialogueCharacterManager : MonoBehaviour
             animator.enabled = true;
             animator.Play("IdleEye");
         }
+
+        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в локацию: {location.name}");
     }
 
     public void MoveCharacterToPosition(Vector3 position, Quaternion rotation, Vector3 scale)
     {
-        if (character == null) return;
+        if (character == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден, перемещение невозможно");
+            return;
+        }
 
         if (character.TryGetComponent(out Animator an))
         {
@@ -240,34 +267,36 @@ public class DialogueCharacterManager : MonoBehaviour
             animator.enabled = true;
             animator.Play("IdleEye");
         }
+
+        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в позицию {position}");
     }
 
     public void MoveCharacterToCurrentLocationReference()
     {
         if (character == null)
         {
-            Debug.LogWarning("Character is null!");
+            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден");
             return;
         }
 
         GameObject currentScene = SceneSlideTransition.Instance?.GetCurrentScene();
         if (currentScene == null)
         {
-            Debug.LogWarning("No current scene found!");
+            Logger.LogWarning(LogModule.Dialogue, "Текущая сцена не найдена");
             return;
         }
 
         LocationNeighbors neighbors = currentScene.GetComponent<LocationNeighbors>();
         if (neighbors == null)
         {
-            Debug.LogWarning($"No LocationNeighbors on {currentScene.name}");
+            Logger.LogWarning(LogModule.Dialogue, $"LocationNeighbors не найден на {currentScene.name}");
             return;
         }
 
         GameObject locationRef = neighbors.GetLocationReference();
         if (locationRef == null)
         {
-            Debug.LogWarning($"No LocationReference in {currentScene.name}");
+            Logger.LogWarning(LogModule.Dialogue, $"LocationReference не найден в {currentScene.name}");
             return;
         }
 
@@ -288,17 +317,21 @@ public class DialogueCharacterManager : MonoBehaviour
             animator.Play("IdleEye");
         }
 
-        Debug.Log($"Character moved to LocationReference: {locationRef.name} in scene: {currentScene.name}");
+        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен к LocationReference: {locationRef.name} в сцене {currentScene.name}");
     }
 
     public void MoveCharacterToCurrentScene()
     {
-        if (character == null) return;
+        if (character == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден");
+            return;
+        }
 
         GameObject currentScene = SceneSlideTransition.Instance?.GetCurrentScene();
         if (currentScene == null)
         {
-            Debug.LogWarning("No current scene found!");
+            Logger.LogWarning(LogModule.Dialogue, "Текущая сцена не найдена");
             return;
         }
 
@@ -319,17 +352,21 @@ public class DialogueCharacterManager : MonoBehaviour
             animator.Play("IdleEye");
         }
 
-        Debug.Log($"Character moved to scene: {currentScene.name}");
+        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в сцену: {currentScene.name}");
     }
 
     public void MoveCharacterToActiveLocationReference()
     {
-        if (character == null) return;
+        if (character == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден");
+            return;
+        }
 
         GameObject locationRef = GetActiveLocationReferenceFromCurrentScene();
         if (locationRef == null)
         {
-            Debug.LogWarning("No active LocationReference found!");
+            Logger.LogWarning(LogModule.Dialogue, "Активный LocationReference не найден");
             return;
         }
 
@@ -349,7 +386,7 @@ public class DialogueCharacterManager : MonoBehaviour
             animator.Play("IdleEye");
         }
 
-        Debug.Log($"Character moved to LocationReference: {locationRef.name}");
+        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен к LocationReference: {locationRef.name}");
     }
 
     private GameObject GetActiveLocationReferenceFromCurrentScene()
@@ -357,14 +394,14 @@ public class DialogueCharacterManager : MonoBehaviour
         GameObject currentScene = SceneSlideTransition.Instance?.GetCurrentScene();
         if (currentScene == null)
         {
-            Debug.LogWarning("No current scene found!");
+            Logger.LogWarning(LogModule.Dialogue, "Текущая сцена не найдена");
             return null;
         }
 
         LocationNeighbors neighbors = currentScene.GetComponent<LocationNeighbors>();
         if (neighbors == null)
         {
-            Debug.LogWarning($"No LocationNeighbors on {currentScene.name}");
+            Logger.LogWarning(LogModule.Dialogue, $"LocationNeighbors не найден на {currentScene.name}");
             return null;
         }
 
@@ -379,21 +416,34 @@ public class DialogueCharacterManager : MonoBehaviour
     {
         if (interactions == null || interactions.Length == 0)
         {
+            Logger.Log(LogModule.Dialogue, "Список взаимодействий пуст");
             return null;
         }
 
         if (string.IsNullOrEmpty(name))
         {
+            Logger.Log(LogModule.Dialogue, "Имя взаимодействия пустое");
             return null;
         }
 
-        return interactions.FirstOrDefault(i => i != null && i.name == name);
+        GameObject result = interactions.FirstOrDefault(i => i != null && i.name == name);
+        if (result != null)
+        {
+            Logger.Log(LogModule.Dialogue, $"Найдено взаимодействие: {name}");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Dialogue, $"Взаимодействие {name} не найдено");
+        }
+
+        return result;
     }
 
     public void ToggleInteraction(string characterName)
     {
         if (string.IsNullOrEmpty(characterName))
         {
+            Logger.LogWarning(LogModule.Dialogue, "Имя персонажа пустое");
             return;
         }
 
@@ -401,6 +451,7 @@ public class DialogueCharacterManager : MonoBehaviour
         if (interaction != null)
         {
             interaction.SetActive(!interaction.activeSelf);
+            Logger.Log(LogModule.Dialogue, $"Взаимодействие {characterName} переключено в состояние {interaction.activeSelf}");
         }
     }
 
@@ -418,6 +469,11 @@ public class DialogueCharacterManager : MonoBehaviour
         if (character != null && character.TryGetComponent(out Animator animator))
         {
             animator.Play(animationName);
+            Logger.Log(LogModule.Dialogue, $"Запущена анимация {animationName} для {character.name}");
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Dialogue, $"Невозможно запустить анимацию {animationName}: персонаж не найден или нет Animator");
         }
     }
 
