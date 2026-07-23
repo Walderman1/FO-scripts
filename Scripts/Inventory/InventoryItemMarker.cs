@@ -32,9 +32,10 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
 
         parentCanvas = GetComponentInParent<Canvas>();
         UpdateUI();
+
+        Logger.Log(LogModule.Inventory, $"Маркер предмета {itemType} инициализирован, количество: {count}");
     }
 
-    // ✅ Удаляем dragVisual при уничтожении объекта
     private void OnDestroy()
     {
         DestroyDragClone();
@@ -99,6 +100,8 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
                 cg.interactable = false;
             }
         }
+
+        Logger.Log(LogModule.Inventory, $"Начало перетаскивания предмета {itemType}");
     }
 
     private GameObject CreateDragVisual(int itemCount)
@@ -240,6 +243,7 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
         }
 
         StartCoroutine(CleanAllSlotsDelayed());
+        Logger.Log(LogModule.Inventory, $"Завершение перетаскивания предмета {itemType}");
     }
 
     private IEnumerator CleanAllSlotsDelayed()
@@ -287,12 +291,14 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
             if (shiftPressed && count > 1)
             {
                 SplitStack(count / 2);
+                Logger.Log(LogModule.Inventory, $"Разделение стека {itemType}: {count / 2} предметов");
                 return;
             }
 
             if (altPressed && count > 1)
             {
                 SplitStack(1);
+                Logger.Log(LogModule.Inventory, $"Разделение стека {itemType}: 1 предмет");
                 return;
             }
 
@@ -302,6 +308,7 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
             if (timeSinceLastClick < DOUBLE_CLICK_DELAY)
             {
                 MenuManager.Instance?.OpenItemView(this);
+                Logger.Log(LogModule.Inventory, $"Двойной клик по предмету {itemType}");
             }
             return;
         }
@@ -315,10 +322,18 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
 
     private void SplitStack(int splitCount)
     {
-        if (splitCount <= 0 || splitCount >= count) return;
+        if (splitCount <= 0 || splitCount >= count)
+        {
+            Logger.LogWarning(LogModule.Inventory, $"Некорректное разделение стека: {splitCount} из {count}");
+            return;
+        }
 
         InventoryUIManager uiManager = FindFirstObjectByType<InventoryUIManager>();
-        if (uiManager == null || uiManager.inventoryGrid == null) return;
+        if (uiManager == null || uiManager.inventoryGrid == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "InventoryUIManager не найден для разделения стека");
+            return;
+        }
 
         Transform emptySlot = null;
         foreach (Transform slot in uiManager.inventoryGrid.transform)
@@ -333,7 +348,7 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
 
         if (emptySlot == null)
         {
-            Debug.Log("Нет свободных слотов для разделения!");
+            Logger.Log(LogModule.Inventory, "Нет свободных слотов для разделения стека");
             return;
         }
 
@@ -380,6 +395,7 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
             }
 
             StartCoroutine(CleanAllSlotsDelayed());
+            Logger.Log(LogModule.Inventory, $"Стек {itemType} разделён: {splitCount} в новом слоте, {count} осталось");
         }
     }
 
@@ -402,6 +418,7 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
     {
         count += amount;
         UpdateUI();
+        Logger.Log(LogModule.Inventory, $"Добавлено {amount} к предмету {itemType}, теперь: {count}");
     }
 
     public void UpdateUI()
