@@ -27,14 +27,12 @@ public class TextBeginner : MonoBehaviour
     [SerializeField] private bool startDialogueOnAwake = false;
     [SerializeField] private int startFileIndex = 0;
 
-    // Dialogue state
     private bool isInDialogue;
     public bool isChoosing;
     private bool hasDeleted;
     private int currentLineIndex;
     private string currentCharacterName;
 
-    // Dialogue data
     private DialogueFileManager fileManager;
 
     private Button skipButton;
@@ -50,12 +48,10 @@ public class TextBeginner : MonoBehaviour
     {
         LoadConfig();
 
-        // Инициализация менеджера файлов
         fileManager = new DialogueFileManager(dialogueConfig);
         fileManager.OnDialogueLoaded += OnFileLoaded;
         fileManager.OnError += OnFileError;
 
-        // Поиск UI
         if (dialogueUI == null)
         {
             dialogueUI = GetComponentInChildren<DialogueUI>();
@@ -65,7 +61,6 @@ public class TextBeginner : MonoBehaviour
             }
         }
 
-        // Поиск Character Manager
         if (characterManager == null)
         {
             characterManager = GetComponentInChildren<DialogueCharacterManager>();
@@ -77,37 +72,34 @@ public class TextBeginner : MonoBehaviour
 
         AutoFindComponents();
 
-        // Инициализация Character Manager - передаем найденные области
         if (characterManager != null)
         {
             characterManager.Initialize(dialogueConfig);
             characterManager.SetCharacterAreas(FirstCharactersArea, SecondCharactersArea);
         }
 
-        // Скрываем PanelDialogue через CanvasGroup при старте
         if (dialogueUI != null)
         {
             dialogueUI.SetPanelDialogueActive(false);
             dialogueUI.ClearDialogueText();
         }
         isInDialogue = false;
+
+        Logger.Log(LogModule.Dialogue, "TextBeginner инициализирован");
     }
 
     private void Start()
     {
-        // Инициализируем пути к файлам ДО загрузки
         fileManager.InitializeFilePaths();
 
-        // Проверяем, что пути загружены
         if (fileManager.GetFilePaths().Count == 0)
         {
-            Debug.LogError("❌ Нет путей к файлам диалогов! Проверьте DialogueConfig.");
+            Logger.LogError(LogModule.Dialogue, "Нет путей к файлам диалогов. Проверьте DialogueConfig");
             return;
         }
 
         LoadDialogueFromFile(startFileIndex);
 
-        // Убеждаемся, что PanelDialogue скрыт
         if (dialogueUI != null)
         {
             dialogueUI.SetPanelDialogueActive(false);
@@ -118,7 +110,6 @@ public class TextBeginner : MonoBehaviour
         UpdateCurrentLocation();
         SetupSkipButton();
 
-        // Запускаем диалог только если включен флаг
         if (startDialogueOnAwake)
         {
             StartDialogueWithFile(startFileIndex);
@@ -128,7 +119,7 @@ public class TextBeginner : MonoBehaviour
         {
             dialogueConfig.LogSettings();
             fileManager.LogFileInfo();
-            Debug.Log($"Start dialogue on awake: {startDialogueOnAwake}");
+            Logger.Log(LogModule.Dialogue, $"Start dialogue on awake: {startDialogueOnAwake}");
         }
     }
 
@@ -154,13 +145,13 @@ public class TextBeginner : MonoBehaviour
     {
         if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
         {
-            Debug.Log("Dialogue file loaded successfully!");
+            Logger.Log(LogModule.Dialogue, "Файл диалога успешно загружен");
         }
     }
 
     private void OnFileError(string error)
     {
-        Debug.LogError($"Dialogue file error: {error}");
+        Logger.LogError(LogModule.Dialogue, $"Ошибка файла диалога: {error}");
     }
 
     #endregion
@@ -171,7 +162,7 @@ public class TextBeginner : MonoBehaviour
     {
         if (dialogueConfig != null)
         {
-            Debug.Log("DialogueConfig already assigned in inspector.");
+            Logger.Log(LogModule.Dialogue, "DialogueConfig назначен в инспекторе");
             return;
         }
 
@@ -179,7 +170,7 @@ public class TextBeginner : MonoBehaviour
 
         if (dialogueConfig != null)
         {
-            Debug.Log("DialogueConfig loaded from Resources/Configs/DialogueConfig");
+            Logger.Log(LogModule.Dialogue, "DialogueConfig загружен из Resources/Configs/DialogueConfig");
         }
         else
         {
@@ -187,11 +178,11 @@ public class TextBeginner : MonoBehaviour
 
             if (dialogueConfig != null)
             {
-                Debug.Log("DialogueConfig loaded from Resources/DialogueConfig");
+                Logger.Log(LogModule.Dialogue, "DialogueConfig загружен из Resources/DialogueConfig");
             }
             else
             {
-                Debug.LogError("DialogueConfig not found in Resources/Configs/ or Resources/!");
+                Logger.LogError(LogModule.Dialogue, "DialogueConfig не найден в Resources/Configs/ или Resources/");
             }
         }
     }
@@ -206,16 +197,23 @@ public class TextBeginner : MonoBehaviour
         string skipName = dialogueConfig != null ? dialogueConfig.skipButtonName : "SkipButton";
 
         GameObject buttonPanel = GameObject.Find(buttonPanelName);
-        if (buttonPanel == null) return;
+        if (buttonPanel == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, $"ButtonPanel {buttonPanelName} не найден");
+            return;
+        }
 
         Transform skipButtonTransform = buttonPanel.transform.Find(skipName);
-        if (skipButtonTransform == null) return;
+        if (skipButtonTransform == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, $"SkipButton {skipName} не найден в {buttonPanelName}");
+            return;
+        }
 
         skipButtonGameObject = skipButtonTransform.gameObject;
         skipButton = skipButtonTransform.GetComponent<Button>();
         if (skipButton == null) return;
 
-        // Добавляем CanvasGroup для управления видимостью
         skipButtonCanvasGroup = skipButtonGameObject.GetComponent<CanvasGroup>();
         if (skipButtonCanvasGroup == null)
         {
@@ -227,7 +225,6 @@ public class TextBeginner : MonoBehaviour
         skipButton.onClick.RemoveAllListeners();
         skipButton.onClick.AddListener(StartSkip);
 
-        // Скрываем через CanvasGroup, а не SetActive
         skipButtonCanvasGroup.alpha = 0f;
         skipButtonCanvasGroup.blocksRaycasts = false;
         skipButtonCanvasGroup.interactable = false;
@@ -237,6 +234,8 @@ public class TextBeginner : MonoBehaviour
             var text = skipButton.GetComponentInChildren<TMP_Text>();
             if (text != null) text.text = dialogueConfig.skipButtonText;
         }
+
+        Logger.Log(LogModule.Dialogue, "SkipButton настроен");
     }
 
     private void UpdateSkipButtonVisibility()
@@ -250,7 +249,6 @@ public class TextBeginner : MonoBehaviour
             shouldBeVisible = false;
         }
 
-        // Управляем через CanvasGroup
         skipButtonCanvasGroup.alpha = shouldBeVisible ? 1f : 0f;
         skipButtonCanvasGroup.blocksRaycasts = shouldBeVisible;
         skipButtonCanvasGroup.interactable = shouldBeVisible;
@@ -264,6 +262,7 @@ public class TextBeginner : MonoBehaviour
     private void StartSkip()
     {
         if (!isInDialogue || isChoosing || isSkipping) return;
+        Logger.Log(LogModule.Dialogue, "Начат пропуск диалога");
         StartCoroutine(SkipDialogueCoroutine());
     }
 
@@ -271,7 +270,6 @@ public class TextBeginner : MonoBehaviour
     {
         isSkipping = true;
 
-        // Скрываем кнопку через CanvasGroup во время пропуска
         if (skipButtonCanvasGroup != null)
         {
             skipButtonCanvasGroup.alpha = 0f;
@@ -292,7 +290,7 @@ public class TextBeginner : MonoBehaviour
 
         if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
         {
-            Debug.Log($"=== SKIP START: currentLineIndex = {currentLineIndex} ===");
+            Logger.Log(LogModule.Dialogue, $"Пропуск: currentLineIndex = {currentLineIndex}");
         }
 
         int maxIterations = dialogueConfig != null ? dialogueConfig.maxSkipIterations : 100;
@@ -317,7 +315,7 @@ public class TextBeginner : MonoBehaviour
                 {
                     if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
                     {
-                        Debug.LogWarning("Skip stuck, forcing end");
+                        Logger.LogWarning(LogModule.Dialogue, "Пропуск завис, принудительное завершение");
                     }
                     EndDialogue();
                     break;
@@ -336,7 +334,7 @@ public class TextBeginner : MonoBehaviour
             {
                 if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
                 {
-                    Debug.Log("SKIP: Choice menu appeared, stopping skip");
+                    Logger.Log(LogModule.Dialogue, "Пропуск: появилось меню выбора, остановка");
                 }
                 break;
             }
@@ -345,7 +343,7 @@ public class TextBeginner : MonoBehaviour
             {
                 if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
                 {
-                    Debug.Log("SKIP: Dialogue ended");
+                    Logger.Log(LogModule.Dialogue, "Пропуск: диалог завершен");
                 }
                 break;
             }
@@ -354,7 +352,7 @@ public class TextBeginner : MonoBehaviour
             {
                 if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
                 {
-                    Debug.Log("SKIP: Index didn't change, ending dialogue");
+                    Logger.Log(LogModule.Dialogue, "Пропуск: индекс не изменился, завершение диалога");
                 }
                 EndDialogue();
                 break;
@@ -364,7 +362,6 @@ public class TextBeginner : MonoBehaviour
             yield return new WaitForSeconds(delay);
         }
 
-        // Восстановление состояния кнопки
         if (skipButton != null)
         {
             var text = skipButton.GetComponentInChildren<TMP_Text>();
@@ -377,13 +374,11 @@ public class TextBeginner : MonoBehaviour
         }
 
         isSkipping = false;
-
-        // Обновляем видимость кнопки
         UpdateSkipButtonVisibility();
 
         if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
         {
-            Debug.Log($"=== SKIP END: currentLineIndex = {currentLineIndex} ===");
+            Logger.Log(LogModule.Dialogue, $"Пропуск завершен: currentLineIndex = {currentLineIndex}");
         }
     }
 
@@ -401,7 +396,6 @@ public class TextBeginner : MonoBehaviour
                 text.text = dialogueConfig.skipButtonText;
             }
 
-            // Скрываем через CanvasGroup
             if (skipButtonCanvasGroup != null)
             {
                 skipButtonCanvasGroup.alpha = 0f;
@@ -415,7 +409,7 @@ public class TextBeginner : MonoBehaviour
 
         if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
         {
-            Debug.Log("Skip button state reset");
+            Logger.Log(LogModule.Dialogue, "Состояние SkipButton сброшено");
         }
     }
 
@@ -491,6 +485,8 @@ public class TextBeginner : MonoBehaviour
                 blackPanelAnimator = blackPanel.GetComponent<Animator>();
             }
         }
+
+        Logger.Log(LogModule.Dialogue, "Компоненты найдены автоматически");
     }
 
     private GameObject FindByTagOrName(string tag, string name)
@@ -510,7 +506,7 @@ public class TextBeginner : MonoBehaviour
 
         if (obj == null && dialogueConfig != null && dialogueConfig.enableDebugLogs)
         {
-            Debug.LogWarning($"Component not found: {tag}/{name}");
+            Logger.LogWarning(LogModule.Dialogue, $"Компонент не найден: {tag}/{name}");
         }
         return obj;
     }
@@ -519,15 +515,15 @@ public class TextBeginner : MonoBehaviour
     {
         if (dialogueUI == null || dialogueUI.DialoguePanel == null)
         {
-            Debug.LogError("DialoguePanel not found! Make sure it has tag 'DialoguePanel'");
+            Logger.LogError(LogModule.Dialogue, "DialoguePanel не найден. Убедитесь, что у него есть тег 'DialoguePanel'");
         }
         if (dialogueUI == null || dialogueUI.DialogueText == null)
         {
-            Debug.LogError("DialogueText not found inside DialoguePanel");
+            Logger.LogError(LogModule.Dialogue, "DialogueText не найден внутри DialoguePanel");
         }
         if (dialogueUI == null || dialogueUI.ChoicePanel == null)
         {
-            Debug.LogError("ChoicePanel not found! Make sure it has tag 'ChoicePanel'");
+            Logger.LogError(LogModule.Dialogue, "ChoicePanel не найден. Убедитесь, что у него есть тег 'ChoicePanel'");
         }
     }
 
@@ -547,6 +543,8 @@ public class TextBeginner : MonoBehaviour
         UpdateCurrentLocation();
         isSkipping = false;
         ResetSkipButtonState();
+
+        Logger.Log(LogModule.Dialogue, "Начата новая игра");
     }
 
     #endregion
@@ -587,7 +585,7 @@ public class TextBeginner : MonoBehaviour
     {
         if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
         {
-            Debug.Log($"🔍 StartDialogueWithFile вызван с индексом: {fileIndex}");
+            Logger.Log(LogModule.Dialogue, $"StartDialogueWithFile вызван с индексом: {fileIndex}");
         }
 
         ResetSkipButtonState();
@@ -602,12 +600,10 @@ public class TextBeginner : MonoBehaviour
 
         LoadDialogueFromFile(fileIndex);
 
-        // ✅ ПРИНУДИТЕЛЬНАЯ АКТИВАЦИЯ PanelDialogue
         if (dialogueUI != null)
         {
             dialogueUI.SetPanelDialogueActive(true);
 
-            // Дополнительно: принудительно включаем объект с тегом Dialogue
             GameObject panelDialogue = GameObject.FindGameObjectWithTag("Dialogue");
             if (panelDialogue != null)
             {
@@ -617,16 +613,15 @@ public class TextBeginner : MonoBehaviour
                     cg.alpha = 1f;
                     cg.blocksRaycasts = true;
                     cg.interactable = true;
-                    Debug.Log("✅ PanelDialogue принудительно активирован через GameObject.Find");
+                    Logger.Log(LogModule.Dialogue, "PanelDialogue принудительно активирован");
                 }
             }
 
-            Debug.Log("✅ PanelDialogue activated via CanvasGroup");
+            Logger.Log(LogModule.Dialogue, "PanelDialogue активирован через CanvasGroup");
         }
 
         currentLineIndex = 0;
         isInDialogue = true;
-        //OnTap();
     }
 
     public void MakeChoice(int choiceIndex)
@@ -661,6 +656,8 @@ public class TextBeginner : MonoBehaviour
                 break;
             }
         }
+
+        Logger.Log(LogModule.Dialogue, $"Выбран вариант {choiceIndex}");
     }
 
     public void SetCurrentCharacter(string characterName)
@@ -670,6 +667,7 @@ public class TextBeginner : MonoBehaviour
         {
             characterManager.SetCurrentCharacter(characterName);
         }
+        Logger.Log(LogModule.Dialogue, $"Текущий персонаж: {characterName}");
     }
 
     public void ToggleDialogue(int mode)
@@ -687,6 +685,8 @@ public class TextBeginner : MonoBehaviour
             }
         }
         isInDialogue = dialogueUI != null && dialogueUI.IsPanelDialogueActive();
+
+        Logger.Log(LogModule.Dialogue, $"Переключение диалога в режим {mode}, состояние: {isInDialogue}");
     }
 
     public void LoadAndContinue()
@@ -710,6 +710,7 @@ public class TextBeginner : MonoBehaviour
     {
         currentLineIndex = 0;
         fileManager.LoadDialogueFromFile(fileIndex);
+        Logger.Log(LogModule.Dialogue, $"Загружен файл диалога с индексом {fileIndex}");
     }
 
     #endregion
@@ -831,7 +832,7 @@ public class TextBeginner : MonoBehaviour
 
         if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
         {
-            Debug.Log("ForceResetDialogue called - isInDialogue set to false");
+            Logger.Log(LogModule.Dialogue, "ForceResetDialogue вызван");
         }
     }
 
@@ -933,6 +934,8 @@ public class TextBeginner : MonoBehaviour
                 {
                     MakeChoice(index + 1);
                 });
+
+                Logger.Log(LogModule.Dialogue, $"Показано меню выбора с {choicesList.Count} вариантами");
             }
 
             dialogueUI.SetPanelDialogueActive(true);
@@ -962,7 +965,7 @@ public class TextBeginner : MonoBehaviour
 
         ResetSkipButtonState();
 
-        Debug.Log("Dialogue ended - UI hidden");
+        Logger.Log(LogModule.Dialogue, "Диалог завершен");
 
         EventManager.Instance?.TriggerEvent(EventTriggerType.DialogueEnd,
             new EventContext().WithDialogue(currentCharacterName ?? "unknown"));
@@ -974,7 +977,7 @@ public class TextBeginner : MonoBehaviour
 
     public void UpdateCurrentLocation()
     {
-        Debug.Log("=== UpdateCurrentLocation START ===");
+        Logger.Log(LogModule.Dialogue, "Обновление текущей локации");
 
         string worldTag = dialogueConfig != null ? dialogueConfig.worldTag : "World";
         GameObject world = GameObject.FindGameObjectWithTag(worldTag);
@@ -984,11 +987,11 @@ public class TextBeginner : MonoBehaviour
             world = GameObject.Find("World");
             if (world == null)
             {
-                Debug.LogError("World not found! Check tag or name.");
+                Logger.LogError(LogModule.Dialogue, "World не найден");
                 return;
             }
         }
-        Debug.Log($"World found: {world.name}");
+        Logger.Log(LogModule.Dialogue, $"World найден: {world.name}");
 
         currentRegion = FindActiveChildByTagOrName(world, "Region", "Region");
         if (currentRegion == null)
@@ -998,19 +1001,19 @@ public class TextBeginner : MonoBehaviour
                 if (child.CompareTag("Region") && child.gameObject.activeInHierarchy)
                 {
                     currentRegion = child.gameObject;
-                    Debug.Log($"Region found by direct search: {currentRegion.name}");
+                    Logger.Log(LogModule.Dialogue, $"Region найден прямым поиском: {currentRegion.name}");
                     break;
                 }
             }
 
             if (currentRegion == null)
             {
-                Debug.LogWarning("No active Region found in World!");
+                Logger.LogWarning(LogModule.Dialogue, "Активный Region не найден в World");
             }
         }
         else
         {
-            Debug.Log($"Region found: {currentRegion.name}");
+            Logger.Log(LogModule.Dialogue, $"Region найден: {currentRegion.name}");
         }
 
         if (currentRegion != null)
@@ -1023,24 +1026,23 @@ public class TextBeginner : MonoBehaviour
                     if (child.CompareTag("Location") && child.gameObject.activeInHierarchy)
                     {
                         currentLocation = child.gameObject;
-                        Debug.Log($"Location found by direct search: {currentLocation.name}");
+                        Logger.Log(LogModule.Dialogue, $"Location найден прямым поиском: {currentLocation.name}");
                         break;
                     }
                 }
 
                 if (currentLocation == null)
                 {
-                    Debug.LogWarning($"No active Location found in Region: {currentRegion.name}");
+                    Logger.LogWarning(LogModule.Dialogue, $"Активный Location не найден в Region: {currentRegion.name}");
                 }
             }
             else
             {
-                Debug.Log($"Location found: {currentLocation.name}");
+                Logger.Log(LogModule.Dialogue, $"Location найден: {currentLocation.name}");
             }
         }
 
         PrintLocationHierarchy();
-        Debug.Log("=== UpdateCurrentLocation END ===");
     }
 
     private GameObject FindActiveChildByTagOrName(GameObject parent, string tag, string name)
@@ -1064,20 +1066,18 @@ public class TextBeginner : MonoBehaviour
 
     private void PrintLocationHierarchy()
     {
-        Debug.Log("=== Текущая иерархия локаций ===");
-        Debug.Log($"World: World");
+        Logger.Log(LogModule.Dialogue, "=== Текущая иерархия локаций ===");
+        Logger.Log(LogModule.Dialogue, "World: World");
 
         if (currentRegion != null)
-            Debug.Log($"Region: {currentRegion.name}");
+            Logger.Log(LogModule.Dialogue, $"Region: {currentRegion.name}");
         else
-            Debug.Log("Region: None");
+            Logger.Log(LogModule.Dialogue, "Region: None");
 
         if (currentLocation != null)
-            Debug.Log($"Location: {currentLocation.name}");
+            Logger.Log(LogModule.Dialogue, $"Location: {currentLocation.name}");
         else
-            Debug.Log("Location: None");
-
-        Debug.Log("=================================");
+            Logger.Log(LogModule.Dialogue, "Location: None");
     }
 
     #endregion
