@@ -1,4 +1,3 @@
-// ItemSO.cs - ПОЛНОСТЬЮ РУСИФИЦИРОВАННЫЙ
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "НовыйПредмет", menuName = "Инвентарь/Предмет")]
@@ -41,7 +40,6 @@ public class ItemSO : ScriptableObject
     [Header("=== ТЭГИ ===")]
     public string[] customTags;
 
-    // ✅ Метод для конвертации в ItemData (для обратной совместимости)
     public ItemData ToItemData()
     {
         return new ItemData
@@ -58,18 +56,16 @@ public class ItemSO : ScriptableObject
         };
     }
 
-    // ✅ Метод для быстрого создания предмета в мире
     public GameObject SpawnWorld(Vector3 position, Quaternion rotation)
     {
         if (worldPrefab == null)
         {
-            Debug.LogWarning($"Мировой префаб не установлен для {itemName}");
+            Logger.LogWarning(LogModule.Inventory, $"Мировой префаб не установлен для {itemName}");
             return null;
         }
 
         GameObject obj = Instantiate(worldPrefab, position, rotation);
 
-        // Настраиваем PickupItem
         PickupItem pickup = obj.GetComponent<PickupItem>();
         if (pickup == null) pickup = obj.AddComponent<PickupItem>();
 
@@ -81,15 +77,15 @@ public class ItemSO : ScriptableObject
         pickup.pickupEffectPath = pickupEffectPath;
         pickup.pickupSound = pickupSound;
 
+        Logger.Log(LogModule.Inventory, $"Создан предмет {itemName} в мире по позиции {position}");
         return obj;
     }
 
-    // ✅ Метод для создания UI элемента
     public GameObject CreateUIElement(Transform parent)
     {
         if (uiPrefab == null)
         {
-            Debug.LogWarning($"UI префаб не установлен для {itemName}");
+            Logger.LogWarning(LogModule.Inventory, $"UI префаб не установлен для {itemName}");
             return null;
         }
 
@@ -104,19 +100,19 @@ public class ItemSO : ScriptableObject
         marker.count = 1;
         marker.UpdateUI();
 
+        Logger.Log(LogModule.Inventory, $"Создан UI элемент для {itemName}");
         return obj;
     }
 
-    // ✅ Валидация данных
     private void OnValidate()
     {
         if (string.IsNullOrEmpty(itemName))
             itemName = itemType.ToString();
 
         if (icon == null)
-            Debug.LogWarning($"Иконка не установлена для {itemName}");
+            Logger.LogWarning(LogModule.Inventory, $"Иконка не установлена для {itemName}");
 
         if (isEquippable && equipmentType == EquipmentType.None)
-            Debug.LogWarning($"Тип экипировки не указан для экипируемого предмета {itemName}");
+            Logger.LogWarning(LogModule.Inventory, $"Тип экипировки не указан для экипируемого предмета {itemName}");
     }
 }
