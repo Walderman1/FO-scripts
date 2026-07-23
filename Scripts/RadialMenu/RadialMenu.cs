@@ -46,7 +46,7 @@ public class RadialMenu : MonoBehaviour
         Move,
         UseMagic,
         OpenInventory,
-        OpenEquipment, // ← ДОБАВИТЬ
+        OpenEquipment,
         Cancel,
         Settings,
         Exit,
@@ -91,6 +91,8 @@ public class RadialMenu : MonoBehaviour
 
         CreateMenu();
         Hide();
+
+        Logger.Log(LogModule.RadialMenu, $"RadialMenu инициализирован с {buttonCount} кнопками, тип: {menuType}");
     }
 
     private void LoadPrefabsFromResources()
@@ -99,9 +101,15 @@ public class RadialMenu : MonoBehaviour
         shortButtonPrefab = Resources.Load<GameObject>("UI/Prefab/Buttons/ShortButton");
 
         if (longButtonPrefab == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "LongButton префаб не найден, создание запасного");
             longButtonPrefab = CreateLongButtonPrefab();
+        }
         if (shortButtonPrefab == null)
+        {
+            Logger.LogWarning(LogModule.RadialMenu, "ShortButton префаб не найден, создание запасного");
             shortButtonPrefab = CreateShortButtonPrefab();
+        }
     }
 
     private GameObject CreateLongButtonPrefab()
@@ -134,6 +142,7 @@ public class RadialMenu : MonoBehaviour
         tmp.raycastTarget = false;
         tmp.font = GetDefaultFont();
 
+        Logger.Log(LogModule.RadialMenu, "Создан запасной LongButton префаб");
         return btn;
     }
 
@@ -167,6 +176,7 @@ public class RadialMenu : MonoBehaviour
         tmp.raycastTarget = false;
         tmp.font = GetDefaultFont();
 
+        Logger.Log(LogModule.RadialMenu, "Создан запасной ShortButton префаб");
         return btn;
     }
 
@@ -190,6 +200,7 @@ public class RadialMenu : MonoBehaviour
                 Destroy(btn.gameObject);
         }
         buttons.Clear();
+        Logger.Log(LogModule.RadialMenu, "Меню очищено");
     }
 
     public void CreateMenu()
@@ -198,7 +209,7 @@ public class RadialMenu : MonoBehaviour
 
         if (buttonCount <= 0)
         {
-            Debug.LogWarning("RadialMenu: buttonCount is 0, no menu created");
+            Logger.LogWarning(LogModule.RadialMenu, "buttonCount равен 0, меню не создано");
             return;
         }
 
@@ -221,6 +232,8 @@ public class RadialMenu : MonoBehaviour
                 CreateHorizontalMenu();
                 break;
         }
+
+        Logger.Log(LogModule.RadialMenu, $"Создано меню с {buttonCount} кнопками, тип: {menuType}");
     }
 
     private void CreateCircleMenu()
@@ -322,7 +335,7 @@ public class RadialMenu : MonoBehaviour
         if (index < buttonActions.Count)
             action = buttonActions[index];
 
-        Debug.Log($"RadialMenu selected: {name} (index {index}, action {action})");
+        Logger.Log(LogModule.RadialMenu, $"Выбрана кнопка: {name} (индекс {index}, действие {action})");
 
         if (currentMode == RadialMenuMode.Choice)
         {
@@ -339,7 +352,6 @@ public class RadialMenu : MonoBehaviour
                 action = GetActionFromButtonName(name);
             }
 
-            // ✅ ПЕРЕДАЁМ В MenuManager
             MenuManager.Instance?.HandleContextAction(currentItem, action);
             currentItem = null;
         }
@@ -365,12 +377,6 @@ public class RadialMenu : MonoBehaviour
         return RadialAction.None;
     }
 
-    // ❌ УДАЛЁН СТАРЫЙ МЕТОД HandleContextAction
-    // Вместо него используем MenuManager.Instance?.HandleContextAction()
-
-    // ❌ УДАЛЁНЫ СТАРЫЕ МЕТОДЫ: UseItem, ExamineItem, DropItem, SplitItem, EquipItem
-    // Все они теперь в MenuManager
-
     public void SetChoiceMode(List<string> choices, System.Action<int> onChoiceSelected)
     {
         currentMode = RadialMenuMode.Choice;
@@ -387,11 +393,14 @@ public class RadialMenu : MonoBehaviour
 
         CreateMenu();
         ShowAtCenter();
+
+        Logger.Log(LogModule.RadialMenu, $"Установлен режим выбора с {choices.Count} вариантами");
     }
 
     public void SetCurrentItem(InventoryItemMarker item)
     {
         currentItem = item;
+        Logger.Log(LogModule.RadialMenu, $"Установлен текущий предмет для контекстного меню: {item?.itemType}");
     }
 
     public void SetContextMenu(List<string> names, List<RadialAction> actions)
@@ -408,6 +417,8 @@ public class RadialMenu : MonoBehaviour
         }
 
         CreateMenu();
+
+        Logger.Log(LogModule.RadialMenu, $"Установлено контекстное меню с {names.Count} кнопками");
     }
 
     public void RestoreDefaultMenu()
@@ -417,6 +428,8 @@ public class RadialMenu : MonoBehaviour
         buttonActions = defaultButtonActions;
         buttonCount = defaultButtonCount;
         CreateMenu();
+
+        Logger.Log(LogModule.RadialMenu, "Восстановлено стандартное меню");
     }
 
     public RadialAction GetActionAtIndex(int index)
@@ -431,12 +444,14 @@ public class RadialMenu : MonoBehaviour
         Vector2 centerScreen = new Vector2(Screen.width / 2, Screen.height / 2);
         SetPosition(centerScreen);
         Show();
+        Logger.Log(LogModule.RadialMenu, "Меню показано по центру");
     }
 
     public void ShowAtPosition(Vector2 screenPosition)
     {
         SetPosition(screenPosition);
         Show();
+        Logger.Log(LogModule.RadialMenu, $"Меню показано по позиции: {screenPosition}");
     }
 
     private void SetPosition(Vector2 screenPosition)
@@ -459,6 +474,7 @@ public class RadialMenu : MonoBehaviour
             canvasGroup.interactable = true;
         }
         transform.SetAsLastSibling();
+        Logger.Log(LogModule.RadialMenu, "Меню показано");
     }
 
     public void Hide()
@@ -470,10 +486,12 @@ public class RadialMenu : MonoBehaviour
             canvasGroup.interactable = false;
         }
         onMenuClosed?.Invoke();
+        Logger.Log(LogModule.RadialMenu, "Меню скрыто");
     }
 
     private void OnDestroy()
     {
         ClearMenu();
+        Logger.Log(LogModule.RadialMenu, "RadialMenu уничтожен");
     }
 }
