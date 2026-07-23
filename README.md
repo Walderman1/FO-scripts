@@ -452,7 +452,7 @@ finding-oneself/
 
 ![Кастомный логгер](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Logger.gif)
 
-![Кастомный логгер](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/GIF/Logger.png)
+![Кастомный логгер](https://raw.githubusercontent.com/Walderman1/FO-scripts/main/Screenshots/Logger.png)
 
 **Logger** — иерархическая система логирования с разделением по модулям.
 
