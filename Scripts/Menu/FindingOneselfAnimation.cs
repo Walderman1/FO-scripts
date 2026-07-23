@@ -38,12 +38,14 @@ public class FindingOneselfAnimation : MonoBehaviour
         {
             config = Resources.Load<MenuUIConfig>("Configs/MenuUIConfig");
             if (config == null)
-                Debug.LogError("MenuUIConfig not found!");
+                Logger.LogError(LogModule.Menu, "MenuUIConfig не найден");
         }
 
         FindTrixieObject();
         FindAllLetters();
         mainAnimationCoroutine = StartCoroutine(AnimateLetters());
+
+        Logger.Log(LogModule.Menu, "FindingOneselfAnimation запущен");
     }
 
     public void CompleteAnimationImmediate()
@@ -79,7 +81,7 @@ public class FindingOneselfAnimation : MonoBehaviour
         isAnimationComplete = true;
         isTrixieComplete = true;
 
-        Debug.Log("Animation completed immediately!");
+        Logger.Log(LogModule.Menu, "Анимация завершена мгновенно");
     }
 
     public bool IsAnimationComplete()
@@ -104,7 +106,7 @@ public class FindingOneselfAnimation : MonoBehaviour
 
         if (trixieObject != null)
         {
-            Debug.Log($"Trixie object found: {trixieObject.name}");
+            Logger.Log(LogModule.Menu, $"Объект Trixie найден: {trixieObject.name}");
 
             trixieSpriteRenderer = trixieObject.GetComponent<SpriteRenderer>();
 
@@ -114,11 +116,11 @@ public class FindingOneselfAnimation : MonoBehaviour
                 Color transparentColor = trixieOriginalColor;
                 transparentColor.a = 0f;
                 trixieSpriteRenderer.color = transparentColor;
-                Debug.Log($"Trixie SpriteRenderer: alpha set to 0 (original alpha: {trixieOriginalColor.a})");
+                Logger.Log(LogModule.Menu, $"Trixie SpriteRenderer: альфа установлена на 0 (исходная альфа: {trixieOriginalColor.a})");
             }
             else
             {
-                Debug.LogWarning("Trixie object found but has no SpriteRenderer!");
+                Logger.LogWarning(LogModule.Menu, "Объект Trixie найден, но SpriteRenderer отсутствует");
             }
 
             trixieLight = trixieObject.GetComponent<Light2D>();
@@ -129,23 +131,23 @@ public class FindingOneselfAnimation : MonoBehaviour
 
                 if (trixieOriginalLightIntensity <= 0f)
                 {
-                    Debug.LogWarning($"Trixie Light2D intensity is {trixieOriginalLightIntensity}, setting to default: {config.trixieDefaultLightIntensity}");
+                    Logger.LogWarning(LogModule.Menu, $"Интенсивность света Trixie равна {trixieOriginalLightIntensity}, установка значения по умолчанию: {config.trixieDefaultLightIntensity}");
                     trixieOriginalLightIntensity = config.trixieDefaultLightIntensity;
                 }
 
                 trixieLight.intensity = 0f;
                 trixieLight.enabled = true;
 
-                Debug.Log($"Trixie Light2D: intensity set to 0, will fade to: {trixieOriginalLightIntensity}");
+                Logger.Log(LogModule.Menu, $"Trixie Light2D: интенсивность установлена на 0, будет восстановлена до: {trixieOriginalLightIntensity}");
             }
             else
             {
-                Debug.LogWarning("Trixie object found but has no Light2D!");
+                Logger.LogWarning(LogModule.Menu, "Объект Trixie найден, но Light2D отсутствует");
             }
         }
         else
         {
-            Debug.LogWarning("Trixie object not found!");
+            Logger.LogWarning(LogModule.Menu, "Объект Trixie не найден");
         }
     }
 
@@ -167,13 +169,13 @@ public class FindingOneselfAnimation : MonoBehaviour
 
                     if (data.originalIntensity <= 0f)
                     {
-                        Debug.LogWarning($"Letter '{letter.name}' Light intensity is {data.originalIntensity}, setting to default: {config.intensityMax}");
+                        Logger.LogWarning(LogModule.Menu, $"Буква '{letter.name}': интенсивность света равна {data.originalIntensity}, установка значения по умолчанию: {config.intensityMax}");
                         data.originalIntensity = config.intensityMax;
                     }
 
                     data.light.intensity = 0f;
 
-                    Debug.Log($"Letter '{letter.name}': Light found, will fade to intensity: {data.originalIntensity}");
+                    Logger.Log(LogModule.Menu, $"Буква '{letter.name}': свет найден, будет восстановлен до интенсивности: {data.originalIntensity}");
                 }
 
                 if (data.spriteRenderer != null)
@@ -184,7 +186,7 @@ public class FindingOneselfAnimation : MonoBehaviour
                     transparentColor.a = 0f;
                     data.spriteRenderer.color = transparentColor;
 
-                    Debug.Log($"Letter '{letter.name}': SpriteRenderer found, alpha set to 0");
+                    Logger.Log(LogModule.Menu, $"Буква '{letter.name}': SpriteRenderer найден, альфа установлена на 0");
                 }
 
                 if (data.light != null || data.spriteRenderer != null)
@@ -194,7 +196,7 @@ public class FindingOneselfAnimation : MonoBehaviour
             }
         }
 
-        Debug.Log($"Found {allLetters.Count} letters with components");
+        Logger.Log(LogModule.Menu, $"Найдено {allLetters.Count} букв с компонентами");
     }
 
     private IEnumerator AnimateLetters()
@@ -242,7 +244,7 @@ public class FindingOneselfAnimation : MonoBehaviour
 
         isAnimationComplete = true;
         isTrixieComplete = true;
-        Debug.Log("Full animation complete!");
+        Logger.Log(LogModule.Menu, "Полная анимация завершена");
     }
 
     private IEnumerator FadeInLetter(LetterData data)
@@ -332,11 +334,11 @@ public class FindingOneselfAnimation : MonoBehaviour
 
     private IEnumerator FadeInTrixie()
     {
-        Debug.Log("Starting Trixie fade in...");
+        Logger.Log(LogModule.Menu, "Начало появления Trixie");
 
         if (trixieSpriteRenderer != null)
         {
-            Debug.Log("Fading in Trixie SpriteRenderer...");
+            Logger.Log(LogModule.Menu, "Появление Trixie SpriteRenderer");
 
             float elapsed = 0f;
             float startAlpha = 0f;
@@ -349,7 +351,7 @@ public class FindingOneselfAnimation : MonoBehaviour
                     Color finalColor = trixieOriginalColor;
                     finalColor.a = 1f;
                     trixieSpriteRenderer.color = finalColor;
-                    Debug.Log("Trixie SpriteRenderer: forced to full visibility!");
+                    Logger.Log(LogModule.Menu, "Trixie SpriteRenderer: принудительно показан");
                     break;
                 }
 
@@ -369,12 +371,12 @@ public class FindingOneselfAnimation : MonoBehaviour
                 Color finalColor = trixieOriginalColor;
                 finalColor.a = 1f;
                 trixieSpriteRenderer.color = finalColor;
-                Debug.Log($"Trixie SpriteRenderer: alpha = {trixieSpriteRenderer.color.a} (fully visible)");
+                Logger.Log(LogModule.Menu, $"Trixie SpriteRenderer: альфа = {trixieSpriteRenderer.color.a} (полностью видим)");
             }
         }
         else
         {
-            Debug.LogWarning("Trixie SpriteRenderer is null, cannot fade in!");
+            Logger.LogWarning(LogModule.Menu, "Trixie SpriteRenderer отсутствует, невозможно выполнить появление");
         }
 
         if (isAnimationStopped)
@@ -394,19 +396,19 @@ public class FindingOneselfAnimation : MonoBehaviour
 
         if (trixieLight != null)
         {
-            Debug.Log($"Fading in Trixie Light2D from 0 to {trixieOriginalLightIntensity}...");
+            Logger.Log(LogModule.Menu, $"Появление Trixie Light2D от 0 до {trixieOriginalLightIntensity}");
 
             yield return StartCoroutine(FadeLightIntensity(trixieLight, trixieOriginalLightIntensity, config.trixieLightFadeInDuration));
 
-            Debug.Log($"Trixie Light2D: intensity = {trixieLight.intensity} (fully lit)");
+            Logger.Log(LogModule.Menu, $"Trixie Light2D: интенсивность = {trixieLight.intensity} (полностью освещён)");
         }
         else
         {
-            Debug.LogWarning("Trixie Light2D is null, cannot fade in light!");
+            Logger.LogWarning(LogModule.Menu, "Trixie Light2D отсутствует, невозможно выполнить появление света");
         }
 
         isTrixieComplete = true;
-        Debug.Log("Trixie fade in complete!");
+        Logger.Log(LogModule.Menu, "Появление Trixie завершено");
     }
 
     private IEnumerator RandomFlicker(Light2D light, LetterData data)
@@ -445,6 +447,7 @@ public class FindingOneselfAnimation : MonoBehaviour
                 data.light.intensity = 0f;
             }
         }
+        Logger.Log(LogModule.Menu, "Все буквы скрыты мгновенно");
     }
 
     public void ShowAllLettersImmediate()
@@ -464,6 +467,7 @@ public class FindingOneselfAnimation : MonoBehaviour
                 data.light.enabled = true;
             }
         }
+        Logger.Log(LogModule.Menu, "Все буквы показаны мгновенно");
     }
 
     public void HideTrixieImmediate()
@@ -479,6 +483,7 @@ public class FindingOneselfAnimation : MonoBehaviour
         {
             trixieLight.intensity = 0f;
         }
+        Logger.Log(LogModule.Menu, "Trixie скрыта мгновенно");
     }
 
     public void ShowTrixieImmediate()
@@ -495,6 +500,7 @@ public class FindingOneselfAnimation : MonoBehaviour
             trixieLight.intensity = trixieOriginalLightIntensity;
             trixieLight.enabled = true;
         }
+        Logger.Log(LogModule.Menu, "Trixie показана мгновенно");
     }
 
     public bool IsTrixieComplete()
