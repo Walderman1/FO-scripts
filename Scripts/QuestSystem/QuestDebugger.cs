@@ -1,6 +1,3 @@
-// ============================================================
-// QuestDebugger.cs
-// ============================================================
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
@@ -29,9 +26,15 @@ public class QuestDebugger : MonoBehaviour
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            Logger.Log(LogModule.QuestSystem, "QuestDebugger инициализирован");
+        }
         else
+        {
+            Logger.Log(LogModule.QuestSystem, "Уничтожение дублирующего QuestDebugger");
             Destroy(gameObject);
+        }
     }
 
     private void Start()
@@ -62,13 +65,13 @@ public class QuestDebugger : MonoBehaviour
                 AddLog($"Активный квест: {q.QuestName} (ID: {q.QuestID})");
                 foreach (var obj in q.Objectives)
                 {
-                    AddLog($"   {obj.description} - {obj.currentCount}/{obj.requiredCount} ({(obj.IsComplete() ? "✅" : "⬜")})");
+                    AddLog($"   {obj.description} - {obj.currentCount}/{obj.requiredCount} ({(obj.IsComplete() ? "выполнено" : "в процессе")})");
                 }
             }
         }
 
         if (showInConsole)
-            Debug.Log("Квест дебаггер активирован! Нажми F12 для показа панели.");
+            Logger.Log(LogModule.QuestSystem, "Квест дебаггер активирован. Нажмите F12 для показа панели.");
 
         if (debugPanel != null)
             debugPanel.SetActive(false);
@@ -161,11 +164,11 @@ public class QuestDebugger : MonoBehaviour
             scroll.horizontal = false;
             scroll.vertical = true;
 
-            Debug.Log("Панель дебаггера создана");
+            Logger.Log(LogModule.QuestSystem, "Панель дебаггера создана");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Ошибка создания панели: {e.Message}");
+            Logger.LogError(LogModule.QuestSystem, $"Ошибка создания панели: {e.Message}");
         }
     }
 
@@ -200,7 +203,7 @@ public class QuestDebugger : MonoBehaviour
         AddLog($"ЦЕЛЬ ОБНОВЛЕНА в квесте: {quest.QuestName}");
         foreach (var obj in quest.Objectives)
         {
-            AddLog($"   {obj.description} - {obj.currentCount}/{obj.requiredCount} ({(obj.IsComplete() ? "✅" : "⬜")})");
+            AddLog($"   {obj.description} - {obj.currentCount}/{obj.requiredCount} ({(obj.IsComplete() ? "выполнено" : "в процессе")})");
         }
         if (isPanelVisible) UpdateDebugUI();
     }
@@ -239,28 +242,28 @@ public class QuestDebugger : MonoBehaviour
         GameObject panel = GameObject.Find("QuestPanel");
         if (panel == null)
         {
-            AddLog("QuestPanel не найден!");
+            AddLog("QuestPanel не найден");
             return;
         }
 
         Transform list = panel.transform.Find("QuestList");
         if (list == null)
         {
-            AddLog("QuestList не найден!");
+            AddLog("QuestList не найден");
             return;
         }
 
         Transform viewport = list.Find("Viewport");
         if (viewport == null)
         {
-            AddLog("Viewport не найден!");
+            AddLog("Viewport не найден");
             return;
         }
 
         Transform content = viewport.Find("Content");
         if (content == null)
         {
-            AddLog("Content не найден!");
+            AddLog("Content не найден");
             return;
         }
 
@@ -269,7 +272,7 @@ public class QuestDebugger : MonoBehaviour
 
         if (childCount == 0)
         {
-            AddLog("В Content нет элементов QuestItem!");
+            AddLog("В Content нет элементов QuestItem");
             return;
         }
 
@@ -279,27 +282,27 @@ public class QuestDebugger : MonoBehaviour
         Transform bar = firstItem.Find("ProgressBar");
         if (bar == null)
         {
-            AddLog("ProgressBar не найден в QuestItem!");
+            AddLog("ProgressBar не найден в QuestItem");
             AddLog($"Дочерние элементы: {GetChildNames(firstItem)}");
             return;
         }
 
-        AddLog("ProgressBar найден!");
+        AddLog("ProgressBar найден");
 
         Transform fill = bar.Find("Fill");
         if (fill == null)
         {
-            AddLog("Fill не найден в ProgressBar!");
+            AddLog("Fill не найден в ProgressBar");
             AddLog($"Дочерние элементы ProgressBar: {GetChildNames(bar)}");
             return;
         }
 
-        AddLog("Fill найден!");
+        AddLog("Fill найден");
 
         Image fillImg = fill.GetComponent<Image>();
         if (fillImg == null)
         {
-            AddLog("Image не найден на Fill!");
+            AddLog("Image не найден на Fill");
             return;
         }
 
@@ -309,16 +312,16 @@ public class QuestDebugger : MonoBehaviour
 
         if (fillImg.type != Image.Type.Filled)
         {
-            AddLog($"⚠️ Image Type должен быть Filled, сейчас {fillImg.type}");
+            AddLog($"Image Type должен быть Filled, сейчас {fillImg.type}");
         }
 
         if (fillImg.fillMethod != Image.FillMethod.Horizontal)
         {
-            AddLog($"⚠️ Fill Method должен быть Horizontal, сейчас {fillImg.fillMethod}");
+            AddLog($"Fill Method должен быть Horizontal, сейчас {fillImg.fillMethod}");
         }
 
         fillImg.fillAmount = 0.75f;
-        AddLog("✅ Принудительно установлен fillAmount = 0.75");
+        AddLog("Принудительно установлен fillAmount = 0.75");
 
         UpdateDebugUI();
     }
@@ -341,7 +344,7 @@ public class QuestDebugger : MonoBehaviour
         log.AppendLine(fullMessage);
 
         if (showInConsole)
-            Debug.Log(fullMessage);
+            Logger.Log(LogModule.QuestSystem, fullMessage);
 
         if (log.Length > 15000)
         {
@@ -369,7 +372,7 @@ public class QuestDebugger : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            Debug.LogWarning($"Ошибка обновления UI: {e.Message}");
+            Logger.LogWarning(LogModule.QuestSystem, $"Ошибка обновления UI: {e.Message}");
         }
     }
 
@@ -391,7 +394,7 @@ public class QuestDebugger : MonoBehaviour
             AddLog($"   Прогресс: {quest.GetProgressText()} ({quest.Progress * 100:F0}%)");
             foreach (var obj in quest.Objectives)
             {
-                AddLog($"   {obj.description} - {obj.currentCount}/{obj.requiredCount} ({(obj.IsComplete() ? "✅" : "⬜")})");
+                AddLog($"   {obj.description} - {obj.currentCount}/{obj.requiredCount} ({(obj.IsComplete() ? "выполнено" : "в процессе")})");
             }
         }
         UpdateDebugUI();
