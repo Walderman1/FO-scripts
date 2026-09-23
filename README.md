@@ -2,6 +2,8 @@
 
 ### _Экспериментальная RPG о пони, потерявшей память_
 
+![Finding Oneself](GIF/hero.gif)
+
 ---
 
 **🎮 Жанр**  
@@ -256,6 +258,8 @@ finding-oneself/
 │   ├── DialogueData/
 │   ├── EventData/
 │   └── CraftData/
+├── GIF/
+├── Screenshots/
 ├── README.md
 ├── LICENSE
 └── .gitignore
@@ -268,6 +272,8 @@ finding-oneself/
 ## ✅ Что уже готово
 
 ### 🧠 Событийная система (Event System)
+
+![Event System](GIF/EventSystem.gif)
 
 <details>
 <summary><b>📖 Подробнее</b></summary>
@@ -290,6 +296,8 @@ finding-oneself/
 </details>
 
 ### 📜 Квестовая система
+
+![Quest System](GIF/QuestSystem.gif)
 
 <details>
 <summary><b>📖 Подробнее</b></summary>
@@ -315,6 +323,8 @@ finding-oneself/
 
 ### 🎒 Инвентарь
 
+![Inventory](GIF/Inventory.gif)
+
 <details>
 <summary><b>📖 Подробнее</b></summary>
 
@@ -336,6 +346,8 @@ finding-oneself/
 
 ### 🔨 Крафт
 
+![Craft](GIF/Craft.gif)
+
 <details>
 <summary><b>📖 Подробнее</b></summary>
 
@@ -356,6 +368,8 @@ finding-oneself/
 
 ### ⚔️ Экипировка
 
+![Equipment](GIF/Equipment.gif)
+
 <details>
 <summary><b>📖 Подробнее</b></summary>
 
@@ -373,6 +387,8 @@ finding-oneself/
 </details>
 
 ### 💬 Диалоговая система
+
+![Dialogue](GIF/Dialogue.gif)
 
 <details>
 <summary><b>📖 Подробнее</b></summary>
@@ -397,6 +413,8 @@ finding-oneself/
 
 ### 🎮 Главное меню
 
+![Main Menu](GIF/MainMenu.gif)
+
 <details>
 <summary><b>📖 Подробнее</b></summary>
 
@@ -416,6 +434,8 @@ finding-oneself/
 </details>
 
 ### 🌀 Радиальное меню
+
+![Radial Menu](GIF/RadialMenu.gif)
 
 <details>
 <summary><b>📖 Подробнее</b></summary>
@@ -437,6 +457,8 @@ finding-oneself/
 
 ### 🗺️ Навигация
 
+![Navigation](GIF/Navigation.gif)
+
 <details>
 <summary><b>📖 Подробнее</b></summary>
 
@@ -456,6 +478,8 @@ finding-oneself/
 
 ### ⚡ Способности
 
+![Abilities](GIF/Abilities.gif)
+
 <details>
 <summary><b>📖 Подробнее</b></summary>
 
@@ -471,6 +495,8 @@ finding-oneself/
 </details>
 
 ### 👁️ Контроллер глаз персонажа
+
+![Eye Controller](GIF/EyeController.gif)
 
 <details>
 <summary><b>📖 Подробнее</b></summary>
@@ -511,6 +537,8 @@ finding-oneself/
 
 ## 🛠 Редакторские инструменты
 
+![Editor Tools](Screenshots/EditorTools.png)
+
 <details>
 <summary><b>📖 Развернуть список</b></summary>
 
@@ -532,6 +560,8 @@ finding-oneself/
 ---
 
 ## 🐞 Система отладки
+
+![Logger](Screenshots/Logger.png)
 
 <details>
 <summary><b>📖 Развернуть описание</b></summary>
