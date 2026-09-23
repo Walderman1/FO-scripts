@@ -66,41 +66,41 @@ AI-ассистируемая | **⚡ Статус**
 
 ## 🏗 Архитектура проекта
 
-```mermaid
-graph TD
-    A[🧠 Core Systems] --> B[🎮 Gameplay]
-    A --> C[🎨 UI]
-    A --> D[🗺️ Navigation]
-    A --> E[🎬 Presentation]
-    A --> F[🐞 Debug & Tools]
+Loading
 
-    B --> B1[Abilities]
-    B --> B2[Inventory]
-    B --> B3[Craft]
-    B --> B4[Equipment]
-    B --> B5[Dialogue]
-    B --> B6[Quests]
-    B --> B7[Events]
+    graph TD
+        A[🧠 Core Systems] --> B[🎮 Gameplay]
+        A --> C[🎨 UI]
+        A --> D[🗺️ Navigation]
+        A --> E[🎬 Presentation]
+        A --> F[🐞 Debug & Tools]
 
-    C --> C1[MenuUI]
-    C --> C2[InventoryUI]
-    C --> C3[QuestUI]
-    C --> C4[RadialMenu]
-    C --> C5[HUD / Tooltips]
+        B --> B1[Abilities]
+        B --> B2[Inventory]
+        B --> B3[Craft]
+        B --> B4[Equipment]
+        B --> B5[Dialogue]
+        B --> B6[Quests]
+        B --> B7[Events]
 
-    D --> D1[LocationNeighbors]
-    D --> D2[SceneSlideTransition]
-    D --> D3[NavigationArrow]
+        C --> C1[MenuUI]
+        C --> C2[InventoryUI]
+        C --> C3[QuestUI]
+        C --> C4[RadialMenu]
+        C --> C5[HUD / Tooltips]
 
-    E --> E1[EyeController]
-    E --> E2[DialogueCharacterManager]
-    E --> E3[FindingOneselfAnimation]
+        D --> D1[LocationNeighbors]
+        D --> D2[SceneSlideTransition]
+        D --> D3[NavigationArrow]
 
-    F --> F1[Logger]
-    F --> F2[DebuggerWindow]
-    F --> F3[QuestDebugger]
-    F --> F4[Editor Tools]
-```
+        E --> E1[EyeController]
+        E --> E2[DialogueCharacterManager]
+        E --> E3[FindingOneselfAnimation]
+
+        F --> F1[Logger]
+        F --> F2[DebuggerWindow]
+        F --> F3[QuestDebugger]
+        F --> F4[Editor Tools]
 
 **📋 Подробное описание модулей**
 
@@ -116,7 +116,8 @@ graph TD
 
 ## 📁 Структура проекта
 
-**📂 Развернуть структуру**
+<details>
+<summary><b>📂 Развернуть структуру</b></summary>
 
 ```
 finding-oneself/
@@ -260,13 +261,16 @@ finding-oneself/
 └── .gitignore
 ```
 
+</details>
+
 ---
 
 ## ✅ Что уже готово
 
 ### 🧠 Событийная система (Event System)
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -283,9 +287,12 @@ finding-oneself/
 
 **Ключевые файлы:** `EventManager`, `EventStateManager`, `EventDataManager`, `GameEvent`, `EventAction`, `EventContext`, `EventConverter`, `EventDataRestorer`
 
+</details>
+
 ### 📜 Квестовая система
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -304,9 +311,12 @@ finding-oneself/
 
 **Ключевые файлы:** `QuestManager`, `QuestUI`, `QuestInstance`, `QuestSO`, `QuestConfigSO`, `QuestNotifications`, `QuestDebugger`
 
+</details>
+
 ### 🎒 Инвентарь
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -322,9 +332,12 @@ finding-oneself/
 
 **Ключевые файлы:** `InventoryUIManager`, `InventorySlot`, `InventoryItemMarker`, `ItemSO`, `ItemDatabase`, `ItemViewPanel`
 
+</details>
+
 ### 🔨 Крафт
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -339,9 +352,12 @@ finding-oneself/
 
 **Ключевые файлы:** `CraftingDatabase`, `CraftingRecipe`, `CraftingSystem`, `CraftingUI`, `CraftingProgress`, `RecipeKey`, `Ingredient`, `CraftSlotUI`
 
+</details>
+
 ### ⚔️ Экипировка
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -354,9 +370,12 @@ finding-oneself/
 
 **Ключевые файлы:** `EquipmentSystem`, `EquipmentSlot`
 
+</details>
+
 ### 💬 Диалоговая система
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -374,9 +393,12 @@ finding-oneself/
 
 **Ключевые файлы:** `TextBeginner`, `DialogueData`, `DialogueUI`, `DialogueFileManager`, `DialogueCharacterManager`, `DialogueTracker`, `DialogueTrigger`
 
+</details>
+
 ### 🎮 Главное меню
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -391,9 +413,12 @@ finding-oneself/
 
 **Ключевые файлы:** `MenuUIManager`, `MenuUIConfig`, `PanelManager`, `BackgroundManager`, `TabManager`, `UIBuilder`, `FindingOneselfAnimation`
 
+</details>
+
 ### 🌀 Радиальное меню
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -408,9 +433,12 @@ finding-oneself/
 
 **Ключевые файлы:** `RadialMenu`, `RadialButton`, `MenuManager`, `RadialMenuOpener`, `ItemViewPanel`, `TooltipManager`
 
+</details>
+
 ### 🗺️ Навигация
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -424,9 +452,12 @@ finding-oneself/
 
 **Ключевые файлы:** `LocationNeighbors`, `NavigationArrow`, `LocationArrows`, `SceneSlideTransition`, `SceneTransition`
 
+</details>
+
 ### ⚡ Способности
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -437,9 +468,12 @@ finding-oneself/
 
 **Ключевые файлы:** `Ability`, `AbilityManager`, `MagicLightAbility`
 
+</details>
+
 ### 👁️ Контроллер глаз персонажа
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -454,9 +488,12 @@ finding-oneself/
 
 **Ключевые файлы:** `EyeController`
 
+</details>
+
 ### 🎛️ Input System и настройки
 
-**📖 Подробнее**
+<details>
+<summary><b>📖 Подробнее</b></summary>
 
 **Возможности:**
 
@@ -468,11 +505,14 @@ finding-oneself/
 
 **Ключевые файлы:** `InputManager`, `InputConfig`, `SettingsManager`, `SettingsData`, `InputManagerEditor`
 
+</details>
+
 ---
 
 ## 🛠 Редакторские инструменты
 
-**📖 Развернуть список**
+<details>
+<summary><b>📖 Развернуть список</b></summary>
 
 Редактор | Назначение
 ---|---
@@ -487,11 +527,14 @@ finding-oneself/
 **EventEditorHelper** | Tools-меню: сохранение, загрузка, восстановление событий, работа с бэкапами
 **DebuggerWindow** | Кастомное окно отладки с фильтрацией по 16 модулям, поиском, экспортом и стеком ошибок
 
+</details>
+
 ---
 
 ## 🐞 Система отладки
 
-**📖 Развернуть описание**
+<details>
+<summary><b>📖 Развернуть описание</b></summary>
 
 **Logger** — иерархическая система логирования с разделением по модулям.
 
@@ -527,11 +570,14 @@ finding-oneself/
 3. Настройте фильтры и наблюдайте за логами в реальном времени
 4. В игре: нажмите **F12** для панели QuestDebugger
 
+</details>
+
 ---
 
 ## 💾 Система сохранений
 
-**📖 Развернуть описание**
+<details>
+<summary><b>📖 Развернуть описание</b></summary>
 
 Все данные сохраняются в формате JSON в папке `Save/` (в корне проекта в редакторе, рядом с билдом — в релизе).
 
@@ -543,6 +589,8 @@ finding-oneself/
 `Save/CraftData/CraftData.json` | Изученные рецепты крафта
 `Assets/EventsData/*.json` | Данные событий (сериализованные GameEvent)
 `Assets/EventsData/Backups/*.json` | Резервные копии событий (до 5 на событие)
+
+</details>
 
 ---
 
@@ -598,6 +646,9 @@ GitHub • Telegram
 
 ## 📊 Статистика проекта
 
+<details>
+<summary><b>📖 Развернуть статистику</b></summary>
+
 Метрика | Значение
 ---|---
 Всего `.cs` файлов | 61
@@ -608,6 +659,8 @@ GitHub • Telegram
 ScriptableObject-конфигов | 8
 Синглтон-менеджеров | ~15
 JSON-сохранений | 5
+
+</details>
 
 ---
 
