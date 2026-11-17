@@ -1,190 +1,238 @@
-using UnityEngine;
+using DialogueSystem;
 using System.Collections.Generic;
+using UnityEngine;
+using VContainer;
 
 public class LocationNeighbors : MonoBehaviour
 {
-    [Header("Auto Detection")]
-    [SerializeField] private float detectionRadius = 30f;
+    [Header("Neighbors")]
+    [SerializeField] private string left;
+    [SerializeField] private string right;
+    [SerializeField] private string up;
+    [SerializeField] private string down;
 
-    [Header("Location Reference")]
+    [Header("Search Settings")]
+    [Tooltip("Максимальное расстояние до соседа. 0 = без ограничения")]
+    [SerializeField] private float maxNeighborDistance = 20f;
+
+    [Tooltip("Минимальное совпадение направления (cos угла). 0.7 ≈ 45°, 0.9 ≈ 25°")]
+    [SerializeField, Range(0f, 1f)] private float directionAlignment = 0.7f;
+
+    [Header("Gizmo Settings")]
+    [SerializeField] private bool drawNeighborGizmos = true;
+    [SerializeField] private Color horizontalGizmoColor = new Color(0.2f, 0.6f, 1f);
+    [SerializeField] private Color verticalGizmoColor = new Color(1f, 0.9f, 0.2f);
+
+    [Header("References")]
     [SerializeField] private GameObject locationReference;
+    [SerializeField] private DialogueData dialogueConfig;
 
-    public GameObject leftNeighbor;
-    public GameObject rightNeighbor;
-    public GameObject upNeighbor;
-    public GameObject downNeighbor;
+    private Dictionary<string, string> neighbors = new Dictionary<string, string>();
+    private bool hasSearched = false;
+
+    public string LeftNeighbor => left;
+    public string RightNeighbor => right;
+    public string UpNeighbor => up;
+    public string DownNeighbor => down;
+
+    public string leftNeighbor => left;
+    public string rightNeighbor => right;
+    public string upNeighbor => up;
+    public string downNeighbor => down;
+    [Inject] private DialogueData _injectedConfig;
 
     private void Start()
     {
+        if (dialogueConfig == null)
+            dialogueConfig = _injectedConfig;
+
+        if (dialogueConfig == null)
+            Logger.LogWarning(LogModule.Navigation, "DialogueConfig не найден");
+
         FindNeighbors();
         FindLocationReference();
-
-        if (transform.position != Vector3.zero)
-        {
-            this.enabled = false;
-        }
-
-        Logger.Log(LogModule.Navigation, $"LocationNeighbors инициализирован для {gameObject.name}");
     }
 
-    private void FindLocationReference()
+    public void FindNeighbors()
     {
-        if (locationReference != null)
+        if (hasSearched) return;
+        hasSearched = true;
+
+        if (!string.IsNullOrEmpty(left) || !string.IsNullOrEmpty(right) ||
+            !string.IsNullOrEmpty(up) || !string.IsNullOrEmpty(down))
         {
-            Logger.Log(LogModule.Navigation, $"LocationReference назначен вручную: {locationReference.name}");
+            neighbors.Clear();
+            if (!string.IsNullOrEmpty(left)) neighbors["Left"] = left;
+            if (!string.IsNullOrEmpty(right)) neighbors["Right"] = right;
+            if (!string.IsNullOrEmpty(up)) neighbors["Up"] = up;
+            if (!string.IsNullOrEmpty(down)) neighbors["Down"] = down;
+
+            Logger.Log(LogModule.Navigation,
+                $"Соседи (вручную) для {gameObject.name}: L={left}, R={right}, U={up}, D={down}");
             return;
         }
 
-        Transform childByName = transform.Find("LocationReference");
-        if (childByName != null)
+        string locationTag = dialogueConfig != null ? dialogueConfig.LocationTag : "Location";
+        GameObject[] allLocations = GameObject.FindGameObjectsWithTag(locationTag);
+
+        Vector3[] dirVectors = { Vector3.left, Vector3.right, Vector3.up, Vector3.down };
+        float[] closestDist = { float.MaxValue, float.MaxValue, float.MaxValue, float.MaxValue };
+        string[] closestName = { null, null, null, null };
+
+        Vector3 myPos = transform.position;
+
+        foreach (GameObject loc in allLocations)
         {
-            locationReference = childByName.gameObject;
-            Logger.Log(LogModule.Navigation, $"LocationReference найден по имени в дочерних: {locationReference.name}");
-            return;
+            if (loc == gameObject) continue;
+
+            Vector3 toLoc = loc.transform.position - myPos;
+            float distance = toLoc.magnitude;
+
+            if (distance < 0.01f) continue;
+            if (maxNeighborDistance > 0f && distance > maxNeighborDistance) continue;
+
+            Vector3 dir = toLoc / distance;
+
+            int bestIdx = -1;
+            float bestDot = directionAlignment;
+            for (int i = 0; i < 4; i++)
+            {
+                float dot = Vector3.Dot(dir, dirVectors[i]);
+                if (dot > bestDot)
+                {
+                    bestDot = dot;
+                    bestIdx = i;
+                }
+            }
+
+            if (bestIdx < 0) continue;
+
+            if (distance < closestDist[bestIdx])
+            {
+                closestDist[bestIdx] = distance;
+                closestName[bestIdx] = loc.name;
+            }
         }
+
+        left = closestName[0];
+        right = closestName[1];
+        up = closestName[2];
+        down = closestName[3];
+
+        neighbors.Clear();
+        if (!string.IsNullOrEmpty(left)) neighbors["Left"] = left;
+        if (!string.IsNullOrEmpty(right)) neighbors["Right"] = right;
+        if (!string.IsNullOrEmpty(up)) neighbors["Up"] = up;
+        if (!string.IsNullOrEmpty(down)) neighbors["Down"] = down;
+
+        Logger.LogVerbose(LogModule.Navigation,
+            $"Соседи для {gameObject.name}: L={left}, R={right}, U={up}, D={down}");
+    }
+
+    public void ForceRefreshNeighbors()
+    {
+        hasSearched = false;
+        FindNeighbors();
+    }
+
+    public void FindLocationReference()
+    {
+        if (locationReference != null) return;
+
+        string locationRefTag = dialogueConfig != null ? dialogueConfig.LocationReferenceTag : "LocationReference";
 
         foreach (Transform child in transform)
         {
-            if (child.CompareTag("LocationReference"))
+            if (child.CompareTag(locationRefTag))
             {
                 locationReference = child.gameObject;
-                Logger.Log(LogModule.Navigation, $"LocationReference найден по тегу в дочерних: {locationReference.name}");
+                Logger.LogVerbose(LogModule.Navigation, $"LocationReference найден по тегу в дочерних: {locationReference.name}");
                 return;
             }
         }
 
-        GameObject foundByTag = GameObject.FindGameObjectWithTag("LocationReference");
-        if (foundByTag != null && foundByTag.transform.IsChildOf(transform))
+        Transform refTransform = transform.Find(locationRefTag);
+        if (refTransform != null)
         {
-            locationReference = foundByTag;
-            Logger.Log(LogModule.Navigation, $"LocationReference найден по тегу глобально: {locationReference.name}");
+            locationReference = refTransform.gameObject;
+            Logger.LogVerbose(LogModule.Navigation, $"LocationReference найден по имени в дочерних: {locationReference.name}");
             return;
         }
 
-        GameObject foundByName = GameObject.Find("LocationReference");
-        if (foundByName != null && foundByName.transform.IsChildOf(transform))
+        GameObject foundRef = GameObject.FindGameObjectWithTag(locationRefTag);
+        if (foundRef != null)
         {
-            locationReference = foundByName;
-            Logger.Log(LogModule.Navigation, $"LocationReference найден по имени глобально: {locationReference.name}");
+            locationReference = foundRef;
+            Logger.LogVerbose(LogModule.Navigation, $"LocationReference найден по тегу в сцене: {locationReference.name}");
             return;
         }
 
         Logger.LogWarning(LogModule.Navigation, $"LocationReference не найден для {gameObject.name}");
     }
 
-    private void FindNeighbors()
+    public string GetNeighbor(string direction)
     {
-        GameObject[] allLocations = GameObject.FindGameObjectsWithTag("Location");
-
-        Dictionary<string, GameObject> candidates = new Dictionary<string, GameObject>();
-        Dictionary<string, float> distances = new Dictionary<string, float>();
-
-        candidates["left"] = null;
-        candidates["right"] = null;
-        candidates["up"] = null;
-        candidates["down"] = null;
-
-        distances["left"] = float.MaxValue;
-        distances["right"] = float.MaxValue;
-        distances["up"] = float.MaxValue;
-        distances["down"] = float.MaxValue;
-
-        foreach (GameObject loc in allLocations)
-        {
-            if (loc == gameObject) continue;
-
-            Vector3 direction = loc.transform.position - transform.position;
-            float distance = direction.magnitude;
-
-            if (distance > detectionRadius) continue;
-
-            Vector3 normalized = direction.normalized;
-
-            if (Mathf.Abs(normalized.x) > Mathf.Abs(normalized.y))
-            {
-                if (normalized.x > 0)
-                {
-                    if (distance < distances["right"])
-                    {
-                        distances["right"] = distance;
-                        candidates["right"] = loc;
-                    }
-                }
-                else
-                {
-                    if (distance < distances["left"])
-                    {
-                        distances["left"] = distance;
-                        candidates["left"] = loc;
-                    }
-                }
-            }
-            else
-            {
-                if (normalized.y > 0)
-                {
-                    if (distance < distances["up"])
-                    {
-                        distances["up"] = distance;
-                        candidates["up"] = loc;
-                    }
-                }
-                else
-                {
-                    if (distance < distances["down"])
-                    {
-                        distances["down"] = distance;
-                        candidates["down"] = loc;
-                    }
-                }
-            }
-        }
-
-        leftNeighbor = candidates["left"];
-        rightNeighbor = candidates["right"];
-        upNeighbor = candidates["up"];
-        downNeighbor = candidates["down"];
-
-        Logger.Log(LogModule.Navigation, $"Соседи для {gameObject.name}: Left={leftNeighbor?.name ?? "None"}, Right={rightNeighbor?.name ?? "None"}, Up={upNeighbor?.name ?? "None"}, Down={downNeighbor?.name ?? "None"}");
-
-        if (locationReference != null)
-        {
-            Logger.Log(LogModule.Navigation, $"LocationReference для {gameObject.name}: {locationReference.name}");
-        }
-        else
-        {
-            Logger.Log(LogModule.Navigation, $"LocationReference для {gameObject.name}: None");
-        }
+        if (neighbors.TryGetValue(direction, out string neighborName))
+            return neighborName;
+        return null;
     }
 
     public GameObject GetLocationReference()
     {
+        if (locationReference == null)
+            FindLocationReference();
         return locationReference;
     }
 
-    private void OnDrawGizmos()
+    public Dictionary<string, string> GetAllNeighbors() => neighbors;
+
+    public string GetLeft() => left;
+    public string GetRight() => right;
+    public string GetUp() => up;
+    public string GetDown() => down;
+
+    public void SetLeft(string value) { left = value; }
+    public void SetRight(string value) { right = value; }
+    public void SetUp(string value) { up = value; }
+    public void SetDown(string value) { down = value; }
+
+    private void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.blue;
-        if (leftNeighbor != null)
-            Gizmos.DrawLine(transform.position, leftNeighbor.transform.position);
+        if (!drawNeighborGizmos) return;
 
-        Gizmos.color = Color.green;
-        if (rightNeighbor != null)
-            Gizmos.DrawLine(transform.position, rightNeighbor.transform.position);
+        Vector3 from = transform.position;
 
-        Gizmos.color = Color.yellow;
-        if (upNeighbor != null)
-            Gizmos.DrawLine(transform.position, upNeighbor.transform.position);
+        DrawNeighborGizmo(from, left, horizontalGizmoColor, Vector3.left);
+        DrawNeighborGizmo(from, right, horizontalGizmoColor, Vector3.right);
+        DrawNeighborGizmo(from, up, verticalGizmoColor, Vector3.up);
+        DrawNeighborGizmo(from, down, verticalGizmoColor, Vector3.down);
+    }
 
-        Gizmos.color = Color.red;
-        if (downNeighbor != null)
-            Gizmos.DrawLine(transform.position, downNeighbor.transform.position);
+    private void DrawNeighborGizmo(Vector3 from, string neighborName, Color color, Vector3 defaultDir)
+    {
+        if (string.IsNullOrEmpty(neighborName)) return;
 
-        Gizmos.color = Color.magenta;
-        if (locationReference != null)
-            Gizmos.DrawLine(transform.position, locationReference.transform.position);
+        GameObject target = GameObject.Find(neighborName);
+        Vector3 to = target != null ? target.transform.position : from + defaultDir * 5f;
 
-        Gizmos.color = Color.gray;
-        Gizmos.DrawWireSphere(transform.position, detectionRadius);
+        Gizmos.color = color;
+        Gizmos.DrawLine(from, to);
+        Gizmos.DrawWireSphere(to, 0.4f);
+
+        Vector3 mid = (from + to) * 0.5f;
+        Gizmos.DrawWireSphere(mid, 0.15f);
+    }
+
+    private static GameObject FindInScene(string name)
+    {
+        var all = Resources.FindObjectsOfTypeAll<GameObject>();
+        foreach (var go in all)
+        {
+            if (go == null) continue;
+            if (go.name != name) continue;
+            if (!go.scene.IsValid()) continue;
+            return go;
+        }
+        return null;
     }
 }

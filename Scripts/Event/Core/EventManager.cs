@@ -1,26 +1,35 @@
-// EventManager.cs - ПОЛНАЯ ВЕРСИЯ С ЗАЩИТОЙ
+using System;
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using VContainer;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
+[DefaultExecutionOrder(-7500)]
 public class EventManager : MonoBehaviour
 {
-    public static EventManager Instance;
+    [Inject] private EventDataManager _eventDataManager;
+    [Inject] private EventStateManager _eventStateManager;
+    [Inject] private ItemDatabase _itemDatabase;
+    [Inject] private IObjectResolver _container;
 
     [Header("Event Configuration")]
     [SerializeField] private bool autoLoadEvents = true;
-    [SerializeField] private string eventsResourcesPath = "Events";
+    [SerializeField] private string eventsResourcesPath = "EventsData";
     public bool logEvents = true;
 
     public List<GameEvent> registeredEvents = new List<GameEvent>();
 
+    private readonly HashSet<GameEvent> registeredSet = new HashSet<GameEvent>();
     private Dictionary<EventTriggerType, List<GameEvent>> eventsByTrigger = new Dictionary<EventTriggerType, List<GameEvent>>();
     private Dictionary<string, GameEvent> eventsById = new Dictionary<string, GameEvent>();
 
-    public System.Action<GameEvent, EventContext> OnEventExecuted;
+    private string cachedItemId = "";
+    private string cachedItemIdSource = "";
+
+    public Action<GameEvent, EventContext> OnEventExecuted;
 
     public bool AutoLoadEvents
     {
@@ -28,65 +37,106 @@ public class EventManager : MonoBehaviour
         set => autoLoadEvents = value;
     }
 
+    private IObjectResolver EffectiveContainer
+    {
+        get
+        {
+            var scene = SceneInjector.Instance?.CurrentSceneScope;
+            if (scene != null) return scene;
+            return _container;
+        }
+    }
+
+    private QuestManager ResolveQuestManager()
+    {
+        var scene = SceneInjector.Instance?.CurrentSceneScope;
+        if (scene != null)
+        {
+            try { var qm = scene.Resolve<QuestManager>(); if (qm != null) return qm; } catch { }
+        }
+
+        var root = SceneInjector.Instance?.RootScope;
+        if (root != null)
+        {
+            try { return root.Resolve<QuestManager>(); } catch { }
+        }
+        return null;
+    }
+
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-
-            if (autoLoadEvents)
-            {
-                bool loadedFromJson = LoadEventsFromJson();
-
-                if (!loadedFromJson)
-                {
-                    LoadAllEventsFromResources();
-                }
-            }
-            else
-            {
-                InitializeEventIndexes();
-            }
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        if (transform.parent != null) transform.SetParent(null);
+        DontDestroyOnLoad(gameObject);
     }
 
     private void Start()
     {
-        ExecuteAwakeEvents();
+        if (autoLoadEvents)
+        {
+            bool loadedFromJson = LoadEventsFromJson();
+            if (!loadedFromJson) LoadEventsFromResourcesDirectly();
+            if (!loadedFromJson && registeredEvents.Count == 0) LoadAllEventsFromResources();
+        }
+        else InitializeEventIndexes();
     }
 
-    public void RunCoroutine(IEnumerator routine)
+    private void OnDestroy()
     {
-        StartCoroutine(routine);
+        registeredSet.Clear();
+        eventsByTrigger.Clear();
+        eventsById.Clear();
+        cachedItemId = "";
+        cachedItemIdSource = "";
     }
+
+    private void LoadEventsFromResourcesDirectly()
+    {
+        TextAsset[] jsonAssets = Resources.LoadAll<TextAsset>(eventsResourcesPath);
+        if (jsonAssets.Length == 0) return;
+
+        registeredEvents.Clear();
+        registeredSet.Clear();
+        eventsByTrigger.Clear();
+        eventsById.Clear();
+
+        int loadedCount = 0;
+        foreach (TextAsset asset in jsonAssets)
+        {
+            try
+            {
+                EventData data = JsonUtility.FromJson<EventData>(asset.text);
+                if (data != null && !string.IsNullOrEmpty(data.eventID))
+                {
+                    GameEvent evt = EventConverter.ToGameEvent(data);
+                    if (evt != null) { RegisterEvent(evt); loadedCount++; }
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(LogModule.Event, $"Error loading {asset.name}: {e.Message}");
+            }
+        }
+
+        if (logEvents)
+            Logger.Log(LogModule.Event, $"Loaded {loadedCount} events from Resources/{eventsResourcesPath}");
+    }
+
+    public void RunCoroutine(IEnumerator routine) => StartCoroutine(routine);
 
     public void OnFlagChanged(string flagName, bool value)
     {
-        TriggerEvent(EventTriggerType.GlobalFlag, new EventContext().WithValue(flagName).WithValue(value ? 1 : 0));
+        TriggerEvent(EventTriggerType.GlobalFlag, new EventContext().WithFlag(flagName, value));
     }
 
     private bool LoadEventsFromJson()
     {
-        if (EventDataManager.Instance == null)
-        {
-            Debug.Log("📭 EventDataManager not found, skipping JSON load");
-            return false;
-        }
+        if (_eventDataManager == null) return false;
 
-        var eventDataList = EventDataManager.Instance.LoadAllEvents();
-
-        if (eventDataList == null || eventDataList.Count == 0)
-        {
-            Debug.Log("📭 No events found in JSON");
-            return false;
-        }
+        var eventDataList = _eventDataManager.LoadAllEvents();
+        if (eventDataList == null || eventDataList.Count == 0) return false;
 
         registeredEvents.Clear();
+        registeredSet.Clear();
         eventsByTrigger.Clear();
         eventsById.Clear();
 
@@ -94,102 +144,77 @@ public class EventManager : MonoBehaviour
         foreach (var data in eventDataList)
         {
             GameEvent evt = EventConverter.ToGameEvent(data);
-            if (evt != null)
-            {
-                RegisterEvent(evt);
-                loadedCount++;
-            }
+            if (evt != null) { RegisterEvent(evt); loadedCount++; }
         }
-
-        Debug.Log($"📦 Loaded {loadedCount} events from JSON");
         return loadedCount > 0;
     }
 
     private void LoadAllEventsFromResources()
     {
         registeredEvents.Clear();
+        registeredSet.Clear();
         eventsByTrigger.Clear();
         eventsById.Clear();
 
         GameEvent[] loadedEvents = Resources.LoadAll<GameEvent>(eventsResourcesPath);
-
-        if (loadedEvents == null || loadedEvents.Length == 0)
-        {
-            if (logEvents)
-                Debug.Log($"📭 Нет событий в папке Resources/{eventsResourcesPath}/");
-            return;
-        }
-
-        if (logEvents)
-            Debug.Log($"📦 Загружено {loadedEvents.Length} событий из Resources/{eventsResourcesPath}/");
+        if (loadedEvents == null || loadedEvents.Length == 0) return;
 
         foreach (var evt in loadedEvents)
-        {
-            if (evt != null)
-            {
-                RegisterEvent(evt);
-                if (logEvents)
-                    Debug.Log($"  ✅ {evt.eventID} - {evt.eventName}");
-            }
-        }
-
-        if (logEvents)
-            Debug.Log($"📦 Всего зарегистрировано: {registeredEvents.Count} событий");
+            if (evt != null) RegisterEvent(evt);
     }
 
     public void RegisterEvent(GameEvent evt)
     {
         if (evt == null) return;
-        if (registeredEvents.Contains(evt)) return;
+        if (!registeredSet.Add(evt)) return;
 
         registeredEvents.Add(evt);
 
         if (!string.IsNullOrEmpty(evt.eventID))
-        {
             eventsById[evt.eventID] = evt;
-        }
 
-        if (!eventsByTrigger.ContainsKey(evt.triggerType))
+        if (!eventsByTrigger.TryGetValue(evt.triggerType, out var list))
         {
-            eventsByTrigger[evt.triggerType] = new List<GameEvent>();
+            list = new List<GameEvent>();
+            eventsByTrigger[evt.triggerType] = list;
         }
-        eventsByTrigger[evt.triggerType].Add(evt);
+        list.Add(evt);
     }
 
     private void InitializeEventIndexes()
     {
         eventsByTrigger.Clear();
         eventsById.Clear();
+        registeredSet.Clear();
 
         foreach (var evt in registeredEvents)
         {
             if (evt == null) continue;
+            registeredSet.Add(evt);
 
             if (!string.IsNullOrEmpty(evt.eventID))
-            {
                 eventsById[evt.eventID] = evt;
-            }
 
-            if (!eventsByTrigger.ContainsKey(evt.triggerType))
+            if (!eventsByTrigger.TryGetValue(evt.triggerType, out var list))
             {
-                eventsByTrigger[evt.triggerType] = new List<GameEvent>();
+                list = new List<GameEvent>();
+                eventsByTrigger[evt.triggerType] = list;
             }
-            eventsByTrigger[evt.triggerType].Add(evt);
-        }
-
-        if (logEvents)
-        {
-            Debug.Log($"EventManager инициализирован с {registeredEvents.Count} событиями");
+            list.Add(evt);
         }
     }
 
-    private void ExecuteAwakeEvents()
+    public void ExecuteAwakeEvents()
     {
-        foreach (var evt in registeredEvents)
+        var container = EffectiveContainer;
+        int count = registeredEvents.Count;
+        for (int i = 0; i < count; i++)
         {
+            var evt = registeredEvents[i];
             if (evt != null && evt.executeOnAwake)
             {
-                evt.Execute(new EventContext());
+                var ctx = new EventContext().WithContainer(container);
+                evt.Execute(ctx);
             }
         }
     }
@@ -197,131 +222,131 @@ public class EventManager : MonoBehaviour
     public void TriggerEvent(EventTriggerType triggerType, EventContext context = null)
     {
         if (context == null) context = new EventContext();
+        if (context.Container == null) context.Container = EffectiveContainer;
 
         if (logEvents)
-        {
-            Debug.Log($"🎯 Триггер: {triggerType}");
-        }
+            Logger.Log(LogModule.Event, $"Триггер: {triggerType}");
 
-        // 🔥 ПРЯМЫЕ ВЫЗОВЫ ДЛЯ КВЕСТОВ
-        if (context != null)
+        var questManager = ResolveQuestManager();
+        string resolvedItemId = ResolveItemIdFromContext(context);
+
+        if (!string.IsNullOrEmpty(resolvedItemId))
         {
-            // Подбор предмета
-            if (triggerType == EventTriggerType.PickupItem && context.ItemType != ItemType.None)
+            if (triggerType == EventTriggerType.PickupItem ||
+                triggerType == EventTriggerType.Custom ||
+                triggerType == EventTriggerType.UseItem)
             {
-                QuestManager.Instance?.UpdateQuestByItem(context.ItemType, 1);
-                if (logEvents)
-                    Debug.Log($"✅ Прямой вызов (PickupItem): обновлён квест по предмету {context.ItemType}");
+                questManager?.UpdateQuestByItem(resolvedItemId, 1);
             }
 
-            // Вход в локацию
-            if (triggerType == EventTriggerType.EnterLocation && !string.IsNullOrEmpty(context.LocationName))
+            if (triggerType == EventTriggerType.EquipItem)
             {
-                QuestManager.Instance?.UpdateQuestByLocation(context.LocationName);
-                if (logEvents)
-                    Debug.Log($"✅ Прямой вызов (EnterLocation): обновлён квест по локации {context.LocationName}");
-            }
-
-            // Диалоги
-            if (triggerType == EventTriggerType.DialogueEnd && !string.IsNullOrEmpty(context.DialogueID))
-            {
-                QuestManager.Instance?.UpdateQuestByNPC(context.DialogueID);
-                if (logEvents)
-                    Debug.Log($"✅ Прямой вызов (DialogueEnd): обновлён квест по NPC {context.DialogueID}");
+                questManager?.UpdateQuestByEquip(resolvedItemId, 1);
             }
         }
 
-        // Выполняем все события по триггеру
-        if (!eventsByTrigger.TryGetValue(triggerType, out var events))
+        if (triggerType == EventTriggerType.EnterLocation && !string.IsNullOrEmpty(context.LocationName))
+            questManager?.UpdateQuestByLocation(context.LocationName);
+
+        if (triggerType == EventTriggerType.DialogueEnd && !string.IsNullOrEmpty(context.DialogueID))
+            questManager?.UpdateQuestByNPC(context.DialogueID);
+
+        if (triggerType == EventTriggerType.Custom)
         {
-            return;
+            if (!string.IsNullOrEmpty(context.LocationName))
+                questManager?.UpdateQuestByLocation(context.LocationName);
+            if (!string.IsNullOrEmpty(context.DialogueID))
+                questManager?.UpdateQuestByNPC(context.DialogueID);
         }
 
-        foreach (var evt in events)
+        if (!eventsByTrigger.TryGetValue(triggerType, out var events)) return;
+
+        int count = events.Count;
+        for (int i = 0; i < count; i++)
         {
-            if (evt != null)
-            {
-                evt.Execute(context);
-            }
+            var evt = events[i];
+            if (evt != null) evt.Execute(context);
         }
+    }
+
+    private string ResolveItemIdFromContext(EventContext context)
+    {
+        if (context == null) return "";
+
+        if (!string.IsNullOrEmpty(context.ItemId))
+        {
+            if (cachedItemIdSource == context.ItemId) return cachedItemId;
+            cachedItemIdSource = context.ItemId;
+            cachedItemId = context.ItemId;
+            return cachedItemId;
+        }
+
+        if (context.ItemSO != null)
+        {
+            if (cachedItemIdSource == context.ItemSO.id) return cachedItemId;
+            cachedItemIdSource = context.ItemSO.id;
+            cachedItemId = context.ItemSO.id;
+            return cachedItemId;
+        }
+
+#pragma warning disable CS0618
+        if (context.ItemType != ItemType.None)
+        {
+            var so = _itemDatabase?.GetItemByLegacyType(context.ItemType);
+            string id = so != null ? so.id : "";
+            if (cachedItemIdSource == id) return cachedItemId;
+            cachedItemIdSource = id;
+            cachedItemId = id;
+            return cachedItemId;
+        }
+#pragma warning restore CS0618
+
+        cachedItemIdSource = "";
+        cachedItemId = "";
+        return "";
     }
 
     public void TriggerEventById(string eventID, EventContext context = null)
     {
         if (context == null) context = new EventContext();
+        if (context.Container == null) context.Container = EffectiveContainer;
 
         if (eventsById.TryGetValue(eventID, out var evt))
-        {
             evt?.Execute(context);
-        }
-        else
-        {
-            Debug.LogWarning($"Событие с ID {eventID} не найдено");
-        }
     }
 
     public void ReloadEvents()
     {
-        Debug.Log("🔄 Перезагрузка событий...");
-
         bool loadedFromJson = LoadEventsFromJson();
-
-        if (!loadedFromJson)
-        {
-            LoadAllEventsFromResources();
-        }
+        if (!loadedFromJson) LoadAllEventsFromResources();
     }
 
     public List<GameEvent> GetEventsByTrigger(EventTriggerType triggerType)
     {
-        if (eventsByTrigger.TryGetValue(triggerType, out var events))
-            return events;
+        if (eventsByTrigger.TryGetValue(triggerType, out var events)) return events;
         return new List<GameEvent>();
     }
 
     public GameEvent GetEventById(string eventID)
     {
-        if (eventsById.TryGetValue(eventID, out var evt))
-            return evt;
+        if (eventsById.TryGetValue(eventID, out var evt)) return evt;
         return null;
     }
 
-    // ============ СОХРАНЕНИЕ В JSON С ЗАЩИТОЙ ============
-
     public void SaveEventToJson(GameEvent gameEvent, bool forceSave = false)
     {
-        if (EventDataManager.Instance == null)
-        {
-            Debug.LogWarning("EventDataManager not found, cannot save to JSON");
-            return;
-        }
-
+        if (_eventDataManager == null) return;
         var data = EventConverter.ToEventData(gameEvent);
-        if (data != null)
-        {
-            EventDataManager.Instance.SaveEvent(data, forceSave);
-        }
+        if (data != null) _eventDataManager.SaveEvent(data, forceSave);
     }
 
     public void SaveAllEventsFromProject()
     {
 #if UNITY_EDITOR
-        if (EventDataManager.Instance == null)
-        {
-            Debug.LogWarning("EventDataManager not found, cannot save to JSON");
-            return;
-        }
+        if (_eventDataManager == null) return;
 
-        // Находим все GameEvent в проекте
         string[] guids = AssetDatabase.FindAssets("t:GameEvent");
-
-        if (guids.Length == 0)
-        {
-            Debug.Log("📭 No GameEvent assets found in project");
-            return;
-        }
-
-        Debug.Log($"📦 Found {guids.Length} GameEvent assets in project");
+        if (guids.Length == 0) return;
 
         int savedCount = 0;
         int skippedCount = 0;
@@ -336,173 +361,130 @@ public class EventManager : MonoBehaviour
                 var data = EventConverter.ToEventData(evt);
                 if (data != null)
                 {
-                    // Проверяем, нужно ли сохранять
-                    if (EventDataManager.Instance.EventExists(evt.eventID))
+                    if (_eventDataManager.EventExists(evt.eventID))
                     {
-                        var existing = EventDataManager.Instance.LoadEvent(evt.eventID);
+                        var existing = _eventDataManager.LoadEvent(evt.eventID);
                         if (existing != null && existing.actions.Count > 0 && data.actions.Count == 0)
                         {
-                            Debug.LogWarning($"🛡️ Skipped saving '{evt.eventID}' - would lose {existing.actions.Count} actions");
                             skippedCount++;
                             continue;
                         }
                     }
 
-                    EventDataManager.Instance.SaveEvent(data, true);
+                    _eventDataManager.SaveEvent(data, true);
                     savedCount++;
-                    Debug.Log($"  ✅ Saved: {evt.eventID} ({evt.eventName}) with {data.actions.Count} actions");
                 }
-            }
-            else
-            {
-                Debug.LogWarning($"  ⚠️ Skipped: {path} (no eventID)");
             }
         }
 
-        Debug.Log($"💾 Saved {savedCount} events to JSON (skipped {skippedCount} to prevent data loss)");
-#else
-        Debug.LogWarning("SaveAllEventsFromProject is only available in Editor");
+        Logger.Log(LogModule.Event, $"Saved {savedCount} events to JSON (skipped {skippedCount})");
 #endif
     }
 
     public void SaveAllEventsToJson()
     {
-        if (EventDataManager.Instance == null)
-        {
-            Debug.LogWarning("EventDataManager not found, cannot save to JSON");
-            return;
-        }
+        if (_eventDataManager == null) return;
 
         int savedCount = 0;
         int skippedCount = 0;
+        int total = registeredEvents.Count;
 
-        foreach (var evt in registeredEvents)
+        for (int i = 0; i < total; i++)
         {
+            var evt = registeredEvents[i];
             if (evt != null && !string.IsNullOrEmpty(evt.eventID))
             {
                 var data = EventConverter.ToEventData(evt);
                 if (data != null)
                 {
-                    // Проверяем, нужно ли сохранять
-                    if (EventDataManager.Instance.EventExists(evt.eventID))
+                    if (_eventDataManager.EventExists(evt.eventID))
                     {
-                        var existing = EventDataManager.Instance.LoadEvent(evt.eventID);
+                        var existing = _eventDataManager.LoadEvent(evt.eventID);
                         if (existing != null && existing.actions.Count > 0 && data.actions.Count == 0)
                         {
-                            Debug.LogWarning($"🛡️ Skipped saving '{evt.eventID}' - would lose {existing.actions.Count} actions");
                             skippedCount++;
                             continue;
                         }
                     }
 
-                    EventDataManager.Instance.SaveEvent(data, true);
+                    _eventDataManager.SaveEvent(data, true);
                     savedCount++;
                 }
             }
         }
-
-        Debug.Log($"💾 Saved {savedCount} loaded events to JSON (skipped {skippedCount} to prevent data loss)");
     }
-
-    // ============ ВОССТАНОВЛЕНИЕ ИЗ JSON ============
 
     public int RestoreEventsFromJsonToSO()
     {
-        if (EventDataManager.Instance == null)
-        {
-            Debug.LogWarning("EventDataManager not found, cannot restore");
-            return 0;
-        }
-
-        return EventDataManager.Instance.RestoreEventsToSO();
+        if (_eventDataManager == null) return 0;
+        return _eventDataManager.RestoreEventsToSO();
     }
 
-    // ============ БЭКАПЫ ============
-
-    public void CreateBackup(string eventID)
-    {
-        if (EventDataManager.Instance == null)
-        {
-            Debug.LogWarning("EventDataManager not found, cannot create backup");
-            return;
-        }
-
-        EventDataManager.Instance.CreateBackup(eventID);
-    }
+    public void CreateBackup(string eventID) => _eventDataManager?.CreateBackup(eventID);
 
     public bool RestoreFromBackup(string eventID, string backupFileName = null)
     {
-        if (EventDataManager.Instance == null)
-        {
-            Debug.LogWarning("EventDataManager not found, cannot restore from backup");
-            return false;
-        }
-
-        return EventDataManager.Instance.RestoreFromBackup(eventID, backupFileName);
+        if (_eventDataManager == null) return false;
+        return _eventDataManager.RestoreFromBackup(eventID, backupFileName);
     }
 
     public List<string> GetBackupFiles(string eventID = null)
     {
-        if (EventDataManager.Instance == null)
-        {
-            Debug.LogWarning("EventDataManager not found");
-            return new List<string>();
-        }
-
-        return EventDataManager.Instance.GetBackupFiles(eventID);
+        if (_eventDataManager == null) return new List<string>();
+        return _eventDataManager.GetBackupFiles(eventID);
     }
-
-    // ============ ОЧИСТКА ============
 
     public void ClearAllEvents()
     {
         registeredEvents.Clear();
+        registeredSet.Clear();
         eventsByTrigger.Clear();
         eventsById.Clear();
-        Debug.Log("🗑️ All events cleared from memory");
+        cachedItemId = "";
+        cachedItemIdSource = "";
     }
 
-    public void ResetAllEventStates()
+    public void ResetAllExecutions()
     {
-        EventStateManager.Instance?.ResetAllEvents();
-        Debug.Log("🔄 All event states reset");
+        int count = registeredEvents.Count;
+        for (int i = 0; i < count; i++)
+        {
+            var evt = registeredEvents[i];
+            if (evt != null) evt.ResetExecution();
+        }
     }
 
-    // ============ ОТЛАДКА ============
+    public void ResetAllEventStates() => _eventStateManager?.ResetAllEvents();
 
     [ContextMenu("Log All Events")]
     public void LogAllEvents()
     {
-        Debug.Log($"=== ALL EVENTS ({registeredEvents.Count}) ===");
-        foreach (var evt in registeredEvents)
+        int count = registeredEvents.Count;
+        for (int i = 0; i < count; i++)
         {
+            var evt = registeredEvents[i];
             if (evt != null)
-            {
-                Debug.Log($"  {evt.eventID} - {evt.eventName} (Trigger: {evt.triggerType}, Actions: {evt.actions.Count})");
-            }
+                Logger.Log(LogModule.Event, $"  {evt.eventID} - {evt.eventName} (Trigger: {evt.triggerType}, Actions: {evt.actions.Count})");
         }
     }
 
     [ContextMenu("Log Events By Trigger")]
     public void LogEventsByTrigger()
     {
-        Debug.Log("=== EVENTS BY TRIGGER ===");
         foreach (var kvp in eventsByTrigger)
         {
-            Debug.Log($"  {kvp.Key}: {kvp.Value.Count} events");
-            foreach (var evt in kvp.Value)
+            Logger.Log(LogModule.Event, $"  {kvp.Key}: {kvp.Value.Count} events");
+            var list = kvp.Value;
+            int count = list.Count;
+            for (int i = 0; i < count; i++)
             {
+                var evt = list[i];
                 if (evt != null)
-                {
-                    Debug.Log($"    - {evt.eventID} ({evt.eventName})");
-                }
+                    Logger.Log(LogModule.Event, $"    - {evt.eventID} ({evt.eventName})");
             }
         }
     }
 
     [ContextMenu("Clear All Event States")]
-    public void ClearAllEventStates()
-    {
-        ResetAllEventStates();
-    }
+    public void ClearAllEventStates() => ResetAllEventStates();
 }

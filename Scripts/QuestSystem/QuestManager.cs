@@ -1,15 +1,25 @@
-using UnityEngine;
+using DialogueSystem;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
+using VContainer;
 
+[DefaultExecutionOrder(-7000)]
 public class QuestManager : MonoBehaviour
 {
-    public static QuestManager Instance;
-
     [Header("Конфиг")]
     [SerializeField] private string questsFolder = "Quests";
     [SerializeField] private bool autoLoad = true;
-    [SerializeField] private bool logQuests = true;
+
+    [Inject] private EventManager _eventManager;
+    [Inject] private EventStateManager _eventStateManager;
+    [Inject] private FlagManager _flagManager;
+    [Inject] private QuestNotifications _questNotifications;
+
+    private EventManager EM => _eventManager;
+    private EventStateManager ESM => _eventStateManager;
+    private FlagManager FM => _flagManager;
+    private QuestNotifications QN => _questNotifications;
 
     private List<QuestInstance> activeQuests = new List<QuestInstance>();
     private List<QuestInstance> completedQuests = new List<QuestInstance>();
@@ -21,28 +31,41 @@ public class QuestManager : MonoBehaviour
     public System.Action<QuestInstance> OnQuestCompleted;
     public System.Action<QuestInstance> OnQuestFailed;
     public System.Action<QuestInstance> OnObjectiveUpdated;
+    public System.Action OnQuestListChanged;
+
     public List<QuestInstance> GetCanceledQuests() => canceledQuests;
+
+    private static T SceneResolve<T>() where T : class
+    {
+        var scope = SceneInjector.Instance?.CurrentSceneScope;
+        if (scope == null) return null;
+        try { return scope.Resolve<T>(); } catch { return null; }
+    }
+
+    private InventoryUIManager Inv => SceneResolve<InventoryUIManager>();
+    private TextBeginner TB => SceneResolve<TextBeginner>();
 
     private void Awake()
     {
-        if (Instance == null)
+        if (transform.parent != null) transform.SetParent(null);
+
+        QuestManager rootQM = null;
+        try { rootQM = GameLifetimeScope.Current?.Container?.Resolve<QuestManager>(); }
+        catch { }
+
+        if (rootQM != null && rootQM != this)
         {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-            if (autoLoad) LoadAllQuests();
-            Logger.Log(LogModule.QuestSystem, "QuestManager инициализирован");
+            enabled = false;
+            return;
         }
-        else
-        {
-            Logger.Log(LogModule.QuestSystem, "Уничтожение дублирующего QuestManager");
-            Destroy(gameObject);
-        }
+
+        DontDestroyOnLoad(gameObject);
+        if (autoLoad) LoadAllQuests();
     }
 
     private void Start()
     {
         SubscribeToEvents();
-        StartAutoQuests();
     }
 
     private void LoadAllQuests()
@@ -50,408 +73,301 @@ public class QuestManager : MonoBehaviour
         allQuestData.Clear();
         QuestSO[] loaded = Resources.LoadAll<QuestSO>(questsFolder);
 
-        foreach (var quest in loaded)
+        if (loaded == null || loaded.Length == 0)
         {
-            if (quest != null && !allQuestData.ContainsKey(quest.questID))
-            {
-                allQuestData.Add(quest.questID, quest);
-            }
+            Logger.LogWarning(LogModule.QuestSystem,
+                $"LoadAllQuests: 0 квестов в Resources/{questsFolder}");
+            return;
         }
 
-        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Загружено квестов: {allQuestData.Count}");
+        foreach (var quest in loaded)
+        {
+            if (quest == null) continue;
+
+            string id = quest.questID;
+            if (string.IsNullOrEmpty(id))
+            {
+                id = quest.name;
+                quest.questID = id;
+                Logger.LogWarning(LogModule.QuestSystem,
+                    $"LoadAllQuests: у '{quest.name}' пустой questID — автозаполнен как '{id}'");
+            }
+
+            if (!allQuestData.ContainsKey(id))
+                allQuestData.Add(id, quest);
+            else
+                Logger.LogWarning(LogModule.QuestSystem,
+                    $"LoadAllQuests: дубликат questID '{id}' (у '{quest.name}')");
+        }
+
+        Logger.Log(LogModule.QuestSystem,
+            $"LoadAllQuests: загружено {allQuestData.Count} квестов из Resources/{questsFolder}");
     }
 
     private void SubscribeToEvents()
     {
-        if (EventManager.Instance != null)
+        var em = EM;
+        if (em != null)
         {
-            EventManager.Instance.OnEventExecuted += OnEventExecuted;
-            Logger.Log(LogModule.QuestSystem, "Подписка на события EventManager выполнена");
-        }
-        else
-        {
-            Logger.LogWarning(LogModule.QuestSystem, "EventManager отсутствует");
+            em.OnEventExecuted -= OnEventExecuted;
+            em.OnEventExecuted += OnEventExecuted;
         }
     }
 
-    private void StartAutoQuests()
+    public void StartAutoQuests()
     {
-        List<string> questIDs = new List<string>(allQuestData.Keys);
-
-        foreach (string questID in questIDs)
+        foreach (var kvp in allQuestData)
         {
-            if (allQuestData.TryGetValue(questID, out QuestSO questData))
-            {
-                if (questData != null && questData.autoStart && CanStartQuest(questData))
-                {
-                    StartQuest(questData.questID);
-                }
-            }
+            var q = kvp.Value;
+            if (q == null) continue;
+            if (q.autoStart && CanStartQuest(q))
+                StartQuest(q.questID);
         }
     }
 
     public void StartQuest(string questID)
     {
-        if (!allQuestData.TryGetValue(questID, out var data))
-        {
-            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден");
-            return;
-        }
-
-        if (activeQuests.Any(q => q.QuestID == questID))
-        {
-            Logger.Log(LogModule.QuestSystem, $"Квест {questID} уже активен");
-            return;
-        }
-
-        if (!CanStartQuest(data))
-        {
-            Logger.Log(LogModule.QuestSystem, $"Не выполнены условия для квеста {questID}");
-            return;
-        }
+        if (!allQuestData.TryGetValue(questID, out var data)) return;
+        if (activeQuests.Any(q => q.QuestID == questID)) return;
+        if (!CanStartQuest(data)) return;
 
         var instance = new QuestInstance(data);
         activeQuests.Add(instance);
 
-        EventStateManager.Instance?.MarkExecuted($"Quest_{questID}_Started");
-
+        ESM?.MarkExecuted($"Quest_{questID}_Started");
         OnQuestStarted?.Invoke(instance);
-        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Квест начат: {data.questName}");
-
-        QuestUI.Instance?.RefreshQuests();
+        OnQuestListChanged?.Invoke();
 
         if (!string.IsNullOrEmpty(data.startDialogueID))
-        {
-            EventManager.Instance?.TriggerEvent(EventTriggerType.DialogueEnd,
-                new EventContext().WithDialogue(data.startDialogueID));
-        }
+            TB?.StartDialogue(data.startDialogueID);
     }
 
     private bool CanStartQuest(QuestSO data)
     {
         foreach (var condition in data.startConditions)
-        {
-            if (!condition.IsMet())
-            {
-                Logger.Log(LogModule.QuestSystem, $"Условие для квеста {data.questName} не выполнено");
-                return false;
-            }
-        }
+            if (!condition.IsMet()) return false;
 
-        if (!data.repeatable && IsQuestCompleted(data.questID))
-        {
-            Logger.Log(LogModule.QuestSystem, $"Квест {data.questName} уже завершён и не повторяемый");
-            return false;
-        }
-
+        if (!data.repeatable && IsQuestCompleted(data.questID)) return false;
         return true;
     }
 
     public void UpdateQuest(string questID, string objectiveID, int progress = 1)
     {
         var instance = activeQuests.FirstOrDefault(q => q.QuestID == questID);
-        if (instance == null)
-        {
-            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден в активных");
-            return;
-        }
+        if (instance == null) return;
 
         var objective = instance.GetObjective(objectiveID);
-        if (objective == null)
-        {
-            Logger.LogWarning(LogModule.QuestSystem, $"Цель {objectiveID} не найдена в квесте {questID}");
-            return;
-        }
-
-        if (objective.isOptional)
-        {
-            Logger.Log(LogModule.QuestSystem, $"Цель {objectiveID} опциональная, пропуск обновления");
-            return;
-        }
+        if (objective == null) return;
+        if (objective.isOptional) return;
 
         int oldProgress = objective.currentCount;
         objective.currentCount += progress;
-
         if (objective.currentCount > objective.requiredCount)
             objective.currentCount = objective.requiredCount;
 
         if (oldProgress != objective.currentCount)
         {
-            Logger.Log(LogModule.QuestSystem, $"Обновлена цель {objectiveID} в квесте {instance.QuestName}: {objective.currentCount}/{objective.requiredCount}");
+            OnQuestUpdated?.Invoke(instance);
             OnObjectiveUpdated?.Invoke(instance);
             CheckQuestCompletion(instance);
-            QuestUI.Instance?.RefreshQuests();
+            OnQuestListChanged?.Invoke();
         }
     }
 
-    public void UpdateQuestByItem(ItemType itemType, int count = 1)
+    public void UpdateQuestByItem(string itemId, int count = 1)
     {
-        var questsCopy = new List<QuestInstance>(activeQuests);
+        if (string.IsNullOrEmpty(itemId) || count <= 0) return;
 
-        foreach (var instance in questsCopy)
-        {
+        var copy = new List<QuestInstance>(activeQuests);
+        foreach (var instance in copy)
             foreach (var obj in instance.Objectives)
             {
-                if (obj.type == QuestObjectiveType.Collect && obj.targetItem == itemType)
-                {
-                    Logger.Log(LogModule.QuestSystem, $"Обновление квеста {instance.QuestName} по предмету {itemType}");
-                    UpdateQuest(instance.QuestID, obj.objectiveID, count);
-                }
+                if (obj.type != QuestObjectiveType.Collect) continue;
+                if (obj.GetTargetItemId() != itemId) continue;
+                UpdateQuest(instance.QuestID, obj.objectiveID, count);
             }
-        }
+    }
+
+    public void UpdateQuestByEquip(string itemId, int count = 1)
+    {
+        if (string.IsNullOrEmpty(itemId) || count <= 0) return;
+
+        var copy = new List<QuestInstance>(activeQuests);
+        foreach (var instance in copy)
+            foreach (var obj in instance.Objectives)
+            {
+                if (obj.type != QuestObjectiveType.UseItem && obj.type != QuestObjectiveType.Interact) continue;
+                if (obj.GetTargetItemId() != itemId) continue;
+                UpdateQuest(instance.QuestID, obj.objectiveID, count);
+            }
     }
 
     public void UpdateQuestByLocation(string locationName)
     {
-        var questsCopy = new List<QuestInstance>(activeQuests);
+        if (string.IsNullOrEmpty(locationName)) return;
 
-        foreach (var instance in questsCopy)
-        {
+        var copy = new List<QuestInstance>(activeQuests);
+        foreach (var instance in copy)
             foreach (var obj in instance.Objectives)
             {
-                if (obj.type == QuestObjectiveType.GoTo && obj.targetLocation == locationName)
-                {
-                    Logger.Log(LogModule.QuestSystem, $"Обновление квеста {instance.QuestName} по локации {locationName}");
-                    UpdateQuest(instance.QuestID, obj.objectiveID, 1);
-                }
+                if (obj.type != QuestObjectiveType.GoTo) continue;
+                if (obj.targetLocation != locationName) continue;
+                UpdateQuest(instance.QuestID, obj.objectiveID, 1);
             }
-        }
     }
 
     public void UpdateQuestByNPC(string npcName)
     {
-        var questsCopy = new List<QuestInstance>(activeQuests);
+        if (string.IsNullOrEmpty(npcName)) return;
 
-        foreach (var instance in questsCopy)
-        {
+        var copy = new List<QuestInstance>(activeQuests);
+        foreach (var instance in copy)
             foreach (var obj in instance.Objectives)
             {
-                if (obj.type == QuestObjectiveType.TalkTo && obj.targetNPC == npcName)
-                {
-                    Logger.Log(LogModule.QuestSystem, $"Обновление квеста {instance.QuestName} по NPC {npcName}");
-                    UpdateQuest(instance.QuestID, obj.objectiveID, 1);
-                }
+                if (obj.type != QuestObjectiveType.TalkTo) continue;
+                if (obj.targetNPC != npcName) continue;
+                UpdateQuest(instance.QuestID, obj.objectiveID, 1);
             }
-        }
     }
 
     private void CheckQuestCompletion(QuestInstance instance)
     {
-        if (instance.IsComplete())
-        {
-            Logger.Log(LogModule.QuestSystem, $"Квест {instance.QuestName} выполнен, запуск завершения");
-            CompleteQuest(instance.QuestID);
-        }
+        if (instance.IsComplete()) CompleteQuest(instance.QuestID);
     }
 
     public void CompleteQuest(string questID)
     {
         var instance = activeQuests.FirstOrDefault(q => q.QuestID == questID);
-        if (instance == null)
+        if (instance == null) return;
+
+        var inv = Inv;
+        if (inv != null && instance.Data.rewards != null)
         {
-            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден в активных для завершения");
-            return;
+            foreach (var reward in instance.Data.rewards)
+            {
+                string itemId = reward.GetItemId();
+                if (string.IsNullOrEmpty(itemId) || reward.amount <= 0) continue;
+
+                if (inv.GetFreeSpaceFor(itemId, reward.amount) < reward.amount)
+                {
+                    QN?.ShowCustom($"Нет места для награды: {itemId} x{reward.amount}", new Color(1f, 0.4f, 0.4f));
+                    return;
+                }
+            }
         }
 
         activeQuests.Remove(instance);
         completedQuests.Add(instance);
-
         GiveRewards(instance);
 
-        foreach (var reward in instance.Data.rewards)
+        if (instance.Data.rewards != null)
         {
-            if (!string.IsNullOrEmpty(reward.flagToSet))
-            {
-                FlagManager.Instance?.SetFlag(reward.flagToSet, true);
-                Logger.Log(LogModule.QuestSystem, $"Установлен флаг {reward.flagToSet} за завершение квеста {instance.QuestName}");
-            }
+            var fm = FM;
+            foreach (var reward in instance.Data.rewards)
+                if (!string.IsNullOrEmpty(reward.flagToSet) && fm != null)
+                    fm.SetFlag(reward.flagToSet, true);
         }
 
         OnQuestCompleted?.Invoke(instance);
-        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Квест завершён: {instance.QuestName}");
-
-        EventStateManager.Instance?.MarkExecuted($"Quest_{questID}_Completed");
+        OnQuestListChanged?.Invoke();
+        ESM?.MarkExecuted($"Quest_{questID}_Completed");
 
         if (!string.IsNullOrEmpty(instance.Data.completeDialogueID))
-        {
-            EventManager.Instance?.TriggerEvent(EventTriggerType.DialogueEnd,
-                new EventContext().WithDialogue(instance.Data.completeDialogueID));
-        }
-
-        QuestUI.Instance?.RefreshQuests();
+            TB?.StartDialogue(instance.Data.completeDialogueID);
     }
 
     private void GiveRewards(QuestInstance instance)
     {
+        var inv = Inv;
+        if (inv == null) return;
+
         foreach (var reward in instance.Data.rewards)
         {
-            if (reward.item != ItemType.None)
-            {
-                for (int i = 0; i < reward.amount; i++)
-                {
-                    InventoryUIManager inventory = FindFirstObjectByType<InventoryUIManager>();
-                    inventory?.AddItem(reward.item);
-                }
-                Logger.Log(LogModule.QuestSystem, $"Награда: {reward.amount}x {reward.item}");
-            }
+            string itemId = reward.GetItemId();
+            if (string.IsNullOrEmpty(itemId) || reward.amount <= 0) continue;
+            inv.AddItem(itemId, reward.amount);
         }
     }
 
-    private void OnEventExecuted(GameEvent evt, EventContext context)
-    {
-        if (evt == null)
-        {
-            if (context != null)
-            {
-                if (context.ItemType != ItemType.None)
-                {
-                    UpdateQuestByItem(context.ItemType, 1);
-                    if (logQuests) Logger.Log(LogModule.QuestSystem, $"Прямой вызов: обновлён квест по предмету {context.ItemType}");
-                }
+    private void OnEventExecuted(GameEvent evt, EventContext context) { }
 
-                if (!string.IsNullOrEmpty(context.LocationName))
-                {
-                    UpdateQuestByLocation(context.LocationName);
-                    if (logQuests) Logger.Log(LogModule.QuestSystem, $"Прямой вызов: обновлён квест по локации {context.LocationName}");
-                }
-
-                if (!string.IsNullOrEmpty(context.DialogueID))
-                {
-                    UpdateQuestByNPC(context.DialogueID);
-                    if (logQuests) Logger.Log(LogModule.QuestSystem, $"Прямой вызов: обновлён квест по NPC {context.DialogueID}");
-                }
-            }
-            return;
-        }
-
-        if (evt.triggerType == EventTriggerType.EnterLocation && context != null && !string.IsNullOrEmpty(context.LocationName))
-        {
-            UpdateQuestByLocation(context.LocationName);
-            if (logQuests) Logger.Log(LogModule.QuestSystem, $"GameEvent '{evt.eventName}': обновлён квест по локации {context.LocationName}");
-        }
-
-        if (evt.triggerType == EventTriggerType.DialogueEnd && context != null && !string.IsNullOrEmpty(context.DialogueID))
-        {
-            UpdateQuestByNPC(context.DialogueID);
-            if (logQuests) Logger.Log(LogModule.QuestSystem, $"GameEvent '{evt.eventName}': обновлён квест по NPC {context.DialogueID}");
-        }
-
-        if (evt.triggerType == EventTriggerType.Custom && context != null)
-        {
-            if (context.ItemType != ItemType.None)
-            {
-                UpdateQuestByItem(context.ItemType, 1);
-                if (logQuests) Logger.Log(LogModule.QuestSystem, $"Custom event '{evt.eventName}': обновлён квест по предмету {context.ItemType}");
-            }
-            if (!string.IsNullOrEmpty(context.LocationName))
-            {
-                UpdateQuestByLocation(context.LocationName);
-                if (logQuests) Logger.Log(LogModule.QuestSystem, $"Custom event '{evt.eventName}': обновлён квест по локации {context.LocationName}");
-            }
-            if (!string.IsNullOrEmpty(context.DialogueID))
-            {
-                UpdateQuestByNPC(context.DialogueID);
-                if (logQuests) Logger.Log(LogModule.QuestSystem, $"Custom event '{evt.eventName}': обновлён квест по NPC {context.DialogueID}");
-            }
-        }
-    }
-
-    public bool IsQuestActive(string questID)
-    {
-        return activeQuests.Any(q => q.QuestID == questID);
-    }
-
-    public bool IsQuestCompleted(string questID)
-    {
-        return completedQuests.Any(q => q.QuestID == questID);
-    }
-
-    public QuestInstance GetQuest(string questID)
-    {
-        return activeQuests.FirstOrDefault(q => q.QuestID == questID);
-    }
-
+    public bool IsQuestActive(string questID) => activeQuests.Any(q => q.QuestID == questID);
+    public bool IsQuestCompleted(string questID) => completedQuests.Any(q => q.QuestID == questID);
+    public QuestInstance GetQuest(string questID) => activeQuests.FirstOrDefault(q => q.QuestID == questID);
     public List<QuestInstance> GetActiveQuests() => activeQuests;
     public List<QuestInstance> GetCompletedQuests() => completedQuests;
-
-    [System.Serializable]
-    public class QuestSaveData
-    {
-        public string questID;
-        public List<ObjectiveSaveData> objectives;
-        public bool isCompleted;
-    }
-
-    [System.Serializable]
-    public class ObjectiveSaveData
-    {
-        public string objectiveID;
-        public int currentCount;
-    }
-
-    public QuestSaveData[] SaveQuests()
-    {
-        var list = new List<QuestSaveData>();
-        foreach (var q in activeQuests)
-        {
-            var data = new QuestSaveData
-            {
-                questID = q.QuestID,
-                objectives = q.Objectives.Select(o => new ObjectiveSaveData
-                {
-                    objectiveID = o.objectiveID,
-                    currentCount = o.currentCount
-                }).ToList()
-            };
-            list.Add(data);
-        }
-        return list.ToArray();
-    }
-
-    public void LoadQuests(QuestSaveData[] data)
-    {
-        activeQuests.Clear();
-        foreach (var d in data)
-        {
-            if (allQuestData.TryGetValue(d.questID, out var questData))
-            {
-                var instance = new QuestInstance(questData);
-                foreach (var obj in instance.Objectives)
-                {
-                    var saved = d.objectives.FirstOrDefault(o => o.objectiveID == obj.objectiveID);
-                    if (saved != null)
-                        obj.currentCount = saved.currentCount;
-                }
-                activeQuests.Add(instance);
-            }
-        }
-        QuestUI.Instance?.RefreshQuests();
-        Logger.Log(LogModule.QuestSystem, $"Загружено {data.Length} квестов");
-    }
 
     public void CancelQuest(string questID)
     {
         var instance = activeQuests.FirstOrDefault(q => q.QuestID == questID);
         if (instance == null)
         {
-            Logger.LogWarning(LogModule.QuestSystem, $"Квест {questID} не найден в активных");
+            Logger.LogWarning(LogModule.QuestSystem,
+                $"CancelQuest: '{questID}' не найден среди активных " +
+                $"(active={activeQuests.Count}, id пустой? {string.IsNullOrEmpty(questID)})");
             return;
         }
 
         instance.IsCanceled = true;
-
-        foreach (var obj in instance.Objectives)
-        {
-            obj.currentCount = obj.requiredCount;
-        }
-
         activeQuests.Remove(instance);
         canceledQuests.Add(instance);
 
-        EventStateManager.Instance?.MarkExecuted($"Quest_{questID}_Canceled");
+        Logger.Log(LogModule.QuestSystem,
+            $"CancelQuest: '{questID}' → canceled ({canceledQuests.Count} total)");
 
-        if (logQuests) Logger.Log(LogModule.QuestSystem, $"Квест отменён: {instance.QuestName}");
-
-        QuestUI.Instance?.RefreshQuests();
+        ESM?.MarkExecuted($"Quest_{questID}_Canceled");
+        OnQuestFailed?.Invoke(instance);
+        OnQuestListChanged?.Invoke();
     }
+
+    public void ClearAllQuests()
+    {
+        activeQuests.Clear();
+        completedQuests.Clear();
+        canceledQuests.Clear();
+    }
+
+    public QuestInstance RestoreQuestState(string questID, bool isCompleted, bool isCanceled, Dictionary<string, int> objectiveProgress)
+    {
+        if (string.IsNullOrEmpty(questID))
+        {
+            Logger.LogWarning(LogModule.QuestSystem,
+                "RestoreQuestState: пустой questID в сейве");
+            return null;
+        }
+
+        if (activeQuests.Any(q => q.QuestID == questID)) return null;
+        if (completedQuests.Any(q => q.QuestID == questID)) return null;
+        if (canceledQuests.Any(q => q.QuestID == questID)) return null;
+
+        if (!allQuestData.TryGetValue(questID, out var data))
+        {
+            string available = string.Join(", ", allQuestData.Keys.Take(10));
+            if (allQuestData.Count > 10) available += "...";
+            Logger.LogWarning(LogModule.QuestSystem,
+                $"RestoreQuestState: QuestSO '{questID}' не найден в Resources/{questsFolder}. " +
+                $"Доступные: [{available}]");
+            return null;
+        }
+
+        var instance = new QuestInstance(data);
+
+        if (objectiveProgress != null)
+            foreach (var obj in instance.Objectives)
+                if (objectiveProgress.TryGetValue(obj.objectiveID, out int count))
+                    obj.currentCount = Mathf.Clamp(count, 0, obj.requiredCount);
+
+        if (isCanceled) { instance.IsCanceled = true; canceledQuests.Add(instance); }
+        else if (isCompleted) completedQuests.Add(instance);
+        else activeQuests.Add(instance);
+
+        Logger.LogVerbose(LogModule.QuestSystem,
+            $"RestoreQuestState: '{questID}' → " +
+            $"{(isCanceled ? "canceled" : isCompleted ? "completed" : "active")}, " +
+            $"objectives={(objectiveProgress?.Count ?? 0)}");
+
+        return instance;
+    }
+
+    public System.Collections.Generic.IEnumerable<string> GetAllQuestIDs() => allQuestData.Keys;
 }

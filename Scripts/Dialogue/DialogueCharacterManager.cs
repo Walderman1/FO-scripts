@@ -1,288 +1,272 @@
-using UnityEngine;
+using DialogueSystem;
+using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+using UnityEngine;
+using UnityEngine.UI;
+using VContainer;
+
+[System.Serializable]
+public class CharacterData
+{
+    public string name;
+    public Sprite portrait;
+    public GameObject characterObject;
+    public Vector2 defaultPosition;
+}
 
 public class DialogueCharacterManager : MonoBehaviour
 {
-    [Header("Character Settings")]
-    [SerializeField] private List<GameObject> characters;
-    [SerializeField] private GameObject[] interactions;
-    [SerializeField] private GameObject character;
+    [Header("Character Data")]
+    [SerializeField] private CharacterData[] characters;
 
     [Header("References")]
+    [SerializeField] private Image portraitImage;
+    [SerializeField] private Transform characterContainer;
+
+    [Header("Animation Settings")]
     [SerializeField] private DialogueData dialogueConfig;
+    [Inject] private GameReferences _refs;
 
-    private GameObject FirstCharactersArea;
-    private GameObject SecondCharactersArea;
+    private SceneSlideTransition _sceneSlideTransition;
 
-    private bool isCharacterSpawned;
+    private GameReferences Refs => _refs ?? GameReferences.Instance;
+
+    private Dictionary<string, CharacterData> characterDict = new Dictionary<string, CharacterData>();
+    private Dictionary<string, GameObject> activeCharacters = new Dictionary<string, GameObject>();
+    private Dictionary<string, Coroutine> activeAnimations = new Dictionary<string, Coroutine>();
+    private Dictionary<string, GameObject> resourceCharacters = new Dictionary<string, GameObject>();
+    private bool resourcesLoaded = false;
+
+    private GameObject currentActiveCharacter;
     private string currentCharacterName;
-    private bool isAnimating;
 
-    #region Properties
-
-    public GameObject CurrentCharacter => character;
-    public bool IsCharacterSpawned => isCharacterSpawned;
-    public bool IsAnimating => isAnimating;
-    public string CurrentCharacterName => currentCharacterName;
-    public List<GameObject> Characters => characters;
-    public GameObject[] Interactions => interactions;
-
-    #endregion
-
-    #region Initialization
-
-    public void Initialize(DialogueData config)
+    private DialogueData Config
     {
-        dialogueConfig = config;
-        LoadCharacters();
-
-        if (interactions == null)
+        get
         {
-            interactions = new GameObject[0];
+            if (dialogueConfig == null && Refs != null) dialogueConfig = Refs.DialogueConfig;
+            return dialogueConfig;
+        }
+    }
+
+    private SceneSlideTransition GetSlide()
+    {
+        if (_sceneSlideTransition != null) return _sceneSlideTransition;
+
+        if (_refs != null) _sceneSlideTransition = _refs.SceneSlideTransition;
+        if (_sceneSlideTransition != null) return _sceneSlideTransition;
+
+        _sceneSlideTransition = FindAnyObjectByType<SceneSlideTransition>(FindObjectsInactive.Include);
+        return _sceneSlideTransition;
+    }
+
+    private void Awake()
+    {
+        if (dialogueConfig == null && Refs != null) dialogueConfig = Refs.DialogueConfig;
+
+        if (characters != null)
+        {
+            foreach (CharacterData data in characters)
+            {
+                if (data == null || string.IsNullOrEmpty(data.name)) continue;
+                if (!characterDict.ContainsKey(data.name)) characterDict.Add(data.name, data);
+            }
         }
 
-        Logger.Log(LogModule.Dialogue, "DialogueCharacterManager инициализирован");
+        LoadCharactersFromResources();
     }
 
-    public void SetCharacterAreas(GameObject firstArea, GameObject secondArea)
+    private void LoadCharactersFromResources()
     {
-        FirstCharactersArea = firstArea;
-        SecondCharactersArea = secondArea;
-        Logger.Log(LogModule.Dialogue, $"Области персонажей установлены: First={FirstCharactersArea?.name}, Second={SecondCharactersArea?.name}");
-    }
+        if (resourcesLoaded) return;
 
-    public void LoadCharacters()
-    {
-        string folder = dialogueConfig != null ? dialogueConfig.charactersFolder : "Characters";
-        characters = Resources.LoadAll<GameObject>(folder).ToList();
-        Logger.Log(LogModule.Dialogue, $"Загружено персонажей: {characters.Count} из папки {folder}");
-    }
+        string path = Config != null ? Config.CharactersResourcesPath : "Characters";
+        GameObject[] loadedCharacters = Resources.LoadAll<GameObject>(path);
 
-    #endregion
-
-    #region Character Management
-
-    public void ActivateCharacter(string characterName)
-    {
-        if (isCharacterSpawned)
+        if (loadedCharacters != null && loadedCharacters.Length > 0)
         {
-            Logger.Log(LogModule.Dialogue, $"Персонаж уже активен, пропуск активации {characterName}");
+            Logger.Log(LogModule.Dialogue, $"Загружено {loadedCharacters.Length} персонажей из Resources/{path}");
+            foreach (GameObject characterPrefab in loadedCharacters)
+            {
+                if (characterPrefab != null && !resourceCharacters.ContainsKey(characterPrefab.name))
+                    resourceCharacters.Add(characterPrefab.name, characterPrefab);
+            }
+        }
+
+        resourcesLoaded = true;
+    }
+
+    public void ProcessActions(DialogueNode node)
+    {
+        if (node == null) return;
+
+        if (!string.IsNullOrEmpty(node.speaker))
+        {
+            ShowCharacter(node.speaker);
+            SetPortrait(node.speaker);
+        }
+
+        if (node.actions == null) return;
+
+        foreach (DialogueAction action in node.actions)
+        {
+            switch (action.type)
+            {
+                case "ShowCharacter": ShowCharacter(action.target); break;
+                case "HideCharacter": HideCharacter(action.target); break;
+                case "MoveCharacter": MoveCharacter(action.target, action.value); break;
+                case "SetPortrait": SetPortrait(action.target); break;
+            }
+        }
+    }
+
+    public void ShowCharacter(string characterName)
+    {
+        if (string.IsNullOrEmpty(characterName)) return;
+
+        GameObject characterPrefab = null;
+        CharacterData data = null;
+
+        if (characterDict.ContainsKey(characterName))
+        {
+            data = characterDict[characterName];
+            characterPrefab = data.characterObject;
+        }
+
+        if (characterPrefab == null && resourceCharacters.ContainsKey(characterName))
+            characterPrefab = resourceCharacters[characterName];
+
+        if (characterPrefab == null)
+        {
+            string path = Config != null ? Config.CharactersResourcesPath : "Characters";
+            characterPrefab = Resources.Load<GameObject>($"{path}/{characterName}");
+            if (characterPrefab != null && !resourceCharacters.ContainsKey(characterName))
+                resourceCharacters.Add(characterName, characterPrefab);
+        }
+
+        if (characterPrefab == null)
+        {
+            Logger.LogError(LogModule.Dialogue, $"Персонаж {characterName} НЕ НАЙДЕН!");
             return;
         }
 
-        if (FirstCharactersArea == null)
+        if (activeCharacters.ContainsKey(characterName))
         {
-            Logger.LogError(LogModule.Dialogue, "FirstCharactersArea не найден! Невозможно активировать персонажа");
+            StartAnimation(characterName, FadeCharacter(activeCharacters[characterName], 1f));
             return;
         }
 
-        string parentName = dialogueConfig != null ? dialogueConfig.charactersParentName : "Characters";
-        Transform target = FirstCharactersArea.transform.Find(parentName);
+        Vector3 spawnPosition = data != null ? (Vector3)data.defaultPosition : Vector3.zero;
+        GameObject characterObj = Instantiate(characterPrefab, characterContainer);
+        characterObj.transform.localPosition = spawnPosition;
+        characterObj.transform.localScale = Vector3.one;
 
-        if (target != null)
+        activeCharacters[characterName] = characterObj;
+        currentActiveCharacter = characterObj;
+        currentCharacterName = characterName;
+
+        StartAnimation(characterName, FadeCharacter(characterObj, 1f));
+    }
+
+    public void HideCharacter(string characterName)
+    {
+        if (!activeCharacters.ContainsKey(characterName)) return;
+        StartAnimation(characterName, FadeCharacter(activeCharacters[characterName], 0f));
+    }
+
+    public void MoveCharacter(string characterName, string position)
+    {
+        if (!activeCharacters.ContainsKey(characterName))
         {
-            int index = GetCharacterIndexByName(characterName);
-            if (index >= 0 && index < characters.Count)
-            {
-                GameObject newCharacter = Instantiate(characters[index], target);
-                if (newCharacter != null)
-                {
-                    character = newCharacter;
-                    isCharacterSpawned = true;
-                    Logger.Log(LogModule.Dialogue, $"Персонаж {characterName} активирован");
-
-                    Animator animator = newCharacter.GetComponent<Animator>();
-                    if (animator != null)
-                    {
-                        animator.Play("Speak");
-                        isAnimating = true;
-                        Logger.Log(LogModule.Dialogue, $"Анимация Speak запущена для {characterName}");
-                    }
-                }
-            }
-            else
-            {
-                Logger.LogWarning(LogModule.Dialogue, $"Персонаж {characterName} не найден в списке");
-            }
+            ShowCharacter(characterName);
+            return;
         }
+
+        GameObject characterObj = activeCharacters[characterName];
+
+        Vector2 targetPos;
+        if (position == "left") targetPos = Config != null ? Config.DefaultLeftPosition : new Vector2(-4f, 0f);
+        else if (position == "right") targetPos = Config != null ? Config.DefaultRightPosition : new Vector2(4f, 0f);
+        else if (position == "center") targetPos = Config != null ? Config.DefaultCenterPosition : new Vector2(0f, 0f);
         else
         {
-            Logger.LogError(LogModule.Dialogue, $"Целевой объект '{parentName}' не найден в FirstCharactersArea");
+            string[] parts = position.Split(',');
+            if (parts.Length == 2) targetPos = new Vector2(float.Parse(parts[0]), float.Parse(parts[1]));
+            else return;
         }
+
+        StartAnimation(characterName, MoveCharacterRoutine(characterObj, targetPos));
     }
 
-    public int GetCharacterIndexByName(string characterName)
+    public void SetPortrait(string characterName)
     {
-        for (int i = 0; i < characters.Count; i++)
-        {
-            if (characters[i] != null && characters[i].name == characterName)
-            {
-                return i;
-            }
-        }
-        return -1;
-    }
+        Sprite portrait = null;
+        if (characterDict.ContainsKey(characterName) && characterDict[characterName].portrait != null)
+            portrait = characterDict[characterName].portrait;
 
-    public void SetCurrentCharacter(string characterName)
-    {
-        currentCharacterName = characterName;
-        Logger.Log(LogModule.Dialogue, $"Текущий персонаж установлен: {characterName}");
-    }
-
-    public void ClearCharacter()
-    {
-        if (character != null)
+        if (portrait == null)
         {
-            Logger.Log(LogModule.Dialogue, $"Уничтожение персонажа: {character.name}");
-            Destroy(character);
-            character = null;
-        }
-        isCharacterSpawned = false;
-        isAnimating = false;
-        currentCharacterName = null;
-    }
-
-    public void ClearAllCharacters()
-    {
-        if (FirstCharactersArea == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, "FirstCharactersArea не найден, очистка невозможна");
-            return;
+            string path = Config != null ? Config.PortraitsResourcesPath : "Portraits";
+            portrait = Resources.Load<Sprite>($"{path}/{characterName}");
         }
 
-        string parentName = dialogueConfig != null ? dialogueConfig.charactersParentName : "Characters";
-        Transform target = FirstCharactersArea.transform.Find(parentName);
-        if (target != null)
-        {
-            int count = target.childCount;
-            foreach (Transform child in target)
-            {
-                Destroy(child.gameObject);
-            }
-            Logger.Log(LogModule.Dialogue, $"Очищено {count} персонажей");
-        }
-
-        character = null;
-        isCharacterSpawned = false;
-        isAnimating = false;
-        currentCharacterName = null;
+        if (portraitImage != null) portraitImage.sprite = portrait;
     }
-
-    #endregion
-
-    #region Character Movement
 
     public void MoveCharacterToSpeakerArea()
     {
-        if (character == null)
+        if (currentActiveCharacter == null) return;
+
+        GameObject firstArea = Refs?.FirstCharactersArea;
+        if (firstArea == null)
         {
-            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден, перемещение невозможно");
-            return;
+            try { firstArea = GameObject.FindGameObjectWithTag("FirstCharactersArea"); }
+            catch (UnityException) { }
         }
 
-        if (FirstCharactersArea == null)
+        if (firstArea == null) { Logger.LogError(LogModule.Dialogue, "FirstCharactersArea НЕ НАЙДЕН!"); return; }
+
+        Transform charactersFolder = firstArea.transform.Find("Characters");
+        if (charactersFolder == null) return;
+
+        Animator animator = currentActiveCharacter.GetComponent<Animator>();
+        if (animator != null)
         {
-            Logger.LogError(LogModule.Dialogue, "FirstCharactersArea не найден");
-            return;
+            animator.enabled = false;
+            animator.Rebind();
+            animator.Update(0f);
         }
 
-        string parentName = dialogueConfig != null ? dialogueConfig.charactersParentName : "Characters";
-        Transform target = FirstCharactersArea.transform.Find(parentName);
-        if (target == null)
-        {
-            Logger.LogError(LogModule.Dialogue, $"Целевой объект '{parentName}' не найден в FirstCharactersArea");
-            return;
-        }
+        currentActiveCharacter.transform.SetParent(charactersFolder);
+        currentActiveCharacter.transform.localPosition = Vector3.zero;
+        currentActiveCharacter.transform.localScale = Vector3.one;
 
-        if (character.TryGetComponent(out Animator an))
-        {
-            an.enabled = false;
-            an.Rebind();
-            an.Update(0f);
-        }
-
-        character.transform.SetParent(target);
-        character.transform.localPosition = Vector3.zero;
-        character.transform.localScale = Vector3.one;
-
-        if (character.TryGetComponent(out Animator animator))
+        if (animator != null)
         {
             animator.enabled = true;
-            animator.Play("Speak");
+            animator.Play(Config != null ? Config.SpeakAnimation : "Speak");
         }
-
-        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в область диалога: {target.name}");
-    }
-
-    public void MoveCharacterToLocation(GameObject location)
-    {
-        if (character == null || location == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, $"Невозможно переместить персонажа: character={character != null}, location={location != null}");
-            return;
-        }
-
-        if (character.TryGetComponent(out Animator an))
-        {
-            an.enabled = false;
-            an.Rebind();
-            an.Update(0f);
-        }
-
-        character.transform.SetParent(location.transform);
-        character.transform.localPosition = Vector3.zero;
-        character.transform.localScale = Vector3.one;
-
-        if (character.TryGetComponent(out Animator animator))
-        {
-            animator.enabled = true;
-            animator.Play("IdleEye");
-        }
-
-        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в локацию: {location.name}");
-    }
-
-    public void MoveCharacterToPosition(Vector3 position, Quaternion rotation, Vector3 scale)
-    {
-        if (character == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден, перемещение невозможно");
-            return;
-        }
-
-        if (character.TryGetComponent(out Animator an))
-        {
-            an.enabled = false;
-            an.Rebind();
-            an.Update(0f);
-        }
-
-        character.transform.position = position;
-        character.transform.rotation = rotation;
-        character.transform.localScale = scale;
-
-        if (character.TryGetComponent(out Animator animator))
-        {
-            animator.enabled = true;
-            animator.Play("IdleEye");
-        }
-
-        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в позицию {position}");
     }
 
     public void MoveCharacterToCurrentLocationReference()
     {
-        if (character == null)
+        if (currentActiveCharacter == null)
         {
-            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден");
+            Logger.LogWarning(LogModule.Dialogue, "Character is null!");
             return;
         }
 
-        GameObject currentScene = SceneSlideTransition.Instance?.GetCurrentScene();
+        var sceneSlide = GetSlide();
+        if (sceneSlide == null)
+        {
+            Logger.LogWarning(LogModule.Dialogue, "SceneSlideTransition недоступен!");
+            return;
+        }
+
+        GameObject currentScene = sceneSlide.GetCurrentScene();
         if (currentScene == null)
         {
-            Logger.LogWarning(LogModule.Dialogue, "Текущая сцена не найдена");
+            Logger.LogWarning(LogModule.Dialogue, "Нет текущей сцены!");
             return;
         }
 
@@ -300,206 +284,152 @@ public class DialogueCharacterManager : MonoBehaviour
             return;
         }
 
-        if (character.TryGetComponent(out Animator an))
+        Logger.LogVerbose(LogModule.Dialogue, $"Перемещаем персонажа на LocationReference: {locationRef.name}");
+
+        Animator animator = currentActiveCharacter.GetComponent<Animator>();
+        if (animator != null)
         {
-            an.enabled = false;
-            an.Rebind();
-            an.Update(0f);
+            animator.enabled = false;
+            animator.Rebind();
+            animator.Update(0f);
         }
 
-        character.transform.SetParent(currentScene.transform);
-        character.transform.position = locationRef.transform.position;
-        character.transform.localScale = locationRef.transform.localScale;
+        currentActiveCharacter.transform.SetParent(currentScene.transform);
+        currentActiveCharacter.transform.position = locationRef.transform.position;
+        currentActiveCharacter.transform.rotation = locationRef.transform.rotation;
+        currentActiveCharacter.transform.localScale = locationRef.transform.localScale;
 
-        if (character.TryGetComponent(out Animator animator))
-        {
-            animator.enabled = true;
-            animator.Play("IdleEye");
-        }
+        Logger.LogVerbose(LogModule.Dialogue, $"Персонаж перемещён на LocationReference: {locationRef.name}");
+        Logger.LogVerbose(LogModule.Dialogue, $"Позиция: {currentActiveCharacter.transform.position}");
+        Logger.LogVerbose(LogModule.Dialogue, $"Поворот: {currentActiveCharacter.transform.rotation.eulerAngles}");
+        Logger.LogVerbose(LogModule.Dialogue, $"Масштаб: {currentActiveCharacter.transform.localScale}");
 
-        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен к LocationReference: {locationRef.name} в сцене {currentScene.name}");
-    }
-
-    public void MoveCharacterToCurrentScene()
-    {
-        if (character == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден");
-            return;
-        }
-
-        GameObject currentScene = SceneSlideTransition.Instance?.GetCurrentScene();
-        if (currentScene == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, "Текущая сцена не найдена");
-            return;
-        }
-
-        if (character.TryGetComponent(out Animator an))
-        {
-            an.enabled = false;
-            an.Rebind();
-            an.Update(0f);
-        }
-
-        character.transform.SetParent(currentScene.transform);
-        character.transform.localPosition = Vector3.zero;
-        character.transform.localScale = Vector3.one;
-
-        if (character.TryGetComponent(out Animator animator))
+        if (animator != null)
         {
             animator.enabled = true;
-            animator.Play("IdleEye");
+            animator.Play(Config != null ? Config.IdleEyeAnimation : "IdleEye");
         }
-
-        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен в сцену: {currentScene.name}");
     }
 
-    public void MoveCharacterToActiveLocationReference()
+    public void ClearAllCharacters()
     {
-        if (character == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, "Персонаж не найден");
-            return;
-        }
+        foreach (GameObject obj in activeCharacters.Values)
+            if (obj != null) Destroy(obj);
+        activeCharacters.Clear();
 
-        GameObject locationRef = GetActiveLocationReferenceFromCurrentScene();
-        if (locationRef == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, "Активный LocationReference не найден");
-            return;
-        }
+        foreach (Coroutine coroutine in activeAnimations.Values)
+            if (coroutine != null) StopCoroutine(coroutine);
+        activeAnimations.Clear();
 
-        if (character.TryGetComponent(out Animator an))
-        {
-            an.enabled = false;
-            an.Rebind();
-            an.Update(0f);
-        }
+        currentActiveCharacter = null;
+        currentCharacterName = null;
+    }
 
-        character.transform.position = locationRef.transform.position;
-        character.transform.localScale = locationRef.transform.localScale;
+    public void MoveCharacterToCurrentScene() => MoveCharacterToCurrentLocationReference();
+    public void MoveCharacterToActiveLocationReference() => MoveCharacterToCurrentLocationReference();
 
-        if (character.TryGetComponent(out Animator animator))
+    public void MoveCharacterToLocation(GameObject location)
+    {
+        if (currentActiveCharacter == null || location == null) return;
+
+        Animator animator = currentActiveCharacter.GetComponent<Animator>();
+        if (animator != null) { animator.enabled = false; animator.Rebind(); animator.Update(0f); }
+
+        currentActiveCharacter.transform.SetParent(location.transform);
+        currentActiveCharacter.transform.localPosition = Vector3.zero;
+        currentActiveCharacter.transform.localScale = Vector3.one;
+
+        if (animator != null)
         {
             animator.enabled = true;
-            animator.Play("IdleEye");
+            animator.Play(Config != null ? Config.IdleEyeAnimation : "IdleEye");
         }
-
-        Logger.Log(LogModule.Dialogue, $"Персонаж перемещен к LocationReference: {locationRef.name}");
     }
 
-    private GameObject GetActiveLocationReferenceFromCurrentScene()
+    public void MoveCharacterToPosition(Vector3 position, Quaternion rotation, Vector3 scale)
     {
-        GameObject currentScene = SceneSlideTransition.Instance?.GetCurrentScene();
-        if (currentScene == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, "Текущая сцена не найдена");
-            return null;
-        }
+        if (currentActiveCharacter == null) return;
 
-        LocationNeighbors neighbors = currentScene.GetComponent<LocationNeighbors>();
-        if (neighbors == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, $"LocationNeighbors не найден на {currentScene.name}");
-            return null;
-        }
+        Animator animator = currentActiveCharacter.GetComponent<Animator>();
+        if (animator != null) { animator.enabled = false; animator.Rebind(); animator.Update(0f); }
 
-        return neighbors.GetLocationReference();
+        currentActiveCharacter.transform.position = position;
+        currentActiveCharacter.transform.rotation = rotation;
+        currentActiveCharacter.transform.localScale = scale;
+
+        if (animator != null)
+        {
+            animator.enabled = true;
+            animator.Play(Config != null ? Config.IdleEyeAnimation : "IdleEye");
+        }
     }
 
-    #endregion
+    public void SetCurrentCharacter(string characterName) => currentCharacterName = characterName;
 
-    #region Interaction Management
+    public GameObject CurrentCharacter => currentActiveCharacter;
+    public bool IsCharacterSpawned => currentActiveCharacter != null;
 
-    public GameObject GetInteractionByName(string name)
+    private void StartAnimation(string characterName, IEnumerator animationRoutine)
     {
-        if (interactions == null || interactions.Length == 0)
+        if (animationRoutine == null) return;
+        if (activeAnimations.ContainsKey(characterName))
         {
-            Logger.Log(LogModule.Dialogue, "Список взаимодействий пуст");
-            return null;
+            StopCoroutine(activeAnimations[characterName]);
+            activeAnimations[characterName] = StartCoroutine(animationRoutine);
         }
-
-        if (string.IsNullOrEmpty(name))
-        {
-            Logger.Log(LogModule.Dialogue, "Имя взаимодействия пустое");
-            return null;
-        }
-
-        GameObject result = interactions.FirstOrDefault(i => i != null && i.name == name);
-        if (result != null)
-        {
-            Logger.Log(LogModule.Dialogue, $"Найдено взаимодействие: {name}");
-        }
-        else
-        {
-            Logger.LogWarning(LogModule.Dialogue, $"Взаимодействие {name} не найдено");
-        }
-
-        return result;
+        else activeAnimations.Add(characterName, StartCoroutine(animationRoutine));
     }
 
-    public void ToggleInteraction(string characterName)
+    private IEnumerator FadeCharacter(GameObject characterObj, float targetAlpha)
     {
-        if (string.IsNullOrEmpty(characterName))
+        if (characterObj == null) yield break;
+
+        CanvasGroup canvasGroup = characterObj.GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = characterObj.AddComponent<CanvasGroup>();
+
+        float startAlpha = canvasGroup.alpha;
+        float elapsed = 0f;
+        float duration = Config != null ? Config.FadeDuration : 0.5f;
+
+        while (elapsed < duration)
         {
-            Logger.LogWarning(LogModule.Dialogue, "Имя персонажа пустое");
-            return;
+            elapsed += Time.deltaTime;
+            canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / duration);
+            yield return null;
         }
 
-        GameObject interaction = GetInteractionByName(characterName);
-        if (interaction != null)
+        canvasGroup.alpha = targetAlpha;
+
+        if (targetAlpha == 0f)
         {
-            interaction.SetActive(!interaction.activeSelf);
-            Logger.Log(LogModule.Dialogue, $"Взаимодействие {characterName} переключено в состояние {interaction.activeSelf}");
+            string characterName = null;
+            foreach (var kvp in activeCharacters)
+                if (kvp.Value == characterObj) { characterName = kvp.Key; break; }
+
+            if (characterName != null)
+            {
+                activeCharacters.Remove(characterName);
+                activeAnimations.Remove(characterName);
+            }
+            Destroy(characterObj);
         }
     }
 
-    #endregion
-
-    #region Public Methods
-
-    public bool IsCharacterActive(string characterName)
+    private IEnumerator MoveCharacterRoutine(GameObject characterObj, Vector2 targetPosition)
     {
-        return currentCharacterName == characterName && isCharacterSpawned;
-    }
+        if (characterObj == null) yield break;
 
-    public void PlayCharacterAnimation(string animationName)
-    {
-        if (character != null && character.TryGetComponent(out Animator animator))
-        {
-            animator.Play(animationName);
-            Logger.Log(LogModule.Dialogue, $"Запущена анимация {animationName} для {character.name}");
-        }
-        else
-        {
-            Logger.LogWarning(LogModule.Dialogue, $"Невозможно запустить анимацию {animationName}: персонаж не найден или нет Animator");
-        }
-    }
+        Vector2 startPosition = characterObj.transform.localPosition;
+        float elapsed = 0f;
+        float duration = Config != null ? Config.MoveDuration : 0.5f;
 
-    public void SetCharacterPosition(Vector3 position)
-    {
-        if (character != null)
+        while (elapsed < duration)
         {
-            character.transform.position = position;
+            elapsed += Time.deltaTime;
+            characterObj.transform.localPosition = Vector2.Lerp(startPosition, targetPosition, elapsed / duration);
+            yield return null;
         }
-    }
 
-    public void SetCharacterScale(Vector3 scale)
-    {
-        if (character != null)
-        {
-            character.transform.localScale = scale;
-        }
+        characterObj.transform.localPosition = targetPosition;
     }
-
-    public void SetCharacterRotation(Quaternion rotation)
-    {
-        if (character != null)
-        {
-            character.transform.rotation = rotation;
-        }
-    }
-
-    #endregion
 }

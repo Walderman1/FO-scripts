@@ -24,7 +24,7 @@ public class BackgroundManager : MonoBehaviour
         this.config = config;
         this.parentTransform = parent;
         isInitialized = true;
-        Logger.Log(LogModule.Menu, "BackgroundManager инициализирован");
+        Logger.LogVerbose(LogModule.Menu, "BackgroundManager инициализирован");
     }
 
     public void CreateBackgrounds()
@@ -52,7 +52,7 @@ public class BackgroundManager : MonoBehaviour
         memoriesBackground = CreateBackground("MemoriesBackground", memoriesBgPrefab, new Vector2(-config.backgroundOffset, 0));
         memoriesBackground.SetActive(false);
 
-        Logger.Log(LogModule.Menu, $"Фоны созданы: Main={mainBackground?.name}, Settings={settingsBackground?.name}, Memories={memoriesBackground?.name}");
+        Logger.LogVerbose(LogModule.Menu, $"Фоны созданы: Main={mainBackground?.name}, Settings={settingsBackground?.name}, Memories={memoriesBackground?.name}");
     }
 
     private GameObject CreateBackground(string name, GameObject prefab, Vector2 startPos)
@@ -64,7 +64,7 @@ public class BackgroundManager : MonoBehaviour
         SpriteRenderer sr = bg.GetComponent<SpriteRenderer>();
         if (sr != null) FitSpriteToScreen(sr);
 
-        Logger.Log(LogModule.Menu, $"Создан фон: {name}");
+        Logger.LogVerbose(LogModule.Menu, $"Создан фон: {name}");
         return bg;
     }
 
@@ -80,7 +80,7 @@ public class BackgroundManager : MonoBehaviour
         sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f));
         sr.sortingOrder = -100;
 
-        Logger.Log(LogModule.Menu, $"Создан запасной фон: {name}");
+        Logger.LogVerbose(LogModule.Menu, $"Создан запасной фон: {name}");
         return bg;
     }
 
@@ -99,7 +99,7 @@ public class BackgroundManager : MonoBehaviour
         sr.transform.localScale = new Vector3(scale, scale, 1f);
         sr.transform.position = new Vector3(0, 0, 10f);
 
-        Logger.Log(LogModule.Menu, $"Спрайт подогнан под экран: scale={scale}");
+        Logger.LogVerbose(LogModule.Menu, $"Спрайт подогнан под экран: scale={scale}");
     }
 
     public void ShowBackground(GameObject bg)
@@ -116,7 +116,7 @@ public class BackgroundManager : MonoBehaviour
         currentBackground = bg;
         OnBackgroundChanged?.Invoke(bg);
 
-        Logger.Log(LogModule.Menu, $"Показан фон: {bg.name}");
+        Logger.LogVerbose(LogModule.Menu, $"Показан фон: {bg.name}");
     }
 
     public void HideAllBackgrounds()
@@ -125,7 +125,7 @@ public class BackgroundManager : MonoBehaviour
         if (settingsBackground != null) settingsBackground.SetActive(false);
         if (memoriesBackground != null) memoriesBackground.SetActive(false);
 
-        Logger.Log(LogModule.Menu, "Все фоны скрыты");
+        Logger.LogVerbose(LogModule.Menu, "Все фоны скрыты");
     }
 
     public IEnumerator AnimateBackgrounds(GameObject oldBg, GameObject newBg, Vector2 direction, Vector2 newStart)
@@ -133,7 +133,7 @@ public class BackgroundManager : MonoBehaviour
         if (isBackgroundAnimating || oldBg == null)
         {
             if (isBackgroundAnimating)
-                Logger.Log(LogModule.Menu, "Анимация фона уже выполняется");
+                Logger.LogVerbose(LogModule.Menu, "Анимация фона уже выполняется");
             yield break;
         }
 
@@ -151,7 +151,7 @@ public class BackgroundManager : MonoBehaviour
         Vector3 oldEnd = oldStart + new Vector3(direction.x * config.backgroundOffset / 100f, direction.y * config.backgroundOffset / 100f, 0);
         Vector3 newStartPos = newBg != null ? newBg.transform.position : Vector3.zero;
 
-        Logger.Log(LogModule.Menu, $"Начата анимация перехода фона: {oldBg?.name} -> {newBg?.name}");
+        Logger.LogVerbose(LogModule.Menu, $"Начата анимация перехода фона: {oldBg?.name} -> {newBg?.name}");
 
         float elapsed = 0f;
         while (elapsed < config.backgroundTransitionDuration)
@@ -178,7 +178,7 @@ public class BackgroundManager : MonoBehaviour
 
         isBackgroundAnimating = false;
 
-        Logger.Log(LogModule.Menu, $"Анимация перехода фона завершена");
+        Logger.LogVerbose(LogModule.Menu, "Анимация перехода фона завершена");
     }
 
     public GameObject GetMainBackground() => mainBackground;
@@ -193,6 +193,6 @@ public class BackgroundManager : MonoBehaviour
         if (settingsBackground != null) Destroy(settingsBackground);
         if (memoriesBackground != null) Destroy(memoriesBackground);
 
-        Logger.Log(LogModule.Menu, "Фоны очищены");
+        Logger.LogVerbose(LogModule.Menu, "Фоны очищены");
     }
 }

@@ -3,95 +3,67 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+using VContainer;
 
 public class QuestNotifications : MonoBehaviour
 {
-    public static QuestNotifications Instance;
-
     [Header("Конфиг")]
     [SerializeField] private QuestConfigSO config;
 
-    private GameObject notificationPrefab;
-    private Transform notificationsParent;
+    [Header("Ссылки")]
+    [SerializeField] private GameObject notificationPrefab;
+
+    [Inject] private QuestConfigSO _injectedConfig;
+
     private List<GameObject> activeNotifications = new List<GameObject>();
-    private bool isInitialized = false;
+    private Stack<GameObject> notificationPool = new Stack<GameObject>();
     private Canvas mainCanvas;
+    private Transform notificationsParent;
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            Logger.Log(LogModule.QuestSystem, "QuestNotifications инициализирован");
-        }
-        else
-        {
-            Logger.Log(LogModule.QuestSystem, "Уничтожение дублирующего QuestNotifications");
-            Destroy(gameObject);
-        }
-
-        if (config == null)
-        {
-            config = Resources.Load<QuestConfigSO>("Configs/QuestConfig");
-            if (config == null)
-                Logger.LogError(LogModule.QuestSystem, "QuestConfig не найден");
-        }
-
-        FindCanvas();
-        LoadPrefab();
-        FindParent();
-        Initialize();
+        if (transform.parent != null) transform.SetParent(null);
+        DontDestroyOnLoad(gameObject);
     }
 
-    private void FindCanvas()
+    private void Start()
     {
-        mainCanvas = FindFirstObjectByType<Canvas>();
+        if (config == null) config = _injectedConfig;
+        EnsureUISetup();
+    }
+
+    private void EnsureUISetup()
+    {
+        if (config == null) config = _injectedConfig;
 
         if (mainCanvas == null)
         {
-            GameObject canvasGO = new GameObject("Canvas");
-            mainCanvas = canvasGO.AddComponent<Canvas>();
+            mainCanvas = GetComponent<Canvas>();
+            if (mainCanvas == null) mainCanvas = gameObject.AddComponent<Canvas>();
+
             mainCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            mainCanvas.sortingOrder = 999;
+            mainCanvas.sortingOrder = 32767;
 
-            CanvasScaler scaler = canvasGO.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
+            if (GetComponent<CanvasScaler>() == null)
+            {
+                var scaler = gameObject.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(1920, 1080);
+            }
 
-            canvasGO.AddComponent<GraphicRaycaster>();
-
-            Logger.Log(LogModule.QuestSystem, "Создан Canvas для уведомлений");
+            if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
         }
-    }
 
-    private void LoadPrefab()
-    {
-        if (config == null) return;
-
-        notificationPrefab = Resources.Load<GameObject>(config.NotificationPrefabPath);
-
-        if (notificationPrefab == null)
+        if (notificationsParent == null)
         {
-            Logger.LogWarning(LogModule.QuestSystem, $"Префаб не найден: {config.NotificationPrefabPath}");
-            notificationPrefab = CreateNotificationPrefab();
-        }
-    }
-
-    private void FindParent()
-    {
-        if (config == null) return;
-
-        GameObject parentObject = GameObject.FindGameObjectWithTag(config.NotificationsTag);
-
-        if (parentObject != null)
-        {
-            notificationsParent = parentObject.transform;
-
-            VerticalLayoutGroup vlg = notificationsParent.GetComponent<VerticalLayoutGroup>();
-            if (vlg != null) Destroy(vlg);
-
-            ContentSizeFitter csf = notificationsParent.GetComponent<ContentSizeFitter>();
-            if (csf != null) Destroy(csf);
+            var existing = transform.Find("QuestNotificationsParent");
+            if (existing != null) notificationsParent = existing;
+            else
+            {
+                GameObject parentObj = new GameObject("QuestNotificationsParent", typeof(RectTransform));
+                parentObj.transform.SetParent(transform, false);
+                notificationsParent = parentObj.transform;
+            }
 
             RectTransform rt = notificationsParent.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(1, 1);
@@ -99,178 +71,177 @@ public class QuestNotifications : MonoBehaviour
             rt.pivot = new Vector2(1, 1);
             rt.anchoredPosition = new Vector2(-20, -100);
             rt.sizeDelta = new Vector2(500, 0);
-
-            Logger.Log(LogModule.QuestSystem, "Родительский объект для уведомлений найден");
-            return;
         }
-
-        Logger.LogError(LogModule.QuestSystem, $"Объект с тегом '{config.NotificationsTag}' не найден");
     }
 
-    private GameObject CreateNotificationPrefab()
+    private void LoadPrefab()
     {
-        GameObject prefab = new GameObject("Notification");
+        if (notificationPrefab != null) return;
+        if (config == null) return;
+
+        notificationPrefab = Resources.Load<GameObject>(config.NotificationPrefabPath);
+        if (notificationPrefab == null) notificationPrefab = CreateFallbackPrefab();
+    }
+
+    private GameObject CreateFallbackPrefab()
+    {
+        GameObject prefab = new GameObject("Notification_Fallback");
         prefab.SetActive(false);
 
         RectTransform rt = prefab.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(0, 60);
-        rt.anchorMin = new Vector2(0, 0);
-        rt.anchorMax = new Vector2(1, 0);
-        rt.pivot = new Vector2(0.5f, 0);
+        rt.sizeDelta = new Vector2(450, 60);
 
         Image bg = prefab.AddComponent<Image>();
         bg.color = new Color(0.08f, 0.08f, 0.12f, 0.92f);
-        bg.raycastTarget = false;
 
-        GameObject textGO = new GameObject("Text");
+        GameObject textGO = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
         textGO.transform.SetParent(prefab.transform, false);
-        RectTransform textRt = textGO.AddComponent<RectTransform>();
-        textRt.anchorMin = new Vector2(0, 0);
-        textRt.anchorMax = new Vector2(1, 1);
+        var textRt = textGO.GetComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
         textRt.offsetMin = new Vector2(55, 10);
         textRt.offsetMax = new Vector2(-15, -10);
 
-        TextMeshProUGUI tmp = textGO.AddComponent<TextMeshProUGUI>();
-        tmp.text = "Уведомление";
+        var tmp = textGO.GetComponent<TextMeshProUGUI>();
         tmp.fontSize = 18;
-        tmp.color = Color.white;
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
-        tmp.enableWordWrapping = true;
-        tmp.raycastTarget = false;
+        tmp.color = Color.white;
 
-        GameObject iconGO = new GameObject("Icon");
-        iconGO.transform.SetParent(prefab.transform, false);
-        RectTransform iconRt = iconGO.AddComponent<RectTransform>();
-        iconRt.anchorMin = new Vector2(0, 0.5f);
-        iconRt.anchorMax = new Vector2(0, 0.5f);
-        iconRt.pivot = new Vector2(0, 0.5f);
-        iconRt.anchoredPosition = new Vector2(15, 0);
-        iconRt.sizeDelta = new Vector2(28, 28);
-
-        Image iconImage = iconGO.AddComponent<Image>();
-        if (config != null && config.StartIcon != null)
-            iconImage.sprite = config.StartIcon;
-        iconImage.color = config != null ? config.StartNotifyColor : Color.white;
-        iconImage.raycastTarget = false;
-        iconImage.preserveAspect = true;
-
-        Logger.Log(LogModule.QuestSystem, "Создан префаб уведомления по умолчанию");
         return prefab;
-    }
-
-    private void Initialize()
-    {
-        if (isInitialized) return;
-        if (notificationPrefab == null)
-        {
-            Logger.LogWarning(LogModule.QuestSystem, "notificationPrefab отсутствует, инициализация отложена");
-            return;
-        }
-        if (notificationsParent == null)
-        {
-            Logger.LogWarning(LogModule.QuestSystem, "notificationsParent отсутствует, инициализация отложена");
-            return;
-        }
-
-        isInitialized = true;
-        Logger.Log(LogModule.QuestSystem, "QuestNotifications инициализирован");
     }
 
     public void ShowQuestStarted(string questName)
     {
         if (config == null) return;
         ShowNotification($"Начат квест: {questName}", config.StartNotifyColor, config.StartIcon);
-        Logger.Log(LogModule.QuestSystem, $"Показано уведомление о начале квеста: {questName}");
     }
 
     public void ShowQuestCompleted(string questName)
     {
         if (config == null) return;
         ShowNotification($"Квест завершён: {questName}", config.CompleteNotifyColor, config.CompleteIcon);
-        Logger.Log(LogModule.QuestSystem, $"Показано уведомление о завершении квеста: {questName}");
     }
 
     public void ShowQuestUpdated(string questName, string objectiveName, int current, int required)
     {
         if (config == null) return;
         ShowNotification($"{objectiveName}: {current}/{required}", config.UpdateNotifyColor, config.UpdateIcon);
-        Logger.Log(LogModule.QuestSystem, $"Показано уведомление об обновлении квеста: {questName} - {objectiveName}");
     }
 
     public void ShowObjectiveCompleted(string objectiveName)
     {
         if (config == null) return;
         ShowNotification($"Выполнено: {objectiveName}", config.CompleteNotifyColor, config.ObjectiveIcon);
-        Logger.Log(LogModule.QuestSystem, $"Показано уведомление о выполнении цели: {objectiveName}");
     }
 
     public void ShowCustom(string message, Color color, Sprite icon = null)
     {
         if (config == null) return;
         ShowNotification(message, color, icon ?? config.StartIcon);
-        Logger.Log(LogModule.QuestSystem, $"Показано пользовательское уведомление: {message}");
+    }
+
+    private GameObject GetPooledNotification()
+    {
+        if (notificationPool.Count > 0)
+        {
+            var pooled = notificationPool.Pop();
+            if (pooled != null) { pooled.SetActive(true); return pooled; }
+        }
+
+        if (notificationPrefab == null) LoadPrefab();
+        if (notificationPrefab == null) return null;
+
+        return Instantiate(notificationPrefab, notificationsParent);
+    }
+
+    private void ReturnToPool(GameObject notification)
+    {
+        if (notification == null) return;
+        notification.SetActive(false);
+        notificationPool.Push(notification);
     }
 
     private void ShowNotification(string message, Color color, Sprite icon)
     {
-        if (!isInitialized) Initialize();
-        if (notificationPrefab == null)
-        {
-            Logger.LogWarning(LogModule.QuestSystem, "notificationPrefab отсутствует, уведомление не показано");
-            return;
-        }
-        if (notificationsParent == null)
-        {
-            Logger.LogWarning(LogModule.QuestSystem, "notificationsParent отсутствует, уведомление не показано");
-            return;
-        }
-        if (config == null)
-        {
-            Logger.LogWarning(LogModule.QuestSystem, "config отсутствует, уведомление не показано");
-            return;
-        }
+        if (notificationsParent == null || mainCanvas == null) EnsureUISetup();
+        if (notificationPrefab == null) LoadPrefab();
+        if (notificationsParent == null || notificationPrefab == null) return;
 
-        GameObject notification = Instantiate(notificationPrefab, notificationsParent);
-        notification.SetActive(true);
-        notification.name = "Notification_" + Time.time;
+        GameObject notification = GetPooledNotification();
+        if (notification == null) return;
 
-        Transform iconTransform = notification.transform.Find("Icon");
-        if (iconTransform != null)
-        {
-            Image iconImage = iconTransform.GetComponent<Image>();
-            if (iconImage != null)
-            {
-                iconImage.sprite = icon;
-                iconImage.color = color;
-            }
-        }
+        RectTransform notifRt = notification.GetComponent<RectTransform>();
+        if (notifRt == null) notifRt = notification.AddComponent<RectTransform>();
 
-        Transform textTransform = notification.transform.Find("Text");
-        if (textTransform != null)
-        {
-            TextMeshProUGUI text = textTransform.GetComponent<TextMeshProUGUI>();
-            if (text != null)
-            {
-                text.text = message;
-                text.color = Color.white;
-            }
-        }
+        notifRt.anchorMin = new Vector2(1, 1);
+        notifRt.anchorMax = new Vector2(1, 1);
+        notifRt.pivot = new Vector2(1, 1);
+        notifRt.sizeDelta = new Vector2(450, config != null && config.NotifyHeight > 0 ? config.NotifyHeight : 60);
+        notifRt.localScale = Vector3.one;
 
         Image bg = notification.GetComponent<Image>();
         if (bg != null)
         {
             Color bgColor = color;
-            bgColor.a = config.NotifyBgAlpha;
+            bgColor.a = config != null ? config.NotifyBgAlpha : 0.8f;
             bg.color = bgColor;
+        }
+
+        Transform iconTransform = notification.transform.Find("Icon");
+        if (iconTransform == null && icon != null)
+        {
+            GameObject iconObj = new GameObject("Icon", typeof(RectTransform), typeof(Image));
+            iconObj.transform.SetParent(notification.transform, false);
+            var irt = iconObj.GetComponent<RectTransform>();
+            irt.anchorMin = new Vector2(0, 0.5f);
+            irt.anchorMax = new Vector2(0, 0.5f);
+            irt.pivot = new Vector2(0, 0.5f);
+            irt.anchoredPosition = new Vector2(15, 0);
+            irt.sizeDelta = new Vector2(30, 30);
+            iconTransform = iconObj.transform;
+        }
+
+        if (iconTransform != null)
+        {
+            Image iconImage = iconTransform.GetComponent<Image>();
+            if (iconImage == null) iconImage = iconTransform.gameObject.AddComponent<Image>();
+
+            iconImage.sprite = icon;
+            iconImage.color = icon != null ? color : Color.clear;
+            iconImage.preserveAspect = true;
+            iconImage.raycastTarget = false;
+        }
+
+        Transform textTransform = notification.transform.Find("Text");
+        if (textTransform == null)
+        {
+            GameObject textObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObj.transform.SetParent(notification.transform, false);
+            var trt = textObj.GetComponent<RectTransform>();
+            trt.anchorMin = Vector2.zero;
+            trt.anchorMax = Vector2.one;
+            trt.offsetMin = new Vector2(icon != null ? 55 : 15, 10);
+            trt.offsetMax = new Vector2(-15, -10);
+            textTransform = textObj.transform;
+        }
+
+        TextMeshProUGUI text = textTransform.GetComponent<TextMeshProUGUI>();
+        if (text != null)
+        {
+            text.text = message;
+            text.color = Color.white;
+            text.fontSize = 20;
+            text.alignment = TextAlignmentOptions.MidlineLeft;
         }
 
         activeNotifications.Add(notification);
 
-        while (activeNotifications.Count > config.MaxNotifications)
+        int maxNotif = config != null ? config.MaxNotifications : 5;
+        while (activeNotifications.Count > maxNotif)
         {
             GameObject old = activeNotifications[0];
             activeNotifications.RemoveAt(0);
-            Destroy(old);
+            ReturnToPool(old);
         }
 
         RepositionNotifications();
@@ -279,7 +250,7 @@ public class QuestNotifications : MonoBehaviour
 
     private void RepositionNotifications()
     {
-        if (config == null) return;
+        float spacing = config != null ? config.NotifySpacing : 70f;
 
         for (int i = 0; i < activeNotifications.Count; i++)
         {
@@ -287,60 +258,61 @@ public class QuestNotifications : MonoBehaviour
             if (notif == null) continue;
 
             RectTransform rt = notif.GetComponent<RectTransform>();
-            if (rt == null) continue;
-
-            float y = -i * config.NotifySpacing;
-            rt.anchoredPosition = new Vector2(0, y);
+            if (rt != null) rt.anchoredPosition = new Vector2(0, -i * spacing);
         }
     }
 
     private IEnumerator AnimateNotification(GameObject notification)
     {
-        if (config == null)
-        {
-            Destroy(notification);
-            yield break;
-        }
+        if (notification == null) yield break;
 
         RectTransform rt = notification.GetComponent<RectTransform>();
         CanvasGroup cg = notification.GetComponent<CanvasGroup>();
         if (cg == null) cg = notification.AddComponent<CanvasGroup>();
 
+        if (rt == null) yield break;
+
         cg.alpha = 0f;
-        rt.anchoredPosition = new Vector2(config.NotifySlideOffset, rt.anchoredPosition.y);
+        Vector2 endPos = rt.anchoredPosition;
+        Vector2 startPos = endPos + new Vector2(50, 0);
+        rt.anchoredPosition = startPos;
 
         float elapsed = 0f;
-        Vector2 startPos = new Vector2(config.NotifySlideOffset, rt.anchoredPosition.y);
-        Vector2 endPos = new Vector2(0, rt.anchoredPosition.y);
+        float slideTime = config != null ? config.NotifySlide : 0.3f;
+        float duration = config != null ? config.NotifyDuration : 3f;
+        float fadeTime = config != null ? config.NotifyFade : 0.5f;
 
-        while (elapsed < config.NotifySlide)
+        while (elapsed < slideTime)
         {
+            if (notification == null) yield break;
             elapsed += Time.deltaTime;
-            float t = elapsed / config.NotifySlide;
-            float smooth = t * t * (3f - 2f * t);
-
-            rt.anchoredPosition = Vector2.Lerp(startPos, endPos, smooth);
+            float t = elapsed / slideTime;
+            rt.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
             cg.alpha = Mathf.Lerp(0f, 1f, t);
-
             yield return null;
         }
 
+        if (notification == null) yield break;
         rt.anchoredPosition = endPos;
         cg.alpha = 1f;
 
-        yield return new WaitForSeconds(config.NotifyDuration);
+        yield return new WaitForSeconds(duration);
 
+        if (notification == null) yield break;
         elapsed = 0f;
-        while (elapsed < config.NotifyFade)
+        while (elapsed < fadeTime)
         {
+            if (notification == null) yield break;
             elapsed += Time.deltaTime;
-            float t = elapsed / config.NotifyFade;
+            float t = elapsed / fadeTime;
             cg.alpha = Mathf.Lerp(1f, 0f, t);
             yield return null;
         }
 
+        if (notification == null) yield break;
+
         activeNotifications.Remove(notification);
         RepositionNotifications();
-        Destroy(notification);
+        ReturnToPool(notification);
     }
 }

@@ -1,10 +1,11 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using VContainer;
 
+[DefaultExecutionOrder(-9300)]
 public class FlagManager : MonoBehaviour
 {
-    public static FlagManager Instance;
-
     [System.Serializable]
     public class FlagEntry
     {
@@ -19,70 +20,68 @@ public class FlagManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-            InitializeFlags();
-        }
-        else
-        {
-            Logger.Log(LogModule.Core, "Уничтожение дублирующего FlagManager");
-            Destroy(gameObject);
-        }
+        if (transform.parent != null) transform.SetParent(null);
+        DontDestroyOnLoad(gameObject);
+        InitializeFlags();
     }
 
     private void InitializeFlags()
     {
         foreach (var entry in initialFlags)
         {
+            if (entry == null || string.IsNullOrEmpty(entry.flagName)) continue;
             flags[entry.flagName] = entry.value;
         }
-        Logger.Log(LogModule.Core, $"FlagManager инициализирован с {initialFlags.Count} флагами");
     }
 
     public void SetFlag(string flagName, bool value)
     {
+        if (string.IsNullOrEmpty(flagName)) return;
+
+        bool changed = !flags.TryGetValue(flagName, out bool old) || old != value;
         flags[flagName] = value;
+
+        if (!changed) return;
+
         Logger.Log(LogModule.Core, $"Флаг {flagName} = {value}");
 
-        if (EventManager.Instance != null)
-        {
-            EventManager.Instance.OnFlagChanged(flagName, value);
-        }
+        var em = SceneInjector.Instance?.RootScope?.Resolve<EventManager>();
+        em?.OnFlagChanged(flagName, value);
     }
 
     public bool GetFlag(string flagName)
     {
-        if (flags.TryGetValue(flagName, out bool value))
-            return value;
+        if (string.IsNullOrEmpty(flagName)) return false;
+        if (flags.TryGetValue(flagName, out bool value)) return value;
         return false;
     }
 
     public bool HasFlag(string flagName)
     {
-        return flags.ContainsKey(flagName);
+        return !string.IsNullOrEmpty(flagName) && flags.ContainsKey(flagName);
     }
 
     public void ToggleFlag(string flagName)
     {
-        bool currentValue = GetFlag(flagName);
-        SetFlag(flagName, !currentValue);
-        Logger.Log(LogModule.Core, $"Флаг {flagName} переключен на {!currentValue}");
+        bool current = GetFlag(flagName);
+        SetFlag(flagName, !current);
     }
 
     public void RemoveFlag(string flagName)
     {
-        if (flags.Remove(flagName))
-        {
-            Logger.Log(LogModule.Core, $"Флаг {flagName} удалён");
-        }
+        if (string.IsNullOrEmpty(flagName)) return;
+        flags.Remove(flagName);
+    }
+
+    public void ResetFlags()
+    {
+        flags.Clear();
+        InitializeFlags();
     }
 
     public void ClearAllFlags()
     {
         flags.Clear();
-        Logger.Log(LogModule.Core, "Все флаги очищены");
     }
 
     public Dictionary<string, bool> GetAllFlags()
@@ -90,47 +89,29 @@ public class FlagManager : MonoBehaviour
         return new Dictionary<string, bool>(flags);
     }
 
-    public void PrintAllFlags()
-    {
-        Logger.Log(LogModule.Core, "=== ВСЕ ФЛАГИ ===");
-        foreach (var kvp in flags)
-        {
-            Logger.Log(LogModule.Core, $"  {kvp.Key} = {kvp.Value}");
-        }
-    }
-
     public string SerializeFlags()
     {
-        return JsonUtility.ToJson(new FlagSaveData { flags = flags });
+        return JsonConvert.SerializeObject(flags, Formatting.Indented);
     }
 
     public void DeserializeFlags(string json)
     {
-        var data = JsonUtility.FromJson<FlagSaveData>(json);
-        if (data != null)
+        if (string.IsNullOrEmpty(json)) return;
+
+        try
         {
-            flags = data.flags;
-            Logger.Log(LogModule.Core, "Флаги восстановлены из сохранения");
+            var loaded = JsonConvert.DeserializeObject<Dictionary<string, bool>>(json);
+            if (loaded == null) return;
+
+            flags.Clear();
+            foreach (var kvp in loaded)
+            {
+                if (!string.IsNullOrEmpty(kvp.Key)) flags[kvp.Key] = kvp.Value;
+            }
+        }
+        catch (System.Exception e)
+        {
+            Logger.LogError(LogModule.Core, $"Ошибка десериализации флагов: {e.Message}");
         }
     }
-
-    [System.Serializable]
-    private class FlagSaveData
-    {
-        public Dictionary<string, bool> flags;
-    }
-
-#if UNITY_EDITOR
-    [ContextMenu("Print All Flags")]
-    public void PrintAllFlagsEditor()
-    {
-        PrintAllFlags();
-    }
-
-    [ContextMenu("Clear All Flags")]
-    public void ClearAllFlagsEditor()
-    {
-        ClearAllFlags();
-    }
-#endif
 }

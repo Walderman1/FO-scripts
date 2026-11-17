@@ -1,1094 +1,790 @@
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using TMPro;
-using UnityEngine;
+using DialogueSystem;
 using UnityEngine.UI;
+using VContainer;
 
-public class TextBeginner : MonoBehaviour
+namespace DialogueSystem
 {
-    #region Fields and Serialization
-
-    [Header("Configuration (Auto-loaded from Resources/Configs/DialogueConfig)")]
-    [SerializeField] private DialogueData dialogueConfig;
-
-    [Header("UI")]
-    [SerializeField] private DialogueUI dialogueUI;
-
-    [Header("Character Manager")]
-    [SerializeField] private DialogueCharacterManager characterManager;
-
-    [Header("Location")]
-    [SerializeField] private GameObject currentLocation;
-    [SerializeField] private GameObject currentRegion;
-    [SerializeField] private Animator blackPanelAnimator;
-
-    [Header("Start Settings")]
-    [SerializeField] private bool startDialogueOnAwake = false;
-    [SerializeField] private int startFileIndex = 0;
-
-    private bool isInDialogue;
-    public bool isChoosing;
-    private bool hasDeleted;
-    private int currentLineIndex;
-    private string currentCharacterName;
-
-    private DialogueFileManager fileManager;
-
-    private Button skipButton;
-    private GameObject skipButtonGameObject;
-    private CanvasGroup skipButtonCanvasGroup;
-    private bool isSkipping;
-
-    #endregion
-
-    #region Unity Lifecycle
-
-    private void Awake()
+    public class TextBeginner : MonoBehaviour
     {
-        LoadConfig();
+        [Header("References")]
+        [SerializeField] private DialogueUI dialogueUI;
+        [SerializeField] private DialogueFileManager fileManager;
+        [SerializeField] private DialogueCharacterManager characterManager;
+        [SerializeField] private RadialMenu radialMenu;
+        [SerializeField] private Button skipButton;
+        [SerializeField] private DialogueData dialogueConfig;
 
-        fileManager = new DialogueFileManager(dialogueConfig);
-        fileManager.OnDialogueLoaded += OnFileLoaded;
-        fileManager.OnError += OnFileError;
+        [Header("Location")]
+        [SerializeField] private GameObject currentLocation;
+        [SerializeField] private GameObject currentRegion;
 
-        if (dialogueUI == null)
+        [Header("Debug")]
+        [SerializeField] private string newGameEventID = "event_novaya_igra";
+        [SerializeField] private bool debugSpawnCharacterAfterEvent = true;
+
+        [Header("Hold Skip (Ctrl)")]
+        [Range(0.01f, 2f)]
+        [SerializeField] private float holdSkipInterval = 0.15f;
+
+        [Inject] private DialogueTracker _dialogueTracker;
+        [Inject] private FlagManager _flagManager;
+        [Inject] private QuestManager _questManager;
+        [Inject] private EventStateManager _eventStateManager;
+        [Inject] private SaveSystem _saveSystem;
+        [Inject] private InventoryUIManager _inventoryUIManager;
+        [Inject] private EventManager _eventManager;
+
+        private DialogueNode[] currentDialogue;
+        private DialogueNode currentNode;
+        private bool isDialogueActive = false;
+        private Coroutine typeCoroutine;
+        private Coroutine skipCoroutine;
+        private bool isSkipping = false;
+
+        private Coroutine holdSkipCoroutine;
+        private bool holdSkipRequested = false;
+
+        private enum DialogueState { Idle, Typing, Showing, Choosing }
+        private DialogueState state = DialogueState.Idle;
+
+        public bool IsDialogueActive => isDialogueActive;
+        public bool IsChoosing => state == DialogueState.Choosing;
+        public bool IsInDialogue => isDialogueActive;
+        public GameObject CurrentLocation => currentLocation;
+        public GameObject CurrentRegion => currentRegion;
+
+        private DialogueChoice[] currentChoices;
+        private string currentDialogueFileName;
+
+        private void Awake()
         {
-            dialogueUI = GetComponentInChildren<DialogueUI>();
-            if (dialogueUI == null)
+            isDialogueActive = false;
+            state = DialogueState.Idle;
+        }
+
+        private void Start()
+        {
+            FindAllManagers();
+
+            if (dialogueUI != null) dialogueUI.HideDialoguePanel();
+
+            UpdateCurrentLocation();
+            FindSkipButton();
+
+            if (skipButton == null) StartCoroutine(FindSkipButtonDelayed());
+
+            if (debugSpawnCharacterAfterEvent && Application.isEditor)
+                StartCoroutine(DebugSpawnCharacterRoutine());
+        }
+
+        // ★★★ ГЛАВНЫЙ ХЕЛПЕР: ищет ИМЕННО ChoiceRadialMenu, а не любой RadialMenu ★★★
+        private RadialMenu FindChoiceRadialMenu()
+        {
+            var choice = GameReferences.Instance?.ChoiceRadialMenu;
+            if (choice != null) return choice;
+
+            try
             {
-                dialogueUI = gameObject.AddComponent<DialogueUI>();
+                var scope = SceneInjector.Instance?.CurrentSceneScope;
+                if (scope != null)
+                {
+                    var registry = scope.Resolve<RadialMenuRegistry>();
+                    if (registry != null && registry.ChoiceRadialMenu != null)
+                        return registry.ChoiceRadialMenu;
+                }
+            }
+            catch { }
+
+            try
+            {
+                var byTag = GameObject.FindGameObjectWithTag("ChoicePanel");
+                if (byTag != null)
+                {
+                    var menu = byTag.GetComponent<RadialMenu>();
+                    if (menu != null)
+                    {
+                        Logger.LogVerbose(LogModule.Dialogue, $"ChoiceRadialMenu найден по тегу: {menu.name}");
+                        return menu;
+                    }
+                }
+            }
+            catch (UnityException) { }
+
+            var byName = GameObject.Find("ChoicePanel");
+            if (byName != null)
+            {
+                var menu = byName.GetComponent<RadialMenu>();
+                if (menu != null)
+                {
+                    Logger.LogVerbose(LogModule.Dialogue, $"ChoiceRadialMenu найден по имени: {menu.name}");
+                    return menu;
+                }
+            }
+
+            Logger.LogWarning(LogModule.Dialogue, "ChoiceRadialMenu не найден — варианты будут показаны через DialogueUI");
+            return null;
+        }
+
+        private IEnumerator FindSkipButtonDelayed()
+        {
+            yield return new WaitForSeconds(0.5f);
+            FindSkipButton();
+
+            if (skipButton == null)
+            {
+                yield return new WaitForSeconds(1f);
+                FindSkipButton();
             }
         }
 
-        if (characterManager == null)
+        private void FindSkipButton()
         {
-            characterManager = GetComponentInChildren<DialogueCharacterManager>();
+            if (skipButton != null) return;
+
+            string skipName = dialogueConfig != null ? dialogueConfig.SkipButtonName : "SkipButton";
+            GameObject skipGO = GameObject.Find(skipName);
+            if (skipGO != null)
+            {
+                skipButton = skipGO.GetComponent<Button>();
+                if (skipButton != null)
+                {
+                    skipButton.onClick.RemoveAllListeners();
+                    skipButton.onClick.AddListener(StartSkip);
+                    skipButton.gameObject.SetActive(false);
+                    return;
+                }
+            }
+
+            Button[] allButtons = FindObjectsByType<Button>();
+            foreach (Button btn in allButtons)
+            {
+                if (btn.name == skipName)
+                {
+                    skipButton = btn;
+                    skipButton.onClick.RemoveAllListeners();
+                    skipButton.onClick.AddListener(StartSkip);
+                    skipButton.gameObject.SetActive(false);
+                    return;
+                }
+            }
+        }
+
+        private void FindAllManagers()
+        {
+            if (dialogueUI == null) dialogueUI = FindAnyObjectByType<DialogueUI>(FindObjectsInactive.Include);
+            if (fileManager == null) fileManager = FindAnyObjectByType<DialogueFileManager>(FindObjectsInactive.Include);
+
             if (characterManager == null)
             {
-                characterManager = gameObject.AddComponent<DialogueCharacterManager>();
+                characterManager = FindAnyObjectByType<DialogueCharacterManager>(FindObjectsInactive.Include);
+                if (characterManager == null) characterManager = gameObject.AddComponent<DialogueCharacterManager>();
+            }
+
+            if (radialMenu == null) radialMenu = FindChoiceRadialMenu();
+            if (radialMenu != null) radialMenu.textBeginner = this;
+
+            if (dialogueConfig == null) dialogueConfig = Resources.Load<DialogueData>("Configs/DialogueConfig");
+        }
+
+        private IEnumerator DebugSpawnCharacterRoutine()
+        {
+            yield return new WaitForSeconds(0.2f);
+
+            if (isDialogueActive) yield break;
+            if (characterManager == null) yield break;
+            if (characterManager.CurrentCharacter != null) yield break;
+
+            string defaultCharacter = dialogueConfig != null ? dialogueConfig.DefaultCharacterName : "";
+            if (string.IsNullOrEmpty(defaultCharacter)) yield break;
+
+            characterManager.ShowCharacter(defaultCharacter);
+            characterManager.MoveCharacterToCurrentLocationReference();
+
+            Logger.Log(LogModule.Dialogue, $"[DebugSpawn] Персонаж '{defaultCharacter}' заспавнен вручную");
+        }
+
+        private void Update()
+        {
+            if (!isDialogueActive) return;
+            if (state == DialogueState.Choosing) return;
+            if (state == DialogueState.Idle) return;
+
+            if (Input.GetMouseButtonDown(0)) HandleClick();
+
+            if (skipButton != null)
+            {
+                bool shouldShow = isDialogueActive && state != DialogueState.Choosing && !isSkipping;
+                if (skipButton.gameObject.activeSelf != shouldShow) skipButton.gameObject.SetActive(shouldShow);
             }
         }
 
-        AutoFindComponents();
-
-        if (characterManager != null)
+        public void StartDialogue(string fileName)
         {
-            characterManager.Initialize(dialogueConfig);
-            characterManager.SetCharacterAreas(FirstCharactersArea, SecondCharactersArea);
-        }
+            UpdateCurrentLocation();
 
-        if (dialogueUI != null)
-        {
-            dialogueUI.SetPanelDialogueActive(false);
-            dialogueUI.ClearDialogueText();
-        }
-        isInDialogue = false;
-
-        Logger.Log(LogModule.Dialogue, "TextBeginner инициализирован");
-    }
-
-    private void Start()
-    {
-        fileManager.InitializeFilePaths();
-
-        if (fileManager.GetFilePaths().Count == 0)
-        {
-            Logger.LogError(LogModule.Dialogue, "Нет путей к файлам диалогов. Проверьте DialogueConfig");
-            return;
-        }
-
-        LoadDialogueFromFile(startFileIndex);
-
-        if (dialogueUI != null)
-        {
-            dialogueUI.SetPanelDialogueActive(false);
-            dialogueUI.ClearDialogueText();
-        }
-        isInDialogue = false;
-
-        UpdateCurrentLocation();
-        SetupSkipButton();
-
-        if (startDialogueOnAwake)
-        {
-            StartDialogueWithFile(startFileIndex);
-        }
-
-        if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            dialogueConfig.LogSettings();
-            fileManager.LogFileInfo();
-            Logger.Log(LogModule.Dialogue, $"Start dialogue on awake: {startDialogueOnAwake}");
-        }
-    }
-
-    private void Update()
-    {
-        UpdateSkipButtonVisibility();
-    }
-
-    private void OnDestroy()
-    {
-        if (fileManager != null)
-        {
-            fileManager.OnDialogueLoaded -= OnFileLoaded;
-            fileManager.OnError -= OnFileError;
-        }
-    }
-
-    #endregion
-
-    #region Event Handlers
-
-    private void OnFileLoaded()
-    {
-        if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            Logger.Log(LogModule.Dialogue, "Файл диалога успешно загружен");
-        }
-    }
-
-    private void OnFileError(string error)
-    {
-        Logger.LogError(LogModule.Dialogue, $"Ошибка файла диалога: {error}");
-    }
-
-    #endregion
-
-    #region Config Loading
-
-    private void LoadConfig()
-    {
-        if (dialogueConfig != null)
-        {
-            Logger.Log(LogModule.Dialogue, "DialogueConfig назначен в инспекторе");
-            return;
-        }
-
-        dialogueConfig = Resources.Load<DialogueData>("Configs/DialogueConfig");
-
-        if (dialogueConfig != null)
-        {
-            Logger.Log(LogModule.Dialogue, "DialogueConfig загружен из Resources/Configs/DialogueConfig");
-        }
-        else
-        {
-            dialogueConfig = Resources.Load<DialogueData>("DialogueConfig");
-
-            if (dialogueConfig != null)
+            if (skipButton == null)
             {
-                Logger.Log(LogModule.Dialogue, "DialogueConfig загружен из Resources/DialogueConfig");
+                FindSkipButton();
+                if (skipButton == null) StartCoroutine(FindSkipButtonDelayed());
+            }
+
+            if (dialogueUI == null) dialogueUI = FindAnyObjectByType<DialogueUI>(FindObjectsInactive.Include);
+            if (dialogueUI == null) { Logger.LogError(LogModule.Dialogue, "DialogueUI is null"); return; }
+
+            if (fileManager == null) fileManager = FindAnyObjectByType<DialogueFileManager>(FindObjectsInactive.Include);
+            if (fileManager == null) { Logger.LogError(LogModule.Dialogue, "DialogueFileManager is null"); return; }
+
+            if (characterManager == null) characterManager = FindAnyObjectByType<DialogueCharacterManager>(FindObjectsInactive.Include);
+
+            radialMenu = FindChoiceRadialMenu();
+            if (radialMenu != null) radialMenu.textBeginner = this;
+
+            if (characterManager != null)
+            {
+                string defaultCharacter = dialogueConfig != null ? dialogueConfig.DefaultCharacterName : "";
+                if (!string.IsNullOrEmpty(defaultCharacter) && characterManager.CurrentCharacter == null)
+                {
+                    characterManager.ShowCharacter(defaultCharacter);
+                    characterManager.SetPortrait(defaultCharacter);
+                }
+                characterManager.MoveCharacterToSpeakerArea();
+            }
+
+            currentDialogue = fileManager.LoadDialogue(fileName);
+            currentDialogueFileName = fileName;
+            if (currentDialogue == null) { Logger.LogError(LogModule.Dialogue, $"Failed to load dialogue: {fileName}"); return; }
+
+            isDialogueActive = true;
+            isSkipping = false;
+
+            dialogueUI.ShowDialoguePanel();
+
+            DialogueNode startNode = fileManager.GetNodeById(currentDialogue, "start");
+            if (startNode == null) { EndDialogue(); return; }
+
+            ShowNode(startNode);
+        }
+
+        private void ShowNode(DialogueNode node)
+        {
+            if (node == null) { EndDialogue(); return; }
+
+            currentNode = node;
+            state = DialogueState.Idle;
+
+            if (dialogueUI != null) dialogueUI.ClearChoices();
+
+            if (characterManager != null)
+            {
+                if (!string.IsNullOrEmpty(node.speaker))
+                {
+                    characterManager.ShowCharacter(node.speaker);
+                    characterManager.SetPortrait(node.speaker);
+                }
+                characterManager.ProcessActions(node);
+            }
+
+            if (!string.IsNullOrEmpty(node.speaker) && dialogueUI != null)
+                dialogueUI.UpdateSpeakerText(node.speaker);
+
+            if (node.choices != null && node.choices.Length > 0)
+            {
+                state = DialogueState.Choosing;
+                currentChoices = node.choices;
+                ShowChoices(node.choices);
+            }
+            else if (!string.IsNullOrEmpty(node.text))
+            {
+                StartCoroutine(TypeText(node.text));
+            }
+            else if (!string.IsNullOrEmpty(node.nextNodeId))
+            {
+                DialogueNode nextNode = fileManager.GetNodeById(currentDialogue, node.nextNodeId);
+                if (nextNode != null) ShowNode(nextNode);
+                else EndDialogue();
+            }
+            else EndDialogue();
+        }
+
+        private void ShowChoices(DialogueChoice[] choices)
+        {
+            List<string> choiceTexts = new List<string>();
+            foreach (DialogueChoice choice in choices)
+            {
+                if (!string.IsNullOrEmpty(choice.condition))
+                    if (!CheckCondition(choice.condition)) continue;
+                choiceTexts.Add(choice.text);
+            }
+
+            if (choiceTexts.Count == 0) { Logger.LogWarning(LogModule.Dialogue, "Нет доступных вариантов"); return; }
+
+            // ★★★ ВСЕГДА берём ИМЕННО ChoicePanel через хелпер ★★★
+            var choiceMenu = FindChoiceRadialMenu();
+            if (choiceMenu != null)
+            {
+                radialMenu = choiceMenu;
+                radialMenu.textBeginner = this;
+                radialMenu.ClearButtons();
+                radialMenu.SetChoiceMode(choiceTexts, OnChoiceMade);
+                radialMenu.ShowAtCenter();
+
+                CanvasGroup cg = radialMenu.GetComponent<CanvasGroup>();
+                if (cg == null) cg = radialMenu.gameObject.AddComponent<CanvasGroup>();
+                cg.alpha = 1f;
+                cg.blocksRaycasts = true;
+                cg.interactable = true;
+
+                Logger.LogVerbose(LogModule.Dialogue, $"Выбор показан через ChoicePanel: {choiceMenu.name}");
+            }
+            else if (dialogueUI != null)
+            {
+                Logger.LogWarning(LogModule.Dialogue, "ChoiceRadialMenu не найден, fallback на DialogueUI.ShowChoices");
+                dialogueUI.ShowChoices(choices, OnChoiceSelected);
+            }
+            else EndDialogue();
+        }
+
+        public void MakeChoice(int choiceIndex)
+        {
+            if (currentChoices == null || choiceIndex < 0 || choiceIndex >= currentChoices.Length) return;
+            OnChoiceSelected(currentChoices[choiceIndex]);
+        }
+
+        private void OnChoiceMade(int choiceIndex) => MakeChoice(choiceIndex);
+
+        private void OnChoiceSelected(DialogueChoice choice)
+        {
+            if (choice == null) return;
+
+            if (radialMenu != null && radialMenu.IsVisible()) radialMenu.Hide();
+
+            ProcessActions(currentNode?.actions);
+
+            DialogueNode nextNode = fileManager.GetNodeById(currentDialogue, choice.nextNodeId);
+            ShowNode(nextNode);
+        }
+
+        private float GetTextSpeed()
+        {
+            var sm = SceneInjector.Instance?.RootScope?.Resolve<SettingsManager>();
+            if (sm != null && sm.Settings != null)
+                return Mathf.Clamp(sm.Settings.dialogueTextSpeed, 0.01f, 0.15f);
+            return dialogueConfig != null ? dialogueConfig.DefaultTextSpeed : 0.05f;
+        }
+
+        private bool IsAutoDialogueEnabled()
+        {
+            var sm = SceneInjector.Instance?.RootScope?.Resolve<SettingsManager>();
+            return sm != null && sm.Settings != null && sm.Settings.autoDialogue;
+        }
+
+        private float GetAutoDialogueDelay()
+        {
+            var sm = SceneInjector.Instance?.RootScope?.Resolve<SettingsManager>();
+            if (sm != null && sm.Settings != null) return Mathf.Clamp(sm.Settings.autoDialogueDelay, 0.5f, 10f);
+            return 2f;
+        }
+
+        private IEnumerator AutoAdvanceTimer()
+        {
+            yield return new WaitForSeconds(GetAutoDialogueDelay());
+            if (state == DialogueState.Showing) HandleClick();
+        }
+
+        private IEnumerator TypeText(string text)
+        {
+            if (typeCoroutine != null) StopCoroutine(typeCoroutine);
+
+            if (dialogueUI != null) dialogueUI.SetDialogueText("");
+            else yield break;
+
+            state = DialogueState.Typing;
+            char[] characters = text.ToCharArray();
+
+            for (int i = 0; i < characters.Length; i++)
+            {
+                if (state == DialogueState.Choosing) { typeCoroutine = null; yield break; }
+
+                if (state == DialogueState.Showing)
+                {
+                    if (dialogueUI != null) dialogueUI.SetDialogueText(text);
+                    state = DialogueState.Showing;
+                    typeCoroutine = null;
+
+                    if (IsAutoDialogueEnabled()) StartCoroutine(AutoAdvanceTimer());
+
+                    yield return new WaitUntil(() => state != DialogueState.Showing);
+                    if (state == DialogueState.Choosing) yield break;
+                    if (!isDialogueActive) yield break;
+
+                    if (!string.IsNullOrEmpty(currentNode?.nextNodeId))
+                        ShowNode(fileManager.GetNodeById(currentDialogue, currentNode.nextNodeId));
+                    else EndDialogue();
+                    yield break;
+                }
+
+                if (dialogueUI != null) dialogueUI.AppendText(characters[i].ToString());
+                yield return new WaitForSeconds(GetTextSpeed());
+            }
+
+            state = DialogueState.Showing;
+            typeCoroutine = null;
+
+            if (IsAutoDialogueEnabled()) StartCoroutine(AutoAdvanceTimer());
+
+            yield return new WaitUntil(() => state != DialogueState.Showing);
+            if (state == DialogueState.Choosing) yield break;
+            if (!isDialogueActive) yield break;
+
+            if (!string.IsNullOrEmpty(currentNode?.nextNodeId))
+                ShowNode(fileManager.GetNodeById(currentDialogue, currentNode.nextNodeId));
+            else EndDialogue();
+        }
+
+        private int GetNodeId(DialogueNode node)
+        {
+            if (node == null || currentDialogue == null) return -1;
+            for (int i = 0; i < currentDialogue.Length; i++)
+                if (currentDialogue[i] == node) return i;
+            return -1;
+        }
+
+        public void SetHoldSkip(bool active)
+        {
+            holdSkipRequested = active;
+
+            if (active)
+            {
+                if (holdSkipCoroutine == null && !isSkipping && isDialogueActive && state != DialogueState.Choosing)
+                    holdSkipCoroutine = StartCoroutine(HoldSkipCoroutine());
             }
             else
             {
-                Logger.LogError(LogModule.Dialogue, "DialogueConfig не найден в Resources/Configs/ или Resources/");
+                if (holdSkipCoroutine != null) { StopCoroutine(holdSkipCoroutine); holdSkipCoroutine = null; }
             }
         }
-    }
 
-    #endregion
-
-    #region Skip Button
-
-    private void SetupSkipButton()
-    {
-        string buttonPanelName = dialogueConfig != null ? dialogueConfig.buttonPanelName : "ButtonPanel";
-        string skipName = dialogueConfig != null ? dialogueConfig.skipButtonName : "SkipButton";
-
-        GameObject buttonPanel = GameObject.Find(buttonPanelName);
-        if (buttonPanel == null)
+        private IEnumerator HoldSkipCoroutine()
         {
-            Logger.LogWarning(LogModule.Dialogue, $"ButtonPanel {buttonPanelName} не найден");
-            return;
-        }
-
-        Transform skipButtonTransform = buttonPanel.transform.Find(skipName);
-        if (skipButtonTransform == null)
-        {
-            Logger.LogWarning(LogModule.Dialogue, $"SkipButton {skipName} не найден в {buttonPanelName}");
-            return;
-        }
-
-        skipButtonGameObject = skipButtonTransform.gameObject;
-        skipButton = skipButtonTransform.GetComponent<Button>();
-        if (skipButton == null) return;
-
-        skipButtonCanvasGroup = skipButtonGameObject.GetComponent<CanvasGroup>();
-        if (skipButtonCanvasGroup == null)
-        {
-            skipButtonCanvasGroup = skipButtonGameObject.AddComponent<CanvasGroup>();
-        }
-
-        skipButton.enabled = true;
-
-        skipButton.onClick.RemoveAllListeners();
-        skipButton.onClick.AddListener(StartSkip);
-
-        skipButtonCanvasGroup.alpha = 0f;
-        skipButtonCanvasGroup.blocksRaycasts = false;
-        skipButtonCanvasGroup.interactable = false;
-
-        if (dialogueConfig != null && !string.IsNullOrEmpty(dialogueConfig.skipButtonText))
-        {
-            var text = skipButton.GetComponentInChildren<TMP_Text>();
-            if (text != null) text.text = dialogueConfig.skipButtonText;
-        }
-
-        Logger.Log(LogModule.Dialogue, "SkipButton настроен");
-    }
-
-    private void UpdateSkipButtonVisibility()
-    {
-        if (skipButtonGameObject == null || skipButton == null || skipButtonCanvasGroup == null) return;
-
-        bool shouldBeVisible = isInDialogue && !isChoosing && !isSkipping;
-
-        if (dialogueConfig != null && !dialogueConfig.autoShowSkipButton)
-        {
-            shouldBeVisible = false;
-        }
-
-        skipButtonCanvasGroup.alpha = shouldBeVisible ? 1f : 0f;
-        skipButtonCanvasGroup.blocksRaycasts = shouldBeVisible;
-        skipButtonCanvasGroup.interactable = shouldBeVisible;
-
-        if (shouldBeVisible)
-        {
-            skipButton.enabled = true;
-        }
-    }
-
-    private void StartSkip()
-    {
-        if (!isInDialogue || isChoosing || isSkipping) return;
-        Logger.Log(LogModule.Dialogue, "Начат пропуск диалога");
-        StartCoroutine(SkipDialogueCoroutine());
-    }
-
-    private IEnumerator SkipDialogueCoroutine()
-    {
-        isSkipping = true;
-
-        if (skipButtonCanvasGroup != null)
-        {
-            skipButtonCanvasGroup.alpha = 0f;
-            skipButtonCanvasGroup.blocksRaycasts = false;
-            skipButtonCanvasGroup.interactable = false;
-        }
-
-        if (skipButton != null)
-        {
-            skipButton.enabled = true;
-        }
-
-        if (skipButton != null && dialogueConfig != null && !string.IsNullOrEmpty(dialogueConfig.skipButtonTextActive))
-        {
-            var text = skipButton.GetComponentInChildren<TMP_Text>();
-            if (text != null) text.text = dialogueConfig.skipButtonTextActive;
-        }
-
-        if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            Logger.Log(LogModule.Dialogue, $"Пропуск: currentLineIndex = {currentLineIndex}");
-        }
-
-        int maxIterations = dialogueConfig != null ? dialogueConfig.maxSkipIterations : 100;
-        int iterations = 0;
-        int lastIndex = -1;
-        int stuckCounter = 0;
-
-        while (isInDialogue && !isChoosing && iterations < maxIterations)
-        {
-            iterations++;
-
-            if (currentLineIndex >= fileManager.LineCount)
+            while (holdSkipRequested && isDialogueActive && !isSkipping)
             {
-                EndDialogue();
-                break;
-            }
+                if (state == DialogueState.Choosing) break;
 
-            if (currentLineIndex == lastIndex)
-            {
-                stuckCounter++;
-                if (stuckCounter > 5)
+                if (state == DialogueState.Typing) { SkipTyping(); yield return null; continue; }
+                if (state != DialogueState.Showing) { yield return null; continue; }
+
+                float elapsed = 0f;
+                while (elapsed < holdSkipInterval)
                 {
-                    if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
+                    if (!holdSkipRequested || !isDialogueActive || state != DialogueState.Showing) break;
+                    elapsed += Time.unscaledDeltaTime;
+                    yield return null;
+                }
+
+                if (!holdSkipRequested || !isDialogueActive) break;
+                if (state != DialogueState.Showing) continue;
+
+                HandleClick();
+                yield return null;
+            }
+            holdSkipCoroutine = null;
+        }
+
+        public void StartSkip()
+        {
+            if (!isDialogueActive) return;
+            if (state == DialogueState.Choosing) return;
+            if (isSkipping) return;
+
+            if (skipCoroutine != null) StopCoroutine(skipCoroutine);
+            skipCoroutine = StartCoroutine(SkipDialogueCoroutine());
+        }
+
+        private IEnumerator SkipDialogueCoroutine()
+        {
+            isSkipping = true;
+            int iterations = 0;
+            int lastNodeId = -1;
+
+            if (typeCoroutine != null)
+            {
+                StopCoroutine(typeCoroutine);
+                typeCoroutine = null;
+                if (dialogueUI != null && currentNode != null) dialogueUI.SetDialogueText(currentNode.text);
+                state = DialogueState.Showing;
+            }
+
+            int maxSkip = dialogueConfig != null ? dialogueConfig.MaxSkipIterations : 100;
+            float skipDelay = dialogueConfig != null ? dialogueConfig.SkipDelay : 0.1f;
+
+            while (isDialogueActive && iterations < maxSkip)
+            {
+                iterations++;
+
+                if (state == DialogueState.Choosing) break;
+
+                if (state == DialogueState.Typing)
+                {
+                    if (typeCoroutine != null) { StopCoroutine(typeCoroutine); typeCoroutine = null; }
+                    if (dialogueUI != null && currentNode != null) dialogueUI.SetDialogueText(currentNode.text);
+                    state = DialogueState.Showing;
+                }
+
+                if (state == DialogueState.Showing)
+                {
+                    yield return new WaitForSeconds(skipDelay);
+                    if (state == DialogueState.Choosing) break;
+
+                    state = DialogueState.Idle;
+
+                    if (!string.IsNullOrEmpty(currentNode?.nextNodeId))
                     {
-                        Logger.LogWarning(LogModule.Dialogue, "Пропуск завис, принудительное завершение");
+                        DialogueNode nextNode = fileManager.GetNodeById(currentDialogue, currentNode.nextNodeId);
+                        if (nextNode != null)
+                        {
+                            int currentNodeId = GetNodeId(currentNode);
+                            ShowNode(nextNode);
+                            if (state == DialogueState.Choosing) break;
+
+                            int nextNodeId = GetNodeId(nextNode);
+                            if (currentNodeId == lastNodeId && currentNodeId == nextNodeId) break;
+                            lastNodeId = currentNodeId;
+                        }
+                        else { EndDialogue(); break; }
                     }
-                    EndDialogue();
-                    break;
+                    else { EndDialogue(); break; }
                 }
-            }
-            else
-            {
-                stuckCounter = 0;
-                lastIndex = currentLineIndex;
+                else break;
             }
 
-            int indexBefore = currentLineIndex;
-            OnTap();
+            isSkipping = false;
+            skipCoroutine = null;
 
-            if (isChoosing)
-            {
-                if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-                {
-                    Logger.Log(LogModule.Dialogue, "Пропуск: появилось меню выбора, остановка");
-                }
-                break;
-            }
-
-            if (!isInDialogue)
-            {
-                if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-                {
-                    Logger.Log(LogModule.Dialogue, "Пропуск: диалог завершен");
-                }
-                break;
-            }
-
-            if (currentLineIndex == indexBefore && !isChoosing)
-            {
-                if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-                {
-                    Logger.Log(LogModule.Dialogue, "Пропуск: индекс не изменился, завершение диалога");
-                }
-                EndDialogue();
-                break;
-            }
-
-            float delay = dialogueConfig != null ? dialogueConfig.skipDelay : 0.05f;
-            yield return new WaitForSeconds(delay);
+            if (skipButton != null) skipButton.gameObject.SetActive(isDialogueActive && state != DialogueState.Choosing);
         }
 
-        if (skipButton != null)
+        public void UpdateCurrentLocation()
         {
-            var text = skipButton.GetComponentInChildren<TMP_Text>();
-            if (text != null && dialogueConfig != null && !string.IsNullOrEmpty(dialogueConfig.skipButtonText))
-            {
-                text.text = dialogueConfig.skipButtonText;
-            }
+            string worldTag = dialogueConfig != null ? dialogueConfig.WorldTag : "World";
+            GameObject world = GameObject.FindGameObjectWithTag(worldTag);
 
-            skipButton.enabled = true;
-        }
-
-        isSkipping = false;
-        UpdateSkipButtonVisibility();
-
-        if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            Logger.Log(LogModule.Dialogue, $"Пропуск завершен: currentLineIndex = {currentLineIndex}");
-        }
-    }
-
-    public void ResetSkipButtonState()
-    {
-        isSkipping = false;
-
-        if (skipButton != null)
-        {
-            skipButton.enabled = true;
-
-            var text = skipButton.GetComponentInChildren<TMP_Text>();
-            if (text != null && dialogueConfig != null && !string.IsNullOrEmpty(dialogueConfig.skipButtonText))
-            {
-                text.text = dialogueConfig.skipButtonText;
-            }
-
-            if (skipButtonCanvasGroup != null)
-            {
-                skipButtonCanvasGroup.alpha = 0f;
-                skipButtonCanvasGroup.blocksRaycasts = false;
-                skipButtonCanvasGroup.interactable = false;
-            }
-
-            skipButton.onClick.RemoveAllListeners();
-            skipButton.onClick.AddListener(StartSkip);
-        }
-
-        if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            Logger.Log(LogModule.Dialogue, "Состояние SkipButton сброшено");
-        }
-    }
-
-    #endregion
-
-    #region Automatic Component Finding
-
-    private GameObject FirstCharactersArea;
-    private GameObject SecondCharactersArea;
-
-    private void AutoFindComponents()
-    {
-        FindPanelComponents();
-        ValidateComponents();
-    }
-
-    private void FindPanelComponents()
-    {
-        string dPanelTag = dialogueConfig != null ? dialogueConfig.dialoguePanelTag : "DialoguePanel";
-        string cPanelTag = dialogueConfig != null ? dialogueConfig.choicePanelTag : "ChoicePanel";
-        string sPanelTag = dialogueConfig != null ? dialogueConfig.speakerNamePanel : "SpeakerNamePanel";
-        string fCharTag = dialogueConfig != null ? dialogueConfig.firstCharactersTag : "FirstCharactersTag";
-        string sCharTag = dialogueConfig != null ? dialogueConfig.secondCharactersTag : "SecondCharactersTag";
-        string pDialTag = dialogueConfig != null ? dialogueConfig.panelDialogueTag : "Dialogue";
-
-        GameObject dialoguePanel = FindByTagOrName(dPanelTag, "DialoguePanel");
-        GameObject choicePanel = FindByTagOrName(cPanelTag, "ChoicePanel");
-        GameObject speakerPanel = FindByTagOrName(sPanelTag, "SpeakerNamePanel");
-        FirstCharactersArea = FindByTagOrName(fCharTag, "FirstCharactersTag");
-        SecondCharactersArea = FindByTagOrName(sCharTag, "SecondCharactersTag");
-        GameObject PanelDialogue = FindByTagOrName(pDialTag, "Dialogue");
-
-        TMP_Text dialogueText = null;
-        TMP_Text speakerNameText = null;
-        Button continueButton = null;
-        RadialMenu radialMenu = null;
-
-        if (dialoguePanel != null)
-        {
-            dialogueText = dialoguePanel.GetComponentInChildren<TMP_Text>();
-            continueButton = dialoguePanel.GetComponentInChildren<Button>();
-        }
-        if (speakerPanel != null)
-        {
-            speakerNameText = speakerPanel.GetComponentInChildren<TMP_Text>();
-        }
-        if (choicePanel != null && choicePanel.TryGetComponent(out RadialMenu rm))
-        {
-            radialMenu = rm;
-            radialMenu.textBeginner = this;
-        }
-
-        if (dialogueUI != null)
-        {
-            dialogueUI.SetupReferences(
-                dialogueText,
-                speakerNameText,
-                dialoguePanel,
-                speakerPanel,
-                choicePanel,
-                PanelDialogue,
-                continueButton,
-                radialMenu
-            );
-        }
-
-        if (blackPanelAnimator == null)
-        {
-            string blackTag = dialogueConfig != null ? dialogueConfig.blackPanelTag : "BlackPanel";
-            var blackPanel = FindByTagOrName(blackTag, "BlackPanel");
-            if (blackPanel != null)
-            {
-                blackPanelAnimator = blackPanel.GetComponent<Animator>();
-            }
-        }
-
-        Logger.Log(LogModule.Dialogue, "Компоненты найдены автоматически");
-    }
-
-    private GameObject FindByTagOrName(string tag, string name)
-    {
-        GameObject obj = null;
-
-        try
-        {
-            obj = GameObject.FindGameObjectWithTag(tag);
-        }
-        catch { }
-
-        if (obj == null)
-        {
-            obj = GameObject.Find(name);
-        }
-
-        if (obj == null && dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            Logger.LogWarning(LogModule.Dialogue, $"Компонент не найден: {tag}/{name}");
-        }
-        return obj;
-    }
-
-    private void ValidateComponents()
-    {
-        if (dialogueUI == null || dialogueUI.DialoguePanel == null)
-        {
-            Logger.LogError(LogModule.Dialogue, "DialoguePanel не найден. Убедитесь, что у него есть тег 'DialoguePanel'");
-        }
-        if (dialogueUI == null || dialogueUI.DialogueText == null)
-        {
-            Logger.LogError(LogModule.Dialogue, "DialogueText не найден внутри DialoguePanel");
-        }
-        if (dialogueUI == null || dialogueUI.ChoicePanel == null)
-        {
-            Logger.LogError(LogModule.Dialogue, "ChoicePanel не найден. Убедитесь, что у него есть тег 'ChoicePanel'");
-        }
-    }
-
-    #endregion
-
-    #region Initialization
-
-    public void StartNewGame()
-    {
-        if (characterManager != null)
-        {
-            characterManager.ClearAllCharacters();
-        }
-
-        fileManager.InitializeFilePaths();
-        LoadDialogueFromFile(0);
-        UpdateCurrentLocation();
-        isSkipping = false;
-        ResetSkipButtonState();
-
-        Logger.Log(LogModule.Dialogue, "Начата новая игра");
-    }
-
-    #endregion
-
-    #region Public Methods (UI Callbacks)
-
-    public void OnTap()
-    {
-        if (isInDialogue)
-        {
-            if (currentCharacterName == null)
-            {
-                SetCurrentCharacter(characterManager != null && characterManager.Characters.Count > 0
-                    ? characterManager.Characters[0].name
-                    : "Trixie");
-            }
-            if (characterManager != null && !characterManager.IsCharacterSpawned)
-            {
-                characterManager.ActivateCharacter(currentCharacterName);
-            }
-        }
-        CheckForFinishFlag();
-
-        if (IsChoiceLine())
-        {
-            ShowChoiceMenu();
-            return;
-        }
-        if (IsDialogueEnded())
-        {
-            EndDialogue();
-            return;
-        }
-        DisplayNextDialogueLine();
-    }
-
-    public void StartDialogueWithFile(int fileIndex)
-    {
-        if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            Logger.Log(LogModule.Dialogue, $"StartDialogueWithFile вызван с индексом: {fileIndex}");
-        }
-
-        ResetSkipButtonState();
-        isSkipping = false;
-
-        MoveCharacterToSpeakerArea();
-
-        if (fileManager.GetFilePaths().Count == 0)
-        {
-            fileManager.InitializeFilePaths();
-        }
-
-        LoadDialogueFromFile(fileIndex);
-
-        if (dialogueUI != null)
-        {
-            dialogueUI.SetPanelDialogueActive(true);
-
-            GameObject panelDialogue = GameObject.FindGameObjectWithTag("Dialogue");
-            if (panelDialogue != null)
-            {
-                CanvasGroup cg = panelDialogue.GetComponent<CanvasGroup>();
-                if (cg != null)
-                {
-                    cg.alpha = 1f;
-                    cg.blocksRaycasts = true;
-                    cg.interactable = true;
-                    Logger.Log(LogModule.Dialogue, "PanelDialogue принудительно активирован");
-                }
-            }
-
-            Logger.Log(LogModule.Dialogue, "PanelDialogue активирован через CanvasGroup");
-        }
-
-        currentLineIndex = 0;
-        isInDialogue = true;
-    }
-
-    public void MakeChoice(int choiceIndex)
-    {
-        isChoosing = false;
-        string targetChoice = GetMarkerChoice() + choiceIndex.ToString();
-
-        for (int i = 0; i < fileManager.LineCount; i++)
-        {
-            if (fileManager.GetLine(i) == targetChoice)
-            {
-                currentLineIndex = i + 1;
-                if (dialogueUI != null)
-                {
-                    dialogueUI.SetContinueButtonEnabled(true);
-                }
-
-                string line = fileManager.GetLine(currentLineIndex);
-                if (!string.IsNullOrEmpty(line) && dialogueUI != null)
-                {
-                    string[] parts = line.Split(GetDialogueSeparator());
-                    if (parts.Length > 0)
-                    {
-                        dialogueUI.SetDialogueText(parts[0], parts.Length > 1 ? parts[1] : "");
-                    }
-                }
-
-                if (dialogueUI != null)
-                {
-                    dialogueUI.SetPanelDialogueActive(true);
-                }
-                break;
-            }
-        }
-
-        Logger.Log(LogModule.Dialogue, $"Выбран вариант {choiceIndex}");
-    }
-
-    public void SetCurrentCharacter(string characterName)
-    {
-        currentCharacterName = characterName;
-        if (characterManager != null)
-        {
-            characterManager.SetCurrentCharacter(characterName);
-        }
-        Logger.Log(LogModule.Dialogue, $"Текущий персонаж: {characterName}");
-    }
-
-    public void ToggleDialogue(int mode)
-    {
-        if (mode != 2 && characterManager != null)
-        {
-            characterManager.ToggleInteraction(currentCharacterName);
-        }
-        if (mode == 0)
-        {
-            if (dialogueUI != null)
-            {
-                dialogueUI.ClearDialogueText();
-                dialogueUI.SetPanelDialogueActive(false);
-            }
-        }
-        isInDialogue = dialogueUI != null && dialogueUI.IsPanelDialogueActive();
-
-        Logger.Log(LogModule.Dialogue, $"Переключение диалога в режим {mode}, состояние: {isInDialogue}");
-    }
-
-    public void LoadAndContinue()
-    {
-        if (!isInDialogue)
-        {
-            ToggleDialogue(1);
-        }
-        currentLineIndex--;
-        if (isInDialogue)
-        {
-            OnTap();
-        }
-        if (blackPanelAnimator != null)
-        {
-            blackPanelAnimator.SetTrigger("1");
-        }
-    }
-
-    public void LoadDialogueFromFile(int fileIndex)
-    {
-        currentLineIndex = 0;
-        fileManager.LoadDialogueFromFile(fileIndex);
-        Logger.Log(LogModule.Dialogue, $"Загружен файл диалога с индексом {fileIndex}");
-    }
-
-    #endregion
-
-    #region Proxy Methods for CharacterManager
-
-    public void MoveCharacterToCurrentScene()
-    {
-        if (characterManager != null)
-        {
-            characterManager.MoveCharacterToCurrentScene();
-        }
-    }
-
-    public void MoveCharacterToActiveLocationReference()
-    {
-        if (characterManager != null)
-        {
-            characterManager.MoveCharacterToActiveLocationReference();
-        }
-    }
-
-    public void MoveCharacterToSpeakerArea()
-    {
-        if (characterManager != null)
-        {
-            characterManager.MoveCharacterToSpeakerArea();
-        }
-    }
-
-    public void MoveCharacterToLocation(GameObject location)
-    {
-        if (characterManager != null)
-        {
-            characterManager.MoveCharacterToLocation(location);
-        }
-    }
-
-    public void MoveCharacterToPosition(Vector3 position, Quaternion rotation, Vector3 scale)
-    {
-        if (characterManager != null)
-        {
-            characterManager.MoveCharacterToPosition(position, rotation, scale);
-        }
-    }
-
-    public void MoveCharacterToCurrentLocationReference()
-    {
-        if (characterManager != null)
-        {
-            characterManager.MoveCharacterToCurrentLocationReference();
-        }
-    }
-
-    public void ClearAllCharacters()
-    {
-        if (characterManager != null)
-        {
-            characterManager.ClearAllCharacters();
-        }
-    }
-
-    public GameObject GetCurrentCharacter()
-    {
-        return characterManager != null ? characterManager.CurrentCharacter : null;
-    }
-
-    public bool IsCharacterSpawned()
-    {
-        return characterManager != null && characterManager.IsCharacterSpawned;
-    }
-
-    #endregion
-
-    #region Helper Methods
-
-    private char GetDialogueSeparator()
-    {
-        return dialogueConfig != null ? dialogueConfig.GetDialogueSeparator() : DialogueData.Constants.DIALOGUE_SEPARATOR;
-    }
-
-    private string GetMarkerChoice()
-    {
-        return dialogueConfig != null ? dialogueConfig.GetMarkerChoice() : DialogueData.Constants.MARKER_CHOICE;
-    }
-
-    private string GetMarkerFinish()
-    {
-        return dialogueConfig != null ? dialogueConfig.GetMarkerFinish() : DialogueData.Constants.MARKER_FINISH;
-    }
-
-    private string GetMarkerContinue()
-    {
-        return dialogueConfig != null ? dialogueConfig.GetMarkerContinue() : DialogueData.Constants.MARKER_CONTINUE;
-    }
-
-    private string GetMarkerEnd()
-    {
-        return dialogueConfig != null ? dialogueConfig.GetMarkerEnd() : DialogueData.Constants.MARKER_END;
-    }
-
-    #endregion
-
-    #region Dialogue Logic
-
-    public void ForceResetDialogue()
-    {
-        isInDialogue = false;
-        isChoosing = false;
-        isSkipping = false;
-
-        if (dialogueUI != null)
-        {
-            dialogueUI.SetPanelDialogueActive(false);
-            dialogueUI.ClearDialogueText();
-        }
-
-        ResetSkipButtonState();
-
-        if (dialogueConfig != null && dialogueConfig.enableDebugLogs)
-        {
-            Logger.Log(LogModule.Dialogue, "ForceResetDialogue вызван");
-        }
-    }
-
-    private void CheckForFinishFlag()
-    {
-        if (currentLineIndex + 1 >= fileManager.LineCount)
-        {
-            return;
-        }
-        if (fileManager.GetLine(currentLineIndex + 1) == GetMarkerFinish())
-        {
-            FindAndMoveToContinueLine();
-        }
-    }
-
-    private void FindAndMoveToContinueLine()
-    {
-        string markerContinue = GetMarkerContinue();
-        for (int i = 0; i < fileManager.LineCount; i++)
-        {
-            if (fileManager.GetLine(i) == markerContinue)
-            {
-                currentLineIndex = i + 1;
-                if (!hasDeleted && dialogueConfig != null && dialogueConfig.deleteReadLines)
-                {
-                    fileManager.DeleteLines(currentLineIndex);
-                    currentLineIndex = 0;
-                    hasDeleted = true;
-                }
-                break;
-            }
-        }
-    }
-
-    private bool IsChoiceLine()
-    {
-        if (currentLineIndex >= fileManager.LineCount)
-        {
-            return false;
-        }
-        string[] parts = fileManager.GetLine(currentLineIndex).Split(GetDialogueSeparator());
-        return parts.Length >= 2 && parts[parts.Length - 2] == GetMarkerChoice();
-    }
-
-    private bool IsDialogueEnded()
-    {
-        if (currentLineIndex >= fileManager.LineCount)
-        {
-            return true;
-        }
-        string[] parts = fileManager.GetLine(currentLineIndex).Split(GetDialogueSeparator());
-        return parts.Length >= 1 && parts[parts.Length - 1] == GetMarkerEnd();
-    }
-
-    private void DisplayNextDialogueLine()
-    {
-        if (currentLineIndex >= fileManager.LineCount)
-        {
-            return;
-        }
-
-        string line = fileManager.GetLine(currentLineIndex);
-        if (!string.IsNullOrEmpty(line) && dialogueUI != null)
-        {
-            string[] parts = line.Split(GetDialogueSeparator());
-            string text = parts.Length > 0 ? parts[0] : "";
-            string speaker = parts.Length > 1 ? parts[1] : "";
-            dialogueUI.SetDialogueText(text, speaker);
-        }
-        currentLineIndex++;
-    }
-
-    #endregion
-
-    #region UI Management
-
-    private void ShowChoiceMenu()
-    {
-        isChoosing = true;
-        hasDeleted = false;
-
-        if (dialogueUI != null)
-        {
-            string line = fileManager.GetLine(currentLineIndex);
-            if (!string.IsNullOrEmpty(line))
-            {
-                string[] choices = line.Split(GetDialogueSeparator());
-                var choicesList = new List<string>();
-                string markerChoice = GetMarkerChoice();
-                foreach (string choice in choices)
-                {
-                    if (choice != markerChoice && !string.IsNullOrEmpty(choice))
-                    {
-                        choicesList.Add(choice);
-                    }
-                }
-
-                dialogueUI.SetupChoices(choicesList.ToArray(), (int index) =>
-                {
-                    MakeChoice(index + 1);
-                });
-
-                Logger.Log(LogModule.Dialogue, $"Показано меню выбора с {choicesList.Count} вариантами");
-            }
-
-            dialogueUI.SetPanelDialogueActive(true);
-            dialogueUI.SetContinueButtonEnabled(false);
-        }
-    }
-
-    private void EndDialogue()
-    {
-        if (characterManager != null)
-        {
-            characterManager.MoveCharacterToCurrentLocationReference();
-        }
-
-        if (dialogueUI != null)
-        {
-            dialogueUI.SetPanelDialogueActive(false);
-            dialogueUI.ClearDialogueText();
-            dialogueUI.SetContinueButtonEnabled(false);
-        }
-
-        isInDialogue = false;
-        isChoosing = false;
-        isSkipping = false;
-        currentLineIndex = 0;
-        hasDeleted = false;
-
-        ResetSkipButtonState();
-
-        Logger.Log(LogModule.Dialogue, "Диалог завершен");
-
-        EventManager.Instance?.TriggerEvent(EventTriggerType.DialogueEnd,
-            new EventContext().WithDialogue(currentCharacterName ?? "unknown"));
-    }
-
-    #endregion
-
-    #region Utility Methods
-
-    public void UpdateCurrentLocation()
-    {
-        Logger.Log(LogModule.Dialogue, "Обновление текущей локации");
-
-        string worldTag = dialogueConfig != null ? dialogueConfig.worldTag : "World";
-        GameObject world = GameObject.FindGameObjectWithTag(worldTag);
-
-        if (world == null)
-        {
-            world = GameObject.Find("World");
             if (world == null)
             {
-                Logger.LogError(LogModule.Dialogue, "World не найден");
-                return;
-            }
-        }
-        Logger.Log(LogModule.Dialogue, $"World найден: {world.name}");
-
-        currentRegion = FindActiveChildByTagOrName(world, "Region", "Region");
-        if (currentRegion == null)
-        {
-            foreach (Transform child in world.transform)
-            {
-                if (child.CompareTag("Region") && child.gameObject.activeInHierarchy)
-                {
-                    currentRegion = child.gameObject;
-                    Logger.Log(LogModule.Dialogue, $"Region найден прямым поиском: {currentRegion.name}");
-                    break;
-                }
+                world = GameObject.Find(dialogueConfig != null ? dialogueConfig.WorldObjectName : "World");
+                if (world == null) return;
             }
 
+            currentRegion = FindActiveChildByTagOrName(world, dialogueConfig != null ? dialogueConfig.RegionTag : "Region", "Region");
             if (currentRegion == null)
             {
-                Logger.LogWarning(LogModule.Dialogue, "Активный Region не найден в World");
-            }
-        }
-        else
-        {
-            Logger.Log(LogModule.Dialogue, $"Region найден: {currentRegion.name}");
-        }
-
-        if (currentRegion != null)
-        {
-            currentLocation = FindActiveChildByTagOrName(currentRegion, "Location", "Location");
-            if (currentLocation == null)
-            {
-                foreach (Transform child in currentRegion.transform)
+                foreach (Transform child in world.transform)
                 {
-                    if (child.CompareTag("Location") && child.gameObject.activeInHierarchy)
-                    {
-                        currentLocation = child.gameObject;
-                        Logger.Log(LogModule.Dialogue, $"Location найден прямым поиском: {currentLocation.name}");
-                        break;
-                    }
+                    if (child.CompareTag(dialogueConfig != null ? dialogueConfig.RegionTag : "Region") && child.gameObject.activeInHierarchy)
+                    { currentRegion = child.gameObject; break; }
                 }
+            }
 
+            if (currentRegion != null)
+            {
+                currentLocation = FindActiveChildByTagOrName(currentRegion, dialogueConfig != null ? dialogueConfig.LocationTag : "Location", "Location");
                 if (currentLocation == null)
                 {
-                    Logger.LogWarning(LogModule.Dialogue, $"Активный Location не найден в Region: {currentRegion.name}");
+                    foreach (Transform child in currentRegion.transform)
+                    {
+                        if (child.CompareTag(dialogueConfig != null ? dialogueConfig.LocationTag : "Location") && child.gameObject.activeInHierarchy)
+                        { currentLocation = child.gameObject; break; }
+                    }
                 }
             }
-            else
-            {
-                Logger.Log(LogModule.Dialogue, $"Location найден: {currentLocation.name}");
-            }
         }
 
-        PrintLocationHierarchy();
-    }
-
-    private GameObject FindActiveChildByTagOrName(GameObject parent, string tag, string name)
-    {
-        if (parent == null) return null;
-
-        foreach (Transform child in parent.transform)
+        private GameObject FindActiveChildByTagOrName(GameObject parent, string tag, string name)
         {
-            if (child.CompareTag(tag) && child.gameObject.activeInHierarchy)
+            if (parent == null) return null;
+            foreach (Transform child in parent.transform)
             {
-                return child.gameObject;
+                if (child.CompareTag(tag) && child.gameObject.activeInHierarchy) return child.gameObject;
+                if (child.name == name && child.gameObject.activeInHierarchy) return child.gameObject;
             }
+            return null;
+        }
 
-            if (child.name == name && child.gameObject.activeInHierarchy)
+        private void ProcessActions(DialogueAction[] actions)
+        {
+            if (actions == null) return;
+
+            foreach (DialogueAction action in actions)
             {
-                return child.gameObject;
+                switch (action.type)
+                {
+                    case "SetFlag": _flagManager?.SetFlag(action.target, bool.Parse(action.value)); break;
+                    case "StartQuest": _questManager?.StartQuest(action.target); break;
+                    case "AddItem": AddItemByName(action.target); break;
+                    case "CompleteQuest": _questManager?.CompleteQuest(action.target); break;
+                    case "CompleteDialogue": _dialogueTracker?.MarkDialogueCompleted(action.target); break;
+                    case "UnlockDialogue": _dialogueTracker?.SetDialogueLock(action.target, false); break;
+                    case "LockDialogue": _dialogueTracker?.SetDialogueLock(action.target, true); break;
+                    case "ResetDialogue": _dialogueTracker?.ResetDialogue(action.target); break;
+                    case "SetNextDialogue": _dialogueTracker?.SetNextDialogue(action.target, action.value); break;
+                    case "CheckDialogueStatus":
+                        bool isCompleted = _dialogueTracker?.IsDialogueCompleted(action.target) ?? false;
+                        if (!string.IsNullOrEmpty(action.value)) _flagManager?.SetFlag(action.value, isCompleted);
+                        break;
+                    default:
+                        Logger.LogWarning(LogModule.Dialogue, $"Неизвестный тип действия: {action.type}");
+                        break;
+                }
             }
         }
-        return null;
+
+        private void AddItemByName(string itemName)
+        {
+            if (string.IsNullOrEmpty(itemName)) return;
+            if (_inventoryUIManager == null) return;
+
+            var db = SceneInjector.Instance?.RootScope?.Resolve<ItemDatabase>();
+            if (db == null) return;
+
+            ItemSO so = db.GetItem(itemName);
+            if (so == null) so = db.GetItemByName(itemName);
+
+            if (so == null)
+            {
+                try
+                {
+#pragma warning disable CS0618
+                    ItemType legacyType = (ItemType)System.Enum.Parse(typeof(ItemType), itemName, true);
+                    so = db.GetItemByLegacyType(legacyType);
+#pragma warning restore CS0618
+                }
+                catch (System.ArgumentException) { }
+            }
+
+            if (so == null) return;
+
+            _inventoryUIManager.AddItem(so, 1);
+        }
+
+        private bool CheckCondition(string condition)
+        {
+            if (string.IsNullOrEmpty(condition)) return true;
+            var tracker = _dialogueTracker;
+
+            if (condition.StartsWith("Flag:"))
+            {
+                string flagName = condition.Substring(5);
+                return _flagManager?.GetFlag(flagName) ?? false;
+            }
+
+            if (condition.StartsWith("DialogueCompleted:"))
+                return tracker?.IsDialogueCompleted(condition.Substring("DialogueCompleted:".Length)) ?? false;
+
+            if (condition.StartsWith("DialogueNotCompleted:"))
+                return !(tracker?.IsDialogueCompleted(condition.Substring("DialogueNotCompleted:".Length)) ?? false);
+
+            if (condition.StartsWith("DialogueUnlocked:"))
+                return !(tracker?.IsDialogueLocked(condition.Substring("DialogueUnlocked:".Length)) ?? true);
+
+            if (condition.StartsWith("DialoguePlayCount:"))
+            {
+                string[] parts = condition.Substring("DialoguePlayCount:".Length).Split('>');
+                if (parts.Length == 2)
+                {
+                    string dialogueId = parts[0];
+                    if (int.TryParse(parts[1], out int minCount))
+                        return (tracker?.GetDialoguePlayCount(dialogueId) ?? 0) >= minCount;
+                }
+                return false;
+            }
+
+            return true;
+        }
+
+        public void EndDialogue()
+        {
+            if (!isDialogueActive && state == DialogueState.Idle) return;
+
+            if (typeCoroutine != null) { StopCoroutine(typeCoroutine); typeCoroutine = null; }
+            if (skipCoroutine != null) { StopCoroutine(skipCoroutine); skipCoroutine = null; }
+            if (holdSkipCoroutine != null) { StopCoroutine(holdSkipCoroutine); holdSkipCoroutine = null; }
+
+            holdSkipRequested = false;
+            isSkipping = false;
+
+            if (characterManager != null)
+                characterManager.MoveCharacterToCurrentLocationReference();
+
+            if (radialMenu != null && radialMenu.IsVisible()) radialMenu.Hide();
+
+            string finishedDialogue = currentDialogueFileName;
+
+            isDialogueActive = false;
+            state = DialogueState.Idle;
+            currentDialogue = null;
+            currentNode = null;
+            currentChoices = null;
+            currentDialogueFileName = null;
+
+            if (dialogueUI != null) dialogueUI.HideDialoguePanel();
+
+            UpdateCurrentLocation();
+
+            if (skipButton != null) skipButton.gameObject.SetActive(false);
+
+            if (!string.IsNullOrEmpty(finishedDialogue))
+            {
+                _eventManager?.TriggerEvent(
+                    EventTriggerType.DialogueEnd,
+                    new EventContext().WithDialogue(finishedDialogue));
+            }
+
+            _saveSystem?.RequestAutoSave();
+        }
+
+        public void HandleClick()
+        {
+            switch (state)
+            {
+                case DialogueState.Typing: state = DialogueState.Showing; break;
+                case DialogueState.Showing: state = DialogueState.Idle; break;
+            }
+        }
+
+        public void SetCurrentCharacter(string characterName)
+        {
+            characterManager?.ShowCharacter(characterName);
+        }
+
+        public void SkipTyping()
+        {
+            if (state == DialogueState.Typing) state = DialogueState.Showing;
+        }
+
+        public void StartDialogueWithFile(int fileIndex)
+        {
+            StartDialogue(GetDialogueFileName(fileIndex));
+        }
+
+        private string GetDialogueFileName(int index)
+        {
+            switch (index)
+            {
+                case 0: return "Prologue";
+                case 1: return "Trixie";
+                default: return $"Dialogue_{index}";
+            }
+        }
+
+        public bool IsDialogueCompleted(string dialogueId) => _dialogueTracker?.IsDialogueCompleted(dialogueId) ?? false;
+        public int GetDialoguePlayCount(string dialogueId) => _dialogueTracker?.GetDialoguePlayCount(dialogueId) ?? 0;
+        public void MarkDialogueCompleted(string dialogueId) => _dialogueTracker?.MarkDialogueCompleted(dialogueId);
+        public void SetDialogueLock(string dialogueId, bool locked) => _dialogueTracker?.SetDialogueLock(dialogueId, locked);
+        public void ResetDialogueStatus(string dialogueId) => _dialogueTracker?.ResetDialogue(dialogueId);
+        public void SaveDialogueStatuses() => _dialogueTracker?.SaveStatuses();
+        public void LoadDialogueStatuses() => _dialogueTracker?.LoadStatuses();
+        public void DebugDialogueStatuses() => _dialogueTracker?.DebugLogAllStatuses();
     }
-
-    private void PrintLocationHierarchy()
-    {
-        Logger.Log(LogModule.Dialogue, "=== Текущая иерархия локаций ===");
-        Logger.Log(LogModule.Dialogue, "World: World");
-
-        if (currentRegion != null)
-            Logger.Log(LogModule.Dialogue, $"Region: {currentRegion.name}");
-        else
-            Logger.Log(LogModule.Dialogue, "Region: None");
-
-        if (currentLocation != null)
-            Logger.Log(LogModule.Dialogue, $"Location: {currentLocation.name}");
-        else
-            Logger.Log(LogModule.Dialogue, "Location: None");
-    }
-
-    #endregion
-
-    #region Public Properties
-
-    public bool IsInDialogue => isInDialogue;
-    public bool IsChoosing => isChoosing;
-    public string CurrentCharacter => currentCharacterName;
-    public GameObject CurrentLocation => currentLocation;
-    public GameObject CurrentRegion => currentRegion;
-
-    #endregion
 }

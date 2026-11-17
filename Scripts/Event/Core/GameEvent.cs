@@ -1,7 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
+using VContainer;
 
-[CreateAssetMenu(fileName = "NewGameEvent", menuName = "Game/Event System/Game Event")]
+[CreateAssetMenu(fileName = "Событие", menuName = "|Система событий|/Событие")]
 public class GameEvent : ScriptableObject
 {
     [Header("Event Identification")]
@@ -12,7 +13,7 @@ public class GameEvent : ScriptableObject
 
     [Header("Trigger Conditions")]
     public EventTriggerType triggerType = EventTriggerType.None;
-    public TriggerCondition triggerCondition;
+    [SerializeReference] public TriggerCondition triggerCondition;
 
     [Header("Execution Control")]
     public ExecutionPolicy executionPolicy = ExecutionPolicy.ExecuteOnce;
@@ -24,43 +25,57 @@ public class GameEvent : ScriptableObject
     [Header("Actions")]
     public bool executeOnce = false;
     public bool executeOnAwake = false;
-    public float delayBeforeExecute = 0f;
-    public List<EventAction> actions = new List<EventAction>();
+    public float delayBeforeExecute = 0.5f;
+    [SerializeReference] public List<EventAction> actions = new List<EventAction>();
 
     [Header("Requirements (AND)")]
-    public List<EventRequirement> requirements = new List<EventRequirement>();
+    [SerializeReference] public List<EventRequirement> requirements = new List<EventRequirement>();
 
     [System.NonSerialized]
     private bool hasBeenExecuted = false;
 
     public bool HasBeenExecuted => hasBeenExecuted;
 
+    private bool ShouldLog
+    {
+        get
+        {
+            var em = EventManagerRef;
+            return em != null && em.logEvents;
+        }
+    }
+
+    private EventManager EventManagerRef => GameLifetimeScope.Current?.Container?.Resolve<EventManager>();
+
     public bool CanExecute(EventContext context)
     {
+        var container = context?.Container;
+        var stateManager = container?.Resolve<EventStateManager>();
+
         if (executionPolicy == ExecutionPolicy.ExecuteOnce)
         {
-            if (EventStateManager.Instance?.IsExecuted(eventID) ?? hasBeenExecuted)
+            if (stateManager?.IsExecuted(eventID) ?? hasBeenExecuted)
             {
-                if (EventManager.Instance != null && EventManager.Instance.logEvents)
-                    Logger.Log(LogModule.Event, $"Событие '{eventID}' уже было выполнено один раз");
+                if (ShouldLog)
+                    Logger.LogVerbose(LogModule.Event, $"Событие '{eventID}' уже было выполнено один раз");
                 return false;
             }
         }
         else if (executionPolicy == ExecutionPolicy.ExecuteMultiple)
         {
-            int count = EventStateManager.Instance?.GetExecutionCount(eventID) ?? 0;
+            int count = stateManager?.GetExecutionCount(eventID) ?? 0;
             if (count >= maxExecutions)
             {
-                if (EventManager.Instance != null && EventManager.Instance.logEvents)
+                if (ShouldLog)
                     Logger.Log(LogModule.Event, $"Событие '{eventID}' достигло максимума выполнений ({maxExecutions})");
                 return false;
             }
         }
         else if (executionPolicy == ExecutionPolicy.ExecutePerSession)
         {
-            if (EventStateManager.Instance?.WasExecutedInSession(eventID) ?? false)
+            if (stateManager?.WasExecutedInSession(eventID) ?? false)
             {
-                if (EventManager.Instance != null && EventManager.Instance.logEvents)
+                if (ShouldLog)
                     Logger.Log(LogModule.Event, $"Событие '{eventID}' уже было выполнено в этой сессии");
                 return false;
             }
@@ -68,10 +83,10 @@ public class GameEvent : ScriptableObject
 
         if (!string.IsNullOrEmpty(dependsOnEventID))
         {
-            bool dependsExecuted = EventStateManager.Instance?.IsExecuted(dependsOnEventID) ?? false;
+            bool dependsExecuted = stateManager?.IsExecuted(dependsOnEventID) ?? false;
             if (!dependsExecuted)
             {
-                if (EventManager.Instance != null && EventManager.Instance.logEvents)
+                if (ShouldLog)
                     Logger.Log(LogModule.Event, $"Событие '{eventID}' зависит от '{dependsOnEventID}', которое не выполнено");
                 return false;
             }
@@ -79,10 +94,10 @@ public class GameEvent : ScriptableObject
 
         if (!string.IsNullOrEmpty(mutuallyExclusiveWithEventID))
         {
-            bool exclusiveExecuted = EventStateManager.Instance?.IsExecuted(mutuallyExclusiveWithEventID) ?? false;
+            bool exclusiveExecuted = stateManager?.IsExecuted(mutuallyExclusiveWithEventID) ?? false;
             if (exclusiveExecuted)
             {
-                if (EventManager.Instance != null && EventManager.Instance.logEvents)
+                if (ShouldLog)
                     Logger.Log(LogModule.Event, $"Событие '{eventID}' взаимоисключающее с '{mutuallyExclusiveWithEventID}', которое уже выполнено");
                 return false;
             }
@@ -92,7 +107,7 @@ public class GameEvent : ScriptableObject
         {
             if (req != null && !req.Check(context))
             {
-                if (EventManager.Instance != null && EventManager.Instance.logEvents)
+                if (ShouldLog)
                     Logger.Log(LogModule.Event, $"Событие '{eventID}' не соответствует требованиям");
                 return false;
             }
@@ -100,7 +115,7 @@ public class GameEvent : ScriptableObject
 
         if (triggerCondition != null && !triggerCondition.Check(context))
         {
-            if (EventManager.Instance != null && EventManager.Instance.logEvents)
+            if (ShouldLog)
                 Logger.Log(LogModule.Event, $"Событие '{eventID}' не соответствует условию триггера");
             return false;
         }
@@ -134,47 +149,40 @@ public class GameEvent : ScriptableObject
 
         hasBeenExecuted = true;
 
-        if (EventStateManager.Instance != null)
-        {
-            EventStateManager.Instance.MarkExecuted(eventID);
-        }
-        else
-        {
-            Logger.LogWarning(LogModule.Event, $"EventStateManager.Instance отсутствует! Состояние события '{eventID}' не сохранено");
-        }
-
         Logger.Log(LogModule.Event, $"Выполняется событие: {eventID} - {eventName}");
 
+        bool anyError = false;
         foreach (var action in actions)
         {
-            if (action != null)
+            if (action == null) continue;
+            try { action.Execute(context); }
+            catch (System.Exception e)
             {
-                try
-                {
-                    action.Execute(context);
-                }
-                catch (System.Exception e)
-                {
-                    Logger.LogError(LogModule.Event, $"Ошибка выполнения действия '{action.actionName}' в событии '{eventID}': {e.Message}");
-                }
+                anyError = true;
+                Logger.LogError(LogModule.Event, $"Ошибка выполнения действия '{action.actionName}' в событии '{eventID}': {e.Message}");
             }
         }
 
-        if (EventManager.Instance != null)
+        if (!anyError)
         {
-            EventManager.Instance.OnEventExecuted?.Invoke(this, context);
+            var stateManager = context?.Container?.Resolve<EventStateManager>();
+            if (stateManager != null) stateManager.MarkExecuted(eventID);
+            else Logger.LogWarning(LogModule.Event, $"EventStateManager недоступен! Состояние события '{eventID}' не сохранено");
         }
+
+        EventManagerRef?.OnEventExecuted?.Invoke(this, context);
     }
 
     public void ResetExecution()
     {
         hasBeenExecuted = false;
-        EventStateManager.Instance?.ResetEvent(eventID);
+        GameLifetimeScope.Current?.Container?.Resolve<EventStateManager>()?.ResetEvent(eventID);
         Logger.Log(LogModule.Event, $"Событие '{eventID}' сброшено");
     }
 
     public bool IsExecuted()
     {
-        return hasBeenExecuted || (EventStateManager.Instance?.IsExecuted(eventID) ?? false);
+        return hasBeenExecuted ||
+               (GameLifetimeScope.Current?.Container?.Resolve<EventStateManager>()?.IsExecuted(eventID) ?? false);
     }
 }

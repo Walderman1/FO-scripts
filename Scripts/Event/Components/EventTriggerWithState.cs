@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using VContainer;
 
 public class EventTriggerWithState : MonoBehaviour
 {
@@ -16,6 +17,9 @@ public class EventTriggerWithState : MonoBehaviour
     [Header("Conditions")]
     public List<EventRequirement> additionalRequirements = new List<EventRequirement>();
 
+    [Inject] private EventStateManager _eventStateManager;
+    [Inject] private IObjectResolver _container;
+
     private bool hasTriggered = false;
 
     private void Start()
@@ -23,79 +27,53 @@ public class EventTriggerWithState : MonoBehaviour
         if (resetOnSceneLoad)
         {
             hasTriggered = false;
-            Logger.Log(LogModule.Event, $"Триггер '{triggerID}' сброшен при загрузке сцены");
         }
         else
         {
-            hasTriggered = EventStateManager.Instance?.IsExecuted($"Trigger_{triggerID}") ?? false;
-            if (hasTriggered)
-            {
-                Logger.Log(LogModule.Event, $"Триггер '{triggerID}' уже был выполнен ранее");
-            }
+            hasTriggered = _eventStateManager?.IsExecuted($"Trigger_{triggerID}") ?? false;
         }
     }
 
     public void Trigger()
     {
-        if (triggerOnlyOnce && hasTriggered)
-        {
-            Logger.Log(LogModule.Event, $"Триггер '{triggerID}' уже выполнен, пропуск");
-            return;
-        }
+        if (triggerOnlyOnce && hasTriggered) return;
 
         foreach (var req in additionalRequirements)
         {
-            if (!req.Check(new EventContext()))
-            {
-                Logger.Log(LogModule.Event, $"Триггер '{triggerID}' не соответствует требованиям");
-                return;
-            }
+            var ctx = new EventContext().WithContainer(_container);
+            if (!req.Check(ctx)) return;
         }
 
         hasTriggered = true;
-        EventStateManager.Instance?.MarkExecuted($"Trigger_{triggerID}");
+        _eventStateManager?.MarkExecuted($"Trigger_{triggerID}");
 
         foreach (var evt in eventsToTrigger)
         {
             if (evt != null)
-            {
                 evt.Execute(new EventContext()
+                    .WithContainer(_container)
                     .WithLocation(gameObject.scene.name)
                     .WithData(this));
-            }
         }
-
-        Logger.Log(LogModule.Event, $"Триггер '{triggerID}' выполнен, запущено {eventsToTrigger.Count} событий");
     }
 
     public void ResetTrigger()
     {
         hasTriggered = false;
-        EventStateManager.Instance?.ResetEvent($"Trigger_{triggerID}");
-        Logger.Log(LogModule.Event, $"Триггер '{triggerID}' сброшен");
+        _eventStateManager?.ResetEvent($"Trigger_{triggerID}");
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player") && triggerType == EventTriggerType.EnterLocation)
-        {
-            Logger.Log(LogModule.Event, $"Игрок вошёл в триггер '{triggerID}'");
             Trigger();
-        }
     }
 
     private void OnMouseDown()
     {
         if (triggerType == EventTriggerType.Custom)
-        {
-            Logger.Log(LogModule.Event, $"Клик по триггеру '{triggerID}'");
             Trigger();
-        }
     }
 
-    public void TriggerCustom()
-    {
-        Logger.Log(LogModule.Event, $"Ручной вызов триггера '{triggerID}'");
-        Trigger();
-    }
+    public void TriggerCustom() => Trigger();
 }

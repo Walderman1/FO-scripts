@@ -42,12 +42,18 @@ public class QuestInstance
 
     public bool IsComplete()
     {
+        bool hasRequired = false;
+
         foreach (var obj in Objectives)
         {
-            if (!obj.isOptional && !obj.IsComplete())
+            if (obj.isOptional) continue;
+            hasRequired = true;
+
+            if (!obj.IsComplete())
                 return false;
         }
-        return true;
+
+        return hasRequired;
     }
 
     public QuestInstance(QuestSO data)
@@ -71,14 +77,15 @@ public class QuestInstance
                 requiredCount = obj.requiredCount,
                 currentCount = obj.currentCount,
                 isOptional = obj.isOptional,
+                targetItemSO = obj.targetItemSO,
+#pragma warning disable CS0618
                 targetItem = obj.targetItem,
+#pragma warning restore CS0618
                 targetNPC = obj.targetNPC,
                 targetLocation = obj.targetLocation,
                 type = obj.type
             });
         }
-
-        Logger.Log(LogModule.QuestSystem, $"Создан экземпляр квеста: {QuestName} (ID: {QuestID})");
     }
 
     public QuestObjective GetObjective(string id)

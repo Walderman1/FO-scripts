@@ -8,5 +8,7 @@ public enum ItemType
     Sword,
     Shield,
     GoldCoin,
-    Lamp
+    Lamp,
+    Pondlily,
+
 }

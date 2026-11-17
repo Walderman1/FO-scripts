@@ -1,22 +1,80 @@
 using UnityEngine;
+using DialogueSystem;
+using VContainer;
 
 [System.Serializable]
 public abstract class EventRequirement
 {
     public abstract bool Check(EventContext context);
+
+    protected static T Resolve<T>(EventContext context) where T : class
+    {
+        var c = context?.Container;
+        if (c != null)
+        {
+            try { var v = c.Resolve<T>(); if (v != null) return v; } catch { }
+        }
+
+        var root = SceneInjector.Instance?.RootScope ?? GameLifetimeScope.Current?.Container;
+        if (root != null)
+        {
+            try { return root.Resolve<T>(); } catch { }
+        }
+        return null;
+    }
 }
 
 [System.Serializable]
 public class RequirementHasItem : EventRequirement
 {
-    public ItemType itemType;
+    [Newtonsoft.Json.JsonIgnore]
+    public ItemSO itemSO;
+
+    public string itemSOId;
+
+    [System.Obsolete("Используйте itemSO")]
+    public ItemType itemType = ItemType.None;
+
     public int minCount = 1;
 
     public override bool Check(EventContext context)
     {
-        Logger.Log(LogModule.Event, $"Проверка наличия предмета {itemType} (минимум {minCount})");
-        return true;
+        var so = ResolveItemSO(context);
+        if (so == null) return false;
+
+        var inv = Resolve<InventoryUIManager>(context);
+        if (inv == null) return false;
+
+        return inv.GetItemCount(so) >= minCount;
     }
+
+    public ItemSO ResolveItemSO() => ResolveItemSO(null);
+
+    public ItemSO ResolveItemSO(EventContext context)
+    {
+        if (itemSO != null) return itemSO;
+
+        var db = Resolve<ItemDatabase>(context);
+        if (db == null) return null;
+
+        if (!string.IsNullOrEmpty(itemSOId))
+        {
+            itemSO = db.GetItem(itemSOId);
+            if (itemSO != null) return itemSO;
+        }
+
+#pragma warning disable CS0618
+        if (itemType != ItemType.None)
+        {
+            itemSO = db.GetItemByLegacyType(itemType);
+            return itemSO;
+        }
+#pragma warning restore CS0618
+
+        return null;
+    }
+
+    public void SyncItemSOId() => itemSOId = itemSO != null ? itemSO.id : "";
 }
 
 [System.Serializable]
@@ -27,9 +85,8 @@ public class RequirementFlag : EventRequirement
 
     public override bool Check(EventContext context)
     {
-        bool result = FlagManager.Instance?.GetFlag(flagName) == flagValue;
-        Logger.Log(LogModule.Event, $"Проверка флага {flagName} = {flagValue}: {(result ? "успешно" : "провал")}");
-        return result;
+        bool current = Resolve<FlagManager>(context)?.GetFlag(flagName) ?? false;
+        return current == flagValue;
     }
 }
 
@@ -40,20 +97,15 @@ public class RequirementLocation : EventRequirement
 
     public override bool Check(EventContext context)
     {
-        string currentLocation = GetCurrentLocationName();
-        bool result = currentLocation == locationName;
-        Logger.Log(LogModule.Event, $"Проверка локации: текущая '{currentLocation}', требуется '{locationName}': {(result ? "успешно" : "провал")}");
-        return result;
+        string current = GetCurrentLocationName(context);
+        return !string.IsNullOrEmpty(current) && current == locationName;
     }
 
-    private string GetCurrentLocationName()
+    private string GetCurrentLocationName(EventContext context)
     {
-        GameObject[] locations = GameObject.FindGameObjectsWithTag("Location");
-        foreach (var loc in locations)
-        {
-            if (loc.activeSelf)
-                return loc.name;
-        }
+        var tb = Resolve<TextBeginner>(context);
+        if (tb != null && tb.CurrentLocation != null) return tb.CurrentLocation.name;
+        if (!string.IsNullOrEmpty(context?.LocationName)) return context.LocationName;
         return string.Empty;
     }
 }
@@ -66,9 +118,8 @@ public class RequirementEventExecuted : EventRequirement
 
     public override bool Check(EventContext context)
     {
-        bool result = EventStateManager.Instance?.IsExecuted(eventID) == executed;
-        Logger.Log(LogModule.Event, $"Проверка события '{eventID}' выполнено={executed}: {(result ? "успешно" : "провал")}");
-        return result;
+        bool isExecuted = Resolve<EventStateManager>(context)?.IsExecuted(eventID) ?? false;
+        return isExecuted == executed;
     }
 }
 
@@ -81,38 +132,28 @@ public class RequirementEventExecutionCount : EventRequirement
 
     public override bool Check(EventContext context)
     {
-        int count = EventStateManager.Instance?.GetExecutionCount(eventID) ?? 0;
-        bool result = count >= minCount && count <= maxCount;
-        Logger.Log(LogModule.Event, $"Проверка количества выполнений '{eventID}': {count} (требуется {minCount}-{maxCount}): {(result ? "успешно" : "провал")}");
-        return result;
+        int count = Resolve<EventStateManager>(context)?.GetExecutionCount(eventID) ?? 0;
+        return count >= minCount && count <= maxCount;
     }
 }
 
 [System.Serializable]
 public class RequirementRandomChance : EventRequirement
 {
-    [Range(0f, 1f)]
-    public float chance = 0.5f;
+    [Range(0f, 1f)] public float chance = 0.5f;
     public bool useSeed = false;
     public int seed = 0;
 
     public override bool Check(EventContext context)
     {
-        bool result;
         if (useSeed)
         {
             Random.InitState(seed);
             float value = Random.value;
             Random.InitState(System.Environment.TickCount);
-            result = value <= chance;
+            return value <= chance;
         }
-        else
-        {
-            result = Random.value <= chance;
-        }
-
-        Logger.Log(LogModule.Event, $"Проверка случайного шанса {chance * 100}%: {(result ? "успешно" : "провал")}");
-        return result;
+        return Random.value <= chance;
     }
 }
 
@@ -124,31 +165,14 @@ public class RequirementCustomCondition : EventRequirement
 
     public override bool Check(EventContext context)
     {
-        if (targetObject == null || string.IsNullOrEmpty(methodName))
-        {
-            Logger.LogWarning(LogModule.Event, "RequirementCustomCondition: targetObject или methodName не заданы");
-            return true;
-        }
+        if (targetObject == null || string.IsNullOrEmpty(methodName)) return true;
 
         var method = targetObject.GetType().GetMethod(methodName);
         if (method != null)
         {
-            try
-            {
-                bool result = (bool)method.Invoke(targetObject, new object[] { context });
-                Logger.Log(LogModule.Event, $"Пользовательское условие '{methodName}': {(result ? "успешно" : "провал")}");
-                return result;
-            }
-            catch (System.Exception e)
-            {
-                Logger.LogError(LogModule.Event, $"RequirementCustomCondition: ошибка вызова метода {methodName}: {e.Message}");
-                return false;
-            }
+            try { return (bool)method.Invoke(targetObject, new object[] { context }); }
+            catch { return false; }
         }
-        else
-        {
-            Logger.LogWarning(LogModule.Event, $"RequirementCustomCondition: метод {methodName} не найден на {targetObject.name}");
-            return false;
-        }
+        return false;
     }
 }

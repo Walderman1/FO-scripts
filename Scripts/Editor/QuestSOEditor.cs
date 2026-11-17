@@ -1,4 +1,3 @@
-// QuestSOEditor.cs - С КНОПКАМИ-ПОДСКАЗКАМИ
 #if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
@@ -8,6 +7,7 @@ using System.Collections.Generic;
 public class QuestSOEditor : Editor
 {
     private QuestSO quest;
+
     private SerializedProperty questIDProp;
     private SerializedProperty questNameProp;
     private SerializedProperty descriptionProp;
@@ -26,48 +26,12 @@ public class QuestSOEditor : Editor
     private bool showObjectives = true;
     private bool showRewards = true;
     private bool showConditions = true;
-    private bool showDialogue = true;
-
-    // Словари для перевода
-    private Dictionary<QuestType, string> questTypeNames = new Dictionary<QuestType, string>
-    {
-        { QuestType.Fetch, "Собрать" },
-        { QuestType.Kill, "Убить" },
-        { QuestType.Talk, "Поговорить" },
-        { QuestType.Explore, "Исследовать" },
-        { QuestType.Use, "Использовать" },
-        { QuestType.Escort, "Сопроводить" },
-        { QuestType.Collection, "Коллекция" },
-        { QuestType.Story, "Сюжетный" },
-    };
-
-    private Dictionary<QuestObjectiveType, string> objectiveTypeNames = new Dictionary<QuestObjectiveType, string>
-    {
-        { QuestObjectiveType.Collect, "Собрать" },
-        { QuestObjectiveType.TalkTo, "Поговорить с" },
-        { QuestObjectiveType.GoTo, "Посетить" },
-        { QuestObjectiveType.UseItem, "Использовать" },
-        { QuestObjectiveType.Kill, "Убить" },
-        { QuestObjectiveType.Interact, "Взаимодействовать" },
-    };
-
-    private Dictionary<ItemType, string> itemTypeNames = new Dictionary<ItemType, string>
-    {
-        { ItemType.None, "Нет" },
-        { ItemType.Apple, "Яблоко" },
-        { ItemType.Key, "Ключ" },
-        { ItemType.Potion, "Зелье" },
-        { ItemType.Bottle, "Бутылка" },
-        { ItemType.Sword, "Меч" },
-        { ItemType.Shield, "Щит" },
-        { ItemType.GoldCoin, "Золотая монета" },
-        { ItemType.Lamp, "Лампа" },
-    };
+    private bool showDialogues = true;
+    private bool showSettings = true;
 
     private void OnEnable()
     {
         quest = (QuestSO)target;
-
         questIDProp = serializedObject.FindProperty("questID");
         questNameProp = serializedObject.FindProperty("questName");
         descriptionProp = serializedObject.FindProperty("description");
@@ -88,103 +52,98 @@ public class QuestSOEditor : Editor
     {
         serializedObject.Update();
 
-        // Стили
-        GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel)
+        EditorGUILayout.Space(8);
+        var header = new GUIStyle(EditorStyles.boldLabel)
         {
-            fontSize = 16,
-            alignment = TextAnchor.MiddleCenter,
-            padding = new RectOffset(0, 0, 10, 10)
+            fontSize = 14,
+            alignment = TextAnchor.MiddleCenter
         };
-        headerStyle.normal.textColor = EditorGUIUtility.isProSkin ? new Color(0.4f, 0.7f, 1f) : new Color(0f, 0.3f, 0.8f);
-
-        GUIStyle boxStyle = new GUIStyle("box")
-        {
-            padding = new RectOffset(10, 10, 10, 10),
-            margin = new RectOffset(5, 5, 5, 5)
-        };
-
-        GUIStyle sectionStyle = new GUIStyle(EditorStyles.boldLabel)
-        {
-            fontSize = 13,
-            padding = new RectOffset(5, 0, 5, 0)
-        };
-        sectionStyle.normal.textColor = EditorGUIUtility.isProSkin ? new Color(0.7f, 0.85f, 1f) : new Color(0.1f, 0.3f, 0.6f);
-
-        // ============================================================
-        // ЗАГОЛОВОК
-        // ============================================================
-        EditorGUILayout.Space(5);
-        EditorGUILayout.LabelField("━═━═━═━═━═━═━═━═━═━═━═━═━═━", headerStyle);
-        EditorGUILayout.LabelField($"📜 {quest.questName}", headerStyle);
-        EditorGUILayout.LabelField("━═━═━═━═━═━═━═━═━═━═━═━═━═━", headerStyle);
-        EditorGUILayout.Space(5);
+        header.normal.textColor = EditorGUIUtility.isProSkin ? Color.white : Color.black;
+        EditorGUILayout.LabelField($"📜 {quest.questName}", header);
 
         if (!string.IsNullOrEmpty(quest.questID))
-        {
-            EditorGUILayout.LabelField($"🔑 ID: {quest.questID}", EditorStyles.miniLabel);
-        }
-        EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField($"ID: {quest.questID}", EditorStyles.miniLabel);
 
-        // ============================================================
-        // ОСНОВНАЯ ИНФОРМАЦИЯ
-        // ============================================================
-        EditorGUILayout.BeginVertical(boxStyle);
-        EditorGUILayout.LabelField("📋 ОСНОВНАЯ ИНФОРМАЦИЯ", sectionStyle);
-        EditorGUILayout.Space(3);
+        EditorGUILayout.Space(8);
 
-        DrawFieldWithHelpButton(questIDProp, "🔑 ID квеста", "Уникальный идентификатор. Используется в коде для старта/завершения квеста.");
-        DrawFieldWithHelpButton(questNameProp, "📛 Название", "Отображаемое название квеста в интерфейсе.");
-        DrawFieldWithHelpButton(descriptionProp, "📝 Описание", "Описание квеста для игрока. Отображается в панели квестов.");
-        DrawFieldWithHelpButton(iconProp, "🖼️ Иконка", "Иконка для отображения в списке квестов.");
-        DrawFieldWithHelpButton(priorityProp, "⭐ Приоритет", "Чем выше число, тем выше квест в списке (0 - низкий, 10 - высокий).");
+        DrawMainInfo();
+        DrawQuestType();
+        DrawObjectives();
+        DrawRewards();
+        DrawConditions();
+        DrawDialogues();
+        DrawSettings();
+        DrawActions();
 
-        DrawQuestTypeField();
+        serializedObject.ApplyModifiedProperties();
+    }
 
+    private void DrawMainInfo()
+    {
+        EditorGUILayout.LabelField("ОСНОВНАЯ ИНФОРМАЦИЯ", EditorStyles.boldLabel);
+        EditorGUILayout.BeginVertical("box");
+        IdEditorHelper.DrawIdField(serializedObject, questIDProp, "ID", "quest", "questName");
+        EditorGUILayout.PropertyField(questNameProp, new GUIContent("Название"));
+        EditorGUILayout.PropertyField(descriptionProp, new GUIContent("Описание"));
+        EditorGUILayout.PropertyField(iconProp, new GUIContent("Иконка"));
+        EditorGUILayout.PropertyField(priorityProp, new GUIContent("Приоритет"));
         EditorGUILayout.EndVertical();
-        EditorGUILayout.Space(10);
+        EditorGUILayout.Space(6);
+    }
 
-        // ============================================================
-        // ЦЕЛИ
-        // ============================================================
-        EditorGUILayout.BeginVertical(boxStyle);
-        showObjectives = EditorGUILayout.Foldout(showObjectives, $"🎯 ЦЕЛИ ({quest.objectives.Count})", true, sectionStyle);
+    private void DrawQuestType()
+    {
+        EditorGUILayout.LabelField("ТИП КВЕСТА", EditorStyles.boldLabel);
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.PropertyField(questTypeProp, new GUIContent("Тип"));
+        EditorGUILayout.EndVertical();
+        EditorGUILayout.Space(6);
+    }
+
+    private void DrawObjectives()
+    {
+        showObjectives = EditorGUILayout.Foldout(showObjectives,
+            $"ЦЕЛИ ({quest.objectives.Count})", true);
+
         if (showObjectives)
         {
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("Цели, которые нужно выполнить для завершения квеста. Все обязательные цели должны быть выполнены.", EditorStyles.miniLabel);
-            EditorGUILayout.Space(5);
+            EditorGUILayout.BeginVertical("box");
+
+            if (quest.objectives.Count == 0)
+                EditorGUILayout.HelpBox("Нет целей. Квест не сможет завершиться сам.", MessageType.Warning);
 
             for (int i = 0; i < quest.objectives.Count; i++)
             {
                 var obj = quest.objectives[i];
                 if (obj == null) continue;
 
-                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.BeginVertical("helpbox");
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"📌 Цель {i + 1}", EditorStyles.boldLabel);
-                if (GUILayout.Button("✕ Удалить", GUILayout.Width(70)))
+                EditorGUILayout.LabelField($"Цель {i + 1}", EditorStyles.boldLabel);
+                if (GUILayout.Button("Удалить", GUILayout.Width(70)))
                 {
                     quest.objectives.RemoveAt(i);
                     EditorUtility.SetDirty(quest);
                     EditorGUILayout.EndHorizontal();
                     EditorGUILayout.EndVertical();
+                    i--;
                     continue;
                 }
                 EditorGUILayout.EndHorizontal();
 
-                DrawObjectiveFields(obj);
+                DrawObjectiveFields(obj, i);
 
                 EditorGUILayout.EndVertical();
                 EditorGUILayout.Space(3);
             }
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("➕ Добавить цель", GUILayout.Height(25)))
+            if (GUILayout.Button("Добавить цель"))
             {
                 quest.objectives.Add(new QuestObjective());
                 EditorUtility.SetDirty(quest);
             }
-            if (GUILayout.Button("🗑️ Очистить все", GUILayout.Height(25)))
+            if (GUILayout.Button("Очистить"))
             {
                 if (EditorUtility.DisplayDialog("Подтверждение", "Удалить все цели?", "Да", "Нет"))
                 {
@@ -193,52 +152,99 @@ public class QuestSOEditor : Editor
                 }
             }
             EditorGUILayout.EndHorizontal();
-        }
-        EditorGUILayout.EndVertical();
-        EditorGUILayout.Space(10);
 
-        // ============================================================
-        // НАГРАДЫ
-        // ============================================================
-        EditorGUILayout.BeginVertical(boxStyle);
-        showRewards = EditorGUILayout.Foldout(showRewards, $"🎁 НАГРАДЫ ({quest.rewards.Count})", true, sectionStyle);
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.Space(4);
+    }
+
+    private void DrawObjectiveFields(QuestObjective obj, int index)
+    {
+        var objProp = objectivesProp.GetArrayElementAtIndex(index);
+
+        EditorGUILayout.PropertyField(objProp.FindPropertyRelative("description"), new GUIContent("Описание"));
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Тип", GUILayout.Width(120));
+        obj.type = (QuestObjectiveType)EditorGUILayout.EnumPopup(obj.type);
+        EditorGUILayout.EndHorizontal();
+
+        IdEditorHelper.DrawInline(
+            "ID",
+            obj.objectiveID,
+            v => { obj.objectiveID = v; },
+            "obj",
+            new[] { obj.description, obj.type.ToString() },
+            index);
+
+        obj.requiredCount = EditorGUILayout.IntField("Требуется", obj.requiredCount);
+        obj.currentCount = EditorGUILayout.IntField("Текущий прогресс", obj.currentCount);
+        obj.isOptional = EditorGUILayout.Toggle("Опционально", obj.isOptional);
+
+        switch (obj.type)
+        {
+            case QuestObjectiveType.Collect:
+            case QuestObjectiveType.UseItem:
+                DrawItemSOWithMigration(objProp, "Предмет");
+                break;
+            case QuestObjectiveType.TalkTo:
+                obj.targetNPC = EditorGUILayout.TextField("NPC", obj.targetNPC);
+                break;
+            case QuestObjectiveType.GoTo:
+                LocationEditorHelper.DrawLocationDropdown(
+                    "Локация",
+                    obj.targetLocation,
+                    v =>
+                    {
+                        obj.targetLocation = v;
+                        EditorUtility.SetDirty(quest);
+                    },
+                    120f);
+                break;
+        }
+    }
+
+    private void DrawRewards()
+    {
+        showRewards = EditorGUILayout.Foldout(showRewards,
+            $"НАГРАДЫ ({quest.rewards.Count})", true);
+
         if (showRewards)
         {
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("Награды, которые игрок получит после завершения квеста.", EditorStyles.miniLabel);
-            EditorGUILayout.Space(5);
+            EditorGUILayout.BeginVertical("box");
 
             for (int i = 0; i < quest.rewards.Count; i++)
             {
                 var reward = quest.rewards[i];
                 if (reward == null) continue;
 
-                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.BeginVertical("helpbox");
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"🎁 Награда {i + 1}", EditorStyles.boldLabel);
-                if (GUILayout.Button("✕ Удалить", GUILayout.Width(70)))
+                EditorGUILayout.LabelField($"Награда {i + 1}", EditorStyles.boldLabel);
+                if (GUILayout.Button("Удалить", GUILayout.Width(70)))
                 {
                     quest.rewards.RemoveAt(i);
                     EditorUtility.SetDirty(quest);
                     EditorGUILayout.EndHorizontal();
                     EditorGUILayout.EndVertical();
+                    i--;
                     continue;
                 }
                 EditorGUILayout.EndHorizontal();
 
-                DrawRewardFields(reward);
+                DrawRewardFields(reward, i);
 
                 EditorGUILayout.EndVertical();
                 EditorGUILayout.Space(3);
             }
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("➕ Добавить награду", GUILayout.Height(25)))
+            if (GUILayout.Button("Добавить награду"))
             {
                 quest.rewards.Add(new QuestReward());
                 EditorUtility.SetDirty(quest);
             }
-            if (GUILayout.Button("🗑️ Очистить все", GUILayout.Height(25)))
+            if (GUILayout.Button("Очистить"))
             {
                 if (EditorUtility.DisplayDialog("Подтверждение", "Удалить все награды?", "Да", "Нет"))
                 {
@@ -247,52 +253,67 @@ public class QuestSOEditor : Editor
                 }
             }
             EditorGUILayout.EndHorizontal();
-        }
-        EditorGUILayout.EndVertical();
-        EditorGUILayout.Space(10);
 
-        // ============================================================
-        // УСЛОВИЯ НАЧАЛА
-        // ============================================================
-        EditorGUILayout.BeginVertical(boxStyle);
-        showConditions = EditorGUILayout.Foldout(showConditions, $"🔒 УСЛОВИЯ НАЧАЛА ({quest.startConditions.Count})", true, sectionStyle);
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.Space(4);
+    }
+
+    private void DrawRewardFields(QuestReward reward, int index)
+    {
+        var rewardProp = rewardsProp.GetArrayElementAtIndex(index);
+
+        DrawItemSOWithMigration(rewardProp, "Предмет");
+
+        reward.amount = EditorGUILayout.IntField("Количество", reward.amount);
+        reward.experience = EditorGUILayout.IntField("Опыт", reward.experience);
+        reward.flagToSet = EditorGUILayout.TextField("Флаг", reward.flagToSet);
+    }
+
+    private void DrawConditions()
+    {
+        showConditions = EditorGUILayout.Foldout(showConditions,
+            $"УСЛОВИЯ СТАРТА ({quest.startConditions.Count})", true);
+
         if (showConditions)
         {
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("Условия, которые должны быть выполнены для старта квеста. Все условия должны быть выполнены.", EditorStyles.miniLabel);
-            EditorGUILayout.Space(5);
+            EditorGUILayout.BeginVertical("box");
 
             for (int i = 0; i < quest.startConditions.Count; i++)
             {
                 var condition = quest.startConditions[i];
                 if (condition == null) continue;
 
-                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.BeginVertical("helpbox");
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"🔐 Условие {i + 1}", EditorStyles.boldLabel);
-                if (GUILayout.Button("✕ Удалить", GUILayout.Width(70)))
+                EditorGUILayout.LabelField($"Условие {i + 1}", EditorStyles.boldLabel);
+                if (GUILayout.Button("Удалить", GUILayout.Width(70)))
                 {
                     quest.startConditions.RemoveAt(i);
                     EditorUtility.SetDirty(quest);
                     EditorGUILayout.EndHorizontal();
                     EditorGUILayout.EndVertical();
+                    i--;
                     continue;
                 }
                 EditorGUILayout.EndHorizontal();
 
-                DrawConditionFields(condition);
+                condition.flagName = EditorGUILayout.TextField("Флаг", condition.flagName);
+                condition.flagValue = EditorGUILayout.Toggle("Значение флага", condition.flagValue);
+                condition.questID = EditorGUILayout.TextField("ID квеста", condition.questID);
+                condition.questCompleted = EditorGUILayout.Toggle("Завершён", condition.questCompleted);
 
                 EditorGUILayout.EndVertical();
                 EditorGUILayout.Space(3);
             }
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("➕ Добавить условие", GUILayout.Height(25)))
+            if (GUILayout.Button("Добавить условие"))
             {
                 quest.startConditions.Add(new QuestCondition());
                 EditorUtility.SetDirty(quest);
             }
-            if (GUILayout.Button("🗑️ Очистить все", GUILayout.Height(25)))
+            if (GUILayout.Button("Очистить"))
             {
                 if (EditorUtility.DisplayDialog("Подтверждение", "Удалить все условия?", "Да", "Нет"))
                 {
@@ -301,386 +322,123 @@ public class QuestSOEditor : Editor
                 }
             }
             EditorGUILayout.EndHorizontal();
-        }
-        EditorGUILayout.EndVertical();
-        EditorGUILayout.Space(10);
 
-        // ============================================================
-        // ДИАЛОГИ
-        // ============================================================
-        EditorGUILayout.BeginVertical(boxStyle);
-        showDialogue = EditorGUILayout.Foldout(showDialogue, "💬 ДИАЛОГИ", true, sectionStyle);
-        if (showDialogue)
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.Space(4);
+    }
+
+    private void DrawDialogues()
+    {
+        showDialogues = EditorGUILayout.Foldout(showDialogues, "ДИАЛОГИ", true);
+
+        if (showDialogues)
         {
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("Диалоги, которые запускаются при старте и завершении квеста. ID должен совпадать с ID в диалоговой системе.", EditorStyles.miniLabel);
-            EditorGUILayout.Space(5);
-
-            DrawFieldWithHelpButton(startDialogueIDProp, "🎬 Диалог старта", "ID диалога, который запускается при старте квеста. Например: 'trixie_quest_start'.");
-            DrawFieldWithHelpButton(completeDialogueIDProp, "🏁 Диалог завершения", "ID диалога, который запускается после завершения квеста. Например: 'trixie_quest_complete'.");
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.PropertyField(startDialogueIDProp, new GUIContent("Диалог старта"));
+            EditorGUILayout.PropertyField(completeDialogueIDProp, new GUIContent("Диалог завершения"));
+            EditorGUILayout.EndVertical();
         }
-        EditorGUILayout.EndVertical();
-        EditorGUILayout.Space(10);
+        EditorGUILayout.Space(4);
+    }
 
-        // ============================================================
-        // НАСТРОЙКИ
-        // ============================================================
-        EditorGUILayout.BeginVertical(boxStyle);
-        EditorGUILayout.LabelField("⚙️ НАСТРОЙКИ", sectionStyle);
-        EditorGUILayout.Space(3);
+    private void DrawSettings()
+    {
+        showSettings = EditorGUILayout.Foldout(showSettings, "НАСТРОЙКИ", true);
 
-        DrawFieldWithHelpButton(autoStartProp, "▶️ Автостарт", "Квест начнётся автоматически при загрузке сцены. Не требует ручного запуска.");
-        DrawFieldWithHelpButton(repeatableProp, "🔄 Повторяемый", "Можно ли проходить квест несколько раз. Если нет, квест исчезнет после завершения.");
-        DrawFieldWithHelpButton(isHiddenProp, "👁️ Скрытый", "Квест НЕ отображается в интерфейсе игрока. Полезно для скрытых сюжетных квестов.");
+        if (showSettings)
+        {
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.PropertyField(autoStartProp, new GUIContent("Автостарт"));
+            EditorGUILayout.PropertyField(repeatableProp, new GUIContent("Повторяемый"));
+            EditorGUILayout.PropertyField(isHiddenProp, new GUIContent("Скрытый"));
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.Space(4);
+    }
 
-        EditorGUILayout.EndVertical();
-        EditorGUILayout.Space(10);
-
-        // ============================================================
-        // КНОПКИ
-        // ============================================================
+    private void DrawActions()
+    {
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("🔄 Обновить", GUILayout.Height(30)))
+        if (GUILayout.Button("Обновить"))
         {
             EditorUtility.SetDirty(quest);
             AssetDatabase.SaveAssets();
-            Debug.Log($"✅ Квест обновлён: {quest.questName}");
         }
-        if (GUILayout.Button("📋 Копировать ID", GUILayout.Height(30)))
-        {
+        if (GUILayout.Button("Копировать ID"))
             EditorGUIUtility.systemCopyBuffer = quest.questID;
-            Debug.Log($"📋 ID скопирован: {quest.questID}");
-        }
+        if (GUILayout.Button("Статистика"))
+            ShowStats();
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void DrawItemSOWithMigration(SerializedProperty parentProp, string label)
+    {
+        var itemSOProp = parentProp.FindPropertyRelative("itemSO")
+                      ?? parentProp.FindPropertyRelative("targetItemSO");
+        var itemLegacyProp = parentProp.FindPropertyRelative("item")
+                          ?? parentProp.FindPropertyRelative("targetItem");
+
+        if (itemSOProp == null) return;
+
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField(label, GUILayout.Width(120));
+        EditorGUILayout.PropertyField(itemSOProp, GUIContent.none);
         EditorGUILayout.EndHorizontal();
 
-        EditorGUILayout.Space(5);
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("🧹 Сбросить настройки", GUILayout.Height(25)))
+        if (itemSOProp.objectReferenceValue == null && itemLegacyProp != null)
         {
-            if (EditorUtility.DisplayDialog("Подтверждение", "Сбросить все настройки квеста?", "Да", "Нет"))
+#pragma warning disable CS0618
+            var legacyVal = (ItemType)itemLegacyProp.enumValueIndex;
+#pragma warning restore CS0618
+
+            if (legacyVal != ItemType.None)
             {
-                ResetQuest();
+                EditorGUILayout.HelpBox($"Legacy ItemType: {legacyVal}", MessageType.Warning);
+                if (GUILayout.Button("Мигрировать в ItemSO"))
+                {
+                    var so = FindItemSOByLegacyType(legacyVal);
+                    if (so != null)
+                    {
+                        itemSOProp.objectReferenceValue = so;
+                        serializedObject.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(quest);
+                    }
+                }
             }
         }
-        if (GUILayout.Button("📊 Статистика", GUILayout.Height(25)))
-        {
-            ShowStats();
-        }
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.Space(10);
-
-        // ============================================================
-        // ПОДСКАЗКИ
-        // ============================================================
-        EditorGUILayout.BeginVertical(boxStyle);
-        EditorGUILayout.LabelField("💡 СОВЕТЫ", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("• Используйте уникальные ID для каждого квеста", EditorStyles.miniLabel);
-        EditorGUILayout.LabelField("• Для целей с типом 'Собрать' укажите Target Item", EditorStyles.miniLabel);
-        EditorGUILayout.LabelField("• Награды выдаются автоматически при завершении", EditorStyles.miniLabel);
-        EditorGUILayout.LabelField("• Квесты с Автостарт = true запускаются сразу", EditorStyles.miniLabel);
-        EditorGUILayout.LabelField("• Условия начала проверяются при старте квеста", EditorStyles.miniLabel);
-        EditorGUILayout.EndVertical();
-
-        EditorGUILayout.Space(10);
-
-        serializedObject.ApplyModifiedProperties();
     }
 
-    // ============================================================
-    // ОТРИСОВКА ПОЛЕЙ С КНОПКОЙ-ПОДСКАЗКОЙ
-    // ============================================================
-
-    private void DrawFieldWithHelpButton(SerializedProperty prop, string displayName, string tooltip)
+    private ItemSO FindItemSOByLegacyType(ItemType legacyType)
     {
-        EditorGUILayout.BeginHorizontal();
+        var db = Object.FindAnyObjectByType<ItemDatabase>(FindObjectsInactive.Include);
+        if (db != null) return db.GetItemByLegacyType(legacyType);
 
-        var content = new GUIContent(displayName);
-        EditorGUILayout.PropertyField(prop, content);
+        string[] guids = AssetDatabase.FindAssets("t:ItemSO");
+        string targetName = legacyType.ToString();
 
-        if (GUILayout.Button("❓", GUILayout.Width(25), GUILayout.Height(18)))
+        foreach (string guid in guids)
         {
-            EditorUtility.DisplayDialog($"ℹ️ {displayName}", tooltip, "OK");
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var so = AssetDatabase.LoadAssetAtPath<ItemSO>(path);
+            if (so == null) continue;
+            if (so.id == targetName.ToLowerInvariant() || so.itemName == targetName)
+                return so;
         }
-
-        EditorGUILayout.EndHorizontal();
-    }
-
-    private void DrawQuestTypeField()
-    {
-        EditorGUILayout.BeginHorizontal();
-
-        var content = new GUIContent("🎯 Тип квеста");
-        EditorGUILayout.LabelField(content, GUILayout.Width(150));
-
-        QuestType currentValue = (QuestType)questTypeProp.enumValueIndex;
-
-        string[] displayNames = new string[questTypeNames.Count];
-        QuestType[] values = new QuestType[questTypeNames.Count];
-
-        int i = 0;
-        foreach (var kvp in questTypeNames)
-        {
-            values[i] = kvp.Key;
-            displayNames[i] = kvp.Value;
-            i++;
-        }
-
-        int currentIndex = System.Array.IndexOf(values, currentValue);
-        if (currentIndex == -1) currentIndex = 0;
-
-        int newIndex = EditorGUILayout.Popup(currentIndex, displayNames);
-
-        if (newIndex != currentIndex)
-        {
-            questTypeProp.enumValueIndex = (int)values[newIndex];
-        }
-
-        // Кнопка-подсказка
-        if (GUILayout.Button("❓", GUILayout.Width(25), GUILayout.Height(18)))
-        {
-            string message = "🎯 ТИП КВЕСТА\n\n" +
-                            "• Собрать - собрать предметы\n" +
-                            "• Убить - победить врагов\n" +
-                            "• Поговорить - поговорить с NPC\n" +
-                            "• Исследовать - посетить локацию\n" +
-                            "• Использовать - использовать предмет\n" +
-                            "• Сопроводить - сопроводить NPC\n" +
-                            "• Коллекция - собрать коллекцию\n" +
-                            "• Сюжетный - сюжетный квест";
-            EditorUtility.DisplayDialog("ℹ️ Тип квеста", message, "OK");
-        }
-
-        EditorGUILayout.EndHorizontal();
-    }
-
-    private void DrawObjectiveFields(QuestObjective obj)
-    {
-        obj.objectiveID = EditorGUILayout.TextField("🔑 ID цели", obj.objectiveID);
-        obj.description = EditorGUILayout.TextField("📝 Описание", obj.description);
-
-        DrawObjectiveTypeField(obj);
-
-        obj.requiredCount = EditorGUILayout.IntField("📊 Требуется", obj.requiredCount);
-        obj.currentCount = EditorGUILayout.IntField("📊 Текущий прогресс", obj.currentCount);
-
-        // Опционально с кнопкой-подсказкой
-        EditorGUILayout.BeginHorizontal();
-        obj.isOptional = EditorGUILayout.Toggle("🔄 Опционально", obj.isOptional);
-        if (GUILayout.Button("❓", GUILayout.Width(25), GUILayout.Height(18)))
-        {
-            EditorUtility.DisplayDialog("ℹ️ Опционально",
-                "Если отмечено, эту цель НЕ обязательно выполнять для завершения квеста.\n\n" +
-                "Полезно для дополнительных заданий или бонусных целей.", "OK");
-        }
-        EditorGUILayout.EndHorizontal();
-
-        if (obj.type == QuestObjectiveType.Collect)
-        {
-            DrawItemTypeField(obj, "📦 Предмет", "Предмет, который нужно собрать.");
-        }
-        else if (obj.type == QuestObjectiveType.TalkTo)
-        {
-            obj.targetNPC = EditorGUILayout.TextField("👤 NPC", obj.targetNPC);
-        }
-        else if (obj.type == QuestObjectiveType.GoTo)
-        {
-            obj.targetLocation = EditorGUILayout.TextField("📍 Локация", obj.targetLocation);
-        }
-        else if (obj.type == QuestObjectiveType.UseItem)
-        {
-            DrawItemTypeField(obj, "📦 Предмет", "Предмет, который нужно использовать.");
-        }
-    }
-
-    private void DrawObjectiveTypeField(QuestObjective obj)
-    {
-        EditorGUILayout.BeginHorizontal();
-
-        var content = new GUIContent("🎯 Тип");
-        EditorGUILayout.LabelField(content, GUILayout.Width(150));
-
-        QuestObjectiveType currentValue = obj.type;
-
-        string[] displayNames = new string[objectiveTypeNames.Count];
-        QuestObjectiveType[] values = new QuestObjectiveType[objectiveTypeNames.Count];
-
-        int i = 0;
-        foreach (var kvp in objectiveTypeNames)
-        {
-            values[i] = kvp.Key;
-            displayNames[i] = kvp.Value;
-            i++;
-        }
-
-        int currentIndex = System.Array.IndexOf(values, currentValue);
-        if (currentIndex == -1) currentIndex = 0;
-
-        int newIndex = EditorGUILayout.Popup(currentIndex, displayNames);
-
-        if (newIndex != currentIndex)
-        {
-            obj.type = values[newIndex];
-        }
-
-        // Кнопка-подсказка
-        if (GUILayout.Button("❓", GUILayout.Width(25), GUILayout.Height(18)))
-        {
-            string message = "🎯 ТИП ЦЕЛИ\n\n" +
-                            "• Собрать - собрать указанное количество предметов\n" +
-                            "• Поговорить с - поговорить с NPC\n" +
-                            "• Посетить - посетить локацию\n" +
-                            "• Использовать - использовать предмет\n" +
-                            "• Убить - победить врага\n" +
-                            "• Взаимодействовать - взаимодействовать с объектом";
-            EditorUtility.DisplayDialog("ℹ️ Тип цели", message, "OK");
-        }
-
-        EditorGUILayout.EndHorizontal();
-    }
-
-    private void DrawItemTypeField(QuestObjective obj, string label, string tooltip)
-    {
-        EditorGUILayout.BeginHorizontal();
-
-        var content = new GUIContent(label);
-        EditorGUILayout.LabelField(content, GUILayout.Width(150));
-
-        ItemType currentValue = obj.targetItem;
-
-        string[] displayNames = new string[itemTypeNames.Count];
-        ItemType[] values = new ItemType[itemTypeNames.Count];
-
-        int i = 0;
-        foreach (var kvp in itemTypeNames)
-        {
-            values[i] = kvp.Key;
-            displayNames[i] = kvp.Value;
-            i++;
-        }
-
-        int currentIndex = System.Array.IndexOf(values, currentValue);
-        if (currentIndex == -1) currentIndex = 0;
-
-        int newIndex = EditorGUILayout.Popup(currentIndex, displayNames);
-
-        if (newIndex != currentIndex)
-        {
-            obj.targetItem = values[newIndex];
-        }
-
-        if (GUILayout.Button("❓", GUILayout.Width(25), GUILayout.Height(18)))
-        {
-            EditorUtility.DisplayDialog($"ℹ️ {label}", tooltip, "OK");
-        }
-
-        EditorGUILayout.EndHorizontal();
-    }
-
-    private void DrawRewardFields(QuestReward reward)
-    {
-        DrawItemTypeField(reward);
-        reward.amount = EditorGUILayout.IntField("📊 Количество", reward.amount);
-        reward.experience = EditorGUILayout.IntField("⭐ Опыт", reward.experience);
-        reward.flagToSet = EditorGUILayout.TextField("🚩 Флаг", reward.flagToSet);
-    }
-
-    private void DrawItemTypeField(QuestReward reward)
-    {
-        EditorGUILayout.BeginHorizontal();
-
-        var content = new GUIContent("📦 Предмет");
-        EditorGUILayout.LabelField(content, GUILayout.Width(150));
-
-        ItemType currentValue = reward.item;
-
-        string[] displayNames = new string[itemTypeNames.Count];
-        ItemType[] values = new ItemType[itemTypeNames.Count];
-
-        int i = 0;
-        foreach (var kvp in itemTypeNames)
-        {
-            values[i] = kvp.Key;
-            displayNames[i] = kvp.Value;
-            i++;
-        }
-
-        int currentIndex = System.Array.IndexOf(values, currentValue);
-        if (currentIndex == -1) currentIndex = 0;
-
-        int newIndex = EditorGUILayout.Popup(currentIndex, displayNames);
-
-        if (newIndex != currentIndex)
-        {
-            reward.item = values[newIndex];
-        }
-
-        if (GUILayout.Button("❓", GUILayout.Width(25), GUILayout.Height(18)))
-        {
-            EditorUtility.DisplayDialog("ℹ️ Предмет",
-                "Предмет, который игрок получит в качестве награды.\n\n" +
-                "Предмет будет добавлен в инвентарь автоматически.", "OK");
-        }
-
-        EditorGUILayout.EndHorizontal();
-    }
-
-    private void DrawConditionFields(QuestCondition condition)
-    {
-        condition.flagName = EditorGUILayout.TextField("🚩 Имя флага", condition.flagName);
-        condition.flagValue = EditorGUILayout.Toggle("✅ Значение", condition.flagValue);
-        condition.questID = EditorGUILayout.TextField("🔑 ID квеста", condition.questID);
-        condition.questCompleted = EditorGUILayout.Toggle("🏁 Завершён", condition.questCompleted);
-    }
-
-    // ============================================================
-    // ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-    // ============================================================
-
-    private void ResetQuest()
-    {
-        quest.questID = "";
-        quest.questName = "Новый квест";
-        quest.description = "";
-        quest.icon = null;
-        quest.priority = 0;
-        quest.questType = QuestType.Fetch;
-        quest.objectives.Clear();
-        quest.rewards.Clear();
-        quest.startConditions.Clear();
-        quest.startDialogueID = "";
-        quest.completeDialogueID = "";
-        quest.autoStart = false;
-        quest.repeatable = false;
-        quest.isHidden = false;
-
-        EditorUtility.SetDirty(quest);
-        Debug.Log($"🧹 Квест сброшен: {quest.questName}");
+        return null;
     }
 
     private void ShowStats()
     {
-        int totalObjectives = quest.objectives.Count;
-        int totalRewards = quest.rewards.Count;
-        int totalConditions = quest.startConditions.Count;
-
-        string message = $"📊 СТАТИСТИКА КВЕСТА\n\n" +
-                         $"📛 Название: {quest.questName}\n" +
-                         $"🔑 ID: {quest.questID}\n" +
-                         $"🎯 Тип: {GetQuestTypeName(quest.questType)}\n" +
-                         $"⭐ Приоритет: {quest.priority}\n\n" +
-                         $"🎯 Целей: {totalObjectives}\n" +
-                         $"🎁 Наград: {totalRewards}\n" +
-                         $"🔒 Условий: {totalConditions}\n" +
-                         $"▶️ Автостарт: {(quest.autoStart ? "Да" : "Нет")}\n" +
-                         $"🔄 Повторяемый: {(quest.repeatable ? "Да" : "Нет")}";
-
-        EditorUtility.DisplayDialog("📊 Статистика квеста", message, "OK");
-    }
-
-    private string GetQuestTypeName(QuestType type)
-    {
-        return questTypeNames.ContainsKey(type) ? questTypeNames[type] : type.ToString();
+        string msg =
+            $"Квест: {quest.questName}\n" +
+            $"ID: {quest.questID}\n" +
+            $"Тип: {quest.questType}\n" +
+            $"Приоритет: {quest.priority}\n\n" +
+            $"Целей: {quest.objectives.Count}\n" +
+            $"Наград: {quest.rewards.Count}\n" +
+            $"Условий: {quest.startConditions.Count}";
+        EditorUtility.DisplayDialog("Статистика", msg, "OK");
     }
 }
 #endif

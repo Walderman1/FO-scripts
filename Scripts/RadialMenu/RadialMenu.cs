@@ -1,10 +1,31 @@
+using DialogueSystem;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using VContainer;
 
 public class RadialMenu : MonoBehaviour
 {
+    [Header("Роль меню")]
+    [Tooltip("Определяет назначение меню. Должно совпадать с тегом объекта:\n" +
+         "• Main — тег «RadialMenu», быстрое меню панелей (I/E/J/настройки), открывается ПКМ\n" +
+         "• Choice — тег «ChoicePanel», только для вариантов диалогов, не открывается вручную\n" +
+         "• Context — тег «ContextMenu», действия над предметом, открывается ПКМ по слоту")]
+    [SerializeField] private RadialMenuRole role = RadialMenuRole.Main;
+
+    public RadialMenuRole Role => role;
+
+    public enum RadialMenuRole
+    {
+        [InspectorName("Быстрое меню панелей")] Main,
+        [InspectorName("Выбор в диалоге")] Choice,
+        [InspectorName("Действия с предметом")] Context
+    }
+    [Header("Префабы кнопок")]
+    [SerializeField] private GameObject longButtonPrefab;
+    [SerializeField] private GameObject shortButtonPrefab;
+
     [Header("Настройки")]
     public int buttonCount = 0;
     public float radius = 250f;
@@ -16,13 +37,7 @@ public class RadialMenu : MonoBehaviour
     [Header("Тип меню")]
     public MenuType menuType = MenuType.Circle;
 
-    public enum MenuType
-    {
-        Circle,
-        Fan,
-        Vertical,
-        Horizontal
-    }
+    public enum MenuType { Circle, Fan, Vertical, Horizontal }
 
     [Header("Настройки веера")]
     public float fanStartAngle = -90f;
@@ -38,37 +53,18 @@ public class RadialMenu : MonoBehaviour
 
     public enum RadialAction
     {
-        None,
-        Talk,
-        Take,
-        Use,
-        Examine,
-        Move,
-        UseMagic,
-        OpenInventory,
-        OpenEquipment,
-        Cancel,
-        Settings,
-        Exit,
-        Menu,
-        Choice,
-        Split,
-        Equip,
+        None, Talk, Take, Use, Examine, Move, UseMagic,
+        OpenInventory, OpenEquipment, Cancel, Settings, Exit,
+        Menu, Choice, Split, Equip,
     }
 
-    public enum RadialMenuMode
-    {
-        Default,
-        Choice,
-        Context
-    }
+    public enum RadialMenuMode { Default, Choice, Context }
 
     private List<RadialButton> buttons = new List<RadialButton>();
+    private readonly Dictionary<GameObject, Stack<RadialButton>> buttonPools = new Dictionary<GameObject, Stack<RadialButton>>();
+    private readonly Dictionary<RadialButton, GameObject> buttonPrefabMap = new Dictionary<RadialButton, GameObject>();
     private CanvasGroup canvasGroup;
     public TextBeginner textBeginner;
-
-    private GameObject longButtonPrefab;
-    private GameObject shortButtonPrefab;
 
     public System.Action<RadialAction, string, int> onButtonClick;
 
@@ -80,8 +76,24 @@ public class RadialMenu : MonoBehaviour
     private List<RadialAction> defaultButtonActions;
     private int defaultButtonCount;
 
+    public bool IsVisible()
+    {
+        return canvasGroup != null && canvasGroup.alpha > 0.5f;
+    }
+
+    public void ClearButtons()
+    {
+        foreach (RadialButton btn in buttons)
+            ReturnButton(btn);
+        buttons.Clear();
+    }
+
     private void Start()
     {
+        ValidateRoleTag();
+        LoadPrefabsFromResources();
+        CacheComponents();
+        Logger.LogVerbose(LogModule.RadialMenu, $"Start menu={name}");
         LoadPrefabsFromResources();
         CacheComponents();
 
@@ -91,24 +103,51 @@ public class RadialMenu : MonoBehaviour
 
         CreateMenu();
         Hide();
+    }
 
-        Logger.Log(LogModule.RadialMenu, $"RadialMenu инициализирован с {buttonCount} кнопками, тип: {menuType}");
+    private void ValidateRoleTag()
+    {
+        string expected = role switch
+        {
+            RadialMenuRole.Main => "RadialMenu",
+            RadialMenuRole.Choice => "ChoicePanel",
+            RadialMenuRole.Context => "ContextMenu",
+            _ => null
+        };
+
+        if (expected == null) return;
+
+        string actual = "?";
+        try { actual = gameObject.tag; } catch (UnityException) { }
+
+        if (actual != expected)
+        {
+            Logger.LogWarning(LogModule.RadialMenu,
+                $"[{gameObject.name}] Роль '{role}' ожидает тег '{expected}', а стоит '{actual}'. " +
+                $"RadialMenuRegistry не сможет корректно определить меню.");
+        }
     }
 
     private void LoadPrefabsFromResources()
     {
-        longButtonPrefab = Resources.Load<GameObject>("UI/Prefab/Buttons/LongButton");
-        shortButtonPrefab = Resources.Load<GameObject>("UI/Prefab/Buttons/ShortButton");
-
         if (longButtonPrefab == null)
         {
-            Logger.LogWarning(LogModule.RadialMenu, "LongButton префаб не найден, создание запасного");
-            longButtonPrefab = CreateLongButtonPrefab();
+            longButtonPrefab = Resources.Load<GameObject>("UI/Prefab/Buttons/LongButton");
+            if (longButtonPrefab == null)
+            {
+                Logger.LogWarning(LogModule.RadialMenu, $"longButtonPrefab не назначен и не найден: Resources/UI/Prefab/Buttons/LongButton. Создан fallback.");
+                longButtonPrefab = CreateLongButtonPrefab();
+            }
         }
+
         if (shortButtonPrefab == null)
         {
-            Logger.LogWarning(LogModule.RadialMenu, "ShortButton префаб не найден, создание запасного");
-            shortButtonPrefab = CreateShortButtonPrefab();
+            shortButtonPrefab = Resources.Load<GameObject>("UI/Prefab/Buttons/ShortButton");
+            if (shortButtonPrefab == null)
+            {
+                Logger.LogWarning(LogModule.RadialMenu, $"shortButtonPrefab не назначен и не найден: Resources/UI/Prefab/Buttons/ShortButton. Создан fallback.");
+                shortButtonPrefab = CreateShortButtonPrefab();
+            }
         }
     }
 
@@ -142,7 +181,6 @@ public class RadialMenu : MonoBehaviour
         tmp.raycastTarget = false;
         tmp.font = GetDefaultFont();
 
-        Logger.Log(LogModule.RadialMenu, "Создан запасной LongButton префаб");
         return btn;
     }
 
@@ -176,7 +214,6 @@ public class RadialMenu : MonoBehaviour
         tmp.raycastTarget = false;
         tmp.font = GetDefaultFont();
 
-        Logger.Log(LogModule.RadialMenu, "Создан запасной ShortButton префаб");
         return btn;
     }
 
@@ -190,6 +227,7 @@ public class RadialMenu : MonoBehaviour
         canvasGroup = GetComponent<CanvasGroup>();
         if (canvasGroup == null)
             canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        Logger.LogVerbose(LogModule.RadialMenu, $"CacheComponents menu={name} canvasGroup={(canvasGroup != null)}");
     }
 
     private void ClearMenu()
@@ -200,7 +238,6 @@ public class RadialMenu : MonoBehaviour
                 Destroy(btn.gameObject);
         }
         buttons.Clear();
-        Logger.Log(LogModule.RadialMenu, "Меню очищено");
     }
 
     public void CreateMenu()
@@ -209,7 +246,8 @@ public class RadialMenu : MonoBehaviour
 
         if (buttonCount <= 0)
         {
-            Logger.LogWarning(LogModule.RadialMenu, "buttonCount равен 0, меню не создано");
+            if (gameObject.tag != "ChoicePanel")
+                Logger.LogVerbose(LogModule.RadialMenu, $"RadialMenu ({gameObject.name}): buttonCount is 0, no menu created");
             return;
         }
 
@@ -232,8 +270,6 @@ public class RadialMenu : MonoBehaviour
                 CreateHorizontalMenu();
                 break;
         }
-
-        Logger.Log(LogModule.RadialMenu, $"Создано меню с {buttonCount} кнопками, тип: {menuType}");
     }
 
     private void CreateCircleMenu()
@@ -249,7 +285,7 @@ public class RadialMenu : MonoBehaviour
 
     private void CreateFanMenu()
     {
-        float angleStep = (fanEndAngle - fanStartAngle) / (buttonCount - 1);
+        float angleStep = (fanEndAngle - fanStartAngle) / Mathf.Max(1, buttonCount - 1);
         for (int i = 0; i < buttonCount; i++)
         {
             float angle = (fanStartAngle + i * angleStep) * Mathf.Deg2Rad;
@@ -283,10 +319,65 @@ public class RadialMenu : MonoBehaviour
         }
     }
 
+    private RadialButton GetButton(GameObject prefab)
+    {
+        if (prefab == null) return null;
+
+        if (!buttonPools.TryGetValue(prefab, out var stack))
+        {
+            stack = new Stack<RadialButton>();
+            buttonPools[prefab] = stack;
+        }
+
+        if (stack.Count > 0)
+        {
+            RadialButton pooled = stack.Pop();
+            if (pooled != null)
+            {
+                pooled.gameObject.SetActive(true);
+                return pooled;
+            }
+        }
+
+        GameObject go = Instantiate(prefab, transform);
+        RadialButton radialBtn = go.GetComponent<RadialButton>();
+        if (radialBtn == null) radialBtn = go.AddComponent<RadialButton>();
+        return radialBtn;
+    }
+
+    private void ReturnButton(RadialButton btn)
+    {
+        if (btn == null || btn.gameObject == null) return;
+
+        btn.onClick -= OnButtonClick;
+        btn.gameObject.SetActive(false);
+        btn.transform.SetParent(transform, false);
+
+        if (buttonPrefabMap.TryGetValue(btn, out var prefab) && prefab != null)
+        {
+            if (!buttonPools.TryGetValue(prefab, out var stack))
+            {
+                stack = new Stack<RadialButton>();
+                buttonPools[prefab] = stack;
+            }
+            stack.Push(btn);
+        }
+        else
+        {
+            Destroy(btn.gameObject);
+        }
+
+        buttonPrefabMap.Remove(btn);
+    }
+
     private void CreateButton(Vector2 position, int index, GameObject prefab)
     {
-        GameObject btn = Instantiate(prefab, transform);
+        RadialButton radialBtn = GetButton(prefab);
+        if (radialBtn == null) return;
+
+        GameObject btn = radialBtn.gameObject;
         btn.transform.localPosition = position;
+        btn.transform.localScale = Vector3.one;
 
         string btnName = (index < buttonNames.Count) ? buttonNames[index] : $"Item {index + 1}";
         RadialAction btnAction = (index < buttonActions.Count) ? buttonActions[index] : RadialAction.None;
@@ -308,25 +399,23 @@ public class RadialMenu : MonoBehaviour
         {
             TMP_Text textComponent = btn.GetComponentInChildren<TMP_Text>();
             if (textComponent != null)
+            {
+                textComponent.gameObject.SetActive(true);
                 textComponent.text = btnName;
+            }
         }
 
         RectTransform rt = btn.GetComponent<RectTransform>();
         if (rt != null)
             rt.rotation = Quaternion.identity;
 
-        RadialButton radialBtn = btn.GetComponent<RadialButton>();
-        if (radialBtn == null)
-            radialBtn = btn.AddComponent<RadialButton>();
         radialBtn.Init(btnName, index);
         radialBtn.SetAction(btnAction);
+        radialBtn.onClick -= OnButtonClick;
         radialBtn.onClick += OnButtonClick;
-        buttons.Add(radialBtn);
-    }
 
-    public bool IsVisible()
-    {
-        return canvasGroup != null && canvasGroup.alpha > 0.5f;
+        buttons.Add(radialBtn);
+        buttonPrefabMap[radialBtn] = prefab;
     }
 
     private void OnButtonClick(string name, int index)
@@ -335,10 +424,11 @@ public class RadialMenu : MonoBehaviour
         if (index < buttonActions.Count)
             action = buttonActions[index];
 
-        Logger.Log(LogModule.RadialMenu, $"Выбрана кнопка: {name} (индекс {index}, действие {action})");
+        Logger.LogVerbose(LogModule.RadialMenu, $"OnButtonClick name={name} index={index} action={action} mode={currentMode} hasListener={(onButtonClick != null)} handlerInstance={(RadialMenuActionHandler.Instance != null)} hasCurrentItem={(currentItem != null)}");
 
         if (currentMode == RadialMenuMode.Choice)
         {
+            Logger.LogVerbose(LogModule.RadialMenu, "choice mode → onChoiceSelected");
             onChoiceSelected?.Invoke(index);
             currentMode = RadialMenuMode.Default;
             Hide();
@@ -348,17 +438,31 @@ public class RadialMenu : MonoBehaviour
         if (currentItem != null)
         {
             if (action == RadialAction.None)
-            {
                 action = GetActionFromButtonName(name);
-            }
 
-            MenuManager.Instance?.HandleContextAction(currentItem, action);
+            Logger.LogVerbose(LogModule.RadialMenu, $"context item, action={action}");
+            var controller = SceneInjector.Instance?.CurrentSceneScope?.Resolve<RadialMenuController>();
+            controller?.HandleContextAction(currentItem, action);
             currentItem = null;
         }
 
-        onButtonClick?.Invoke(action, name, index);
+        if (onButtonClick != null)
+        {
+            Logger.LogVerbose(LogModule.RadialMenu, "→ onButtonClick listeners");
+            onButtonClick(action, name, index);
+        }
+        else if (RadialMenuActionHandler.Instance != null)
+        {
+            Logger.LogVerbose(LogModule.RadialMenu, "→ RadialMenuActionHandler.Instance");
+            RadialMenuActionHandler.Instance.ProcessAction(action, name, index);
+        }
+        else
+        {
+            Logger.LogError(LogModule.RadialMenu, "No listener AND handler Instance == null");
+        }
 
-        MenuManager.Instance?.CloseAllMenus();
+        var ctrl = SceneInjector.Instance?.CurrentSceneScope?.Resolve<RadialMenuController>();
+        ctrl?.CloseAllMenus();
     }
 
     private RadialAction GetActionFromButtonName(string buttonName)
@@ -379,32 +483,34 @@ public class RadialMenu : MonoBehaviour
 
     public void SetChoiceMode(List<string> choices, System.Action<int> onChoiceSelected)
     {
+        Logger.LogVerbose(LogModule.RadialMenu, $"SetChoiceMode menu={name} choices={choices.Count}");
         currentMode = RadialMenuMode.Choice;
 
         buttonNames = new List<string>(choices);
         buttonActions = new List<RadialAction>();
         for (int i = 0; i < choices.Count; i++)
-        {
             buttonActions.Add(RadialAction.Choice);
-        }
-        buttonCount = choices.Count;
 
+        buttonCount = choices.Count;
         this.onChoiceSelected = onChoiceSelected;
 
         CreateMenu();
         ShowAtCenter();
 
-        Logger.Log(LogModule.RadialMenu, $"Установлен режим выбора с {choices.Count} вариантами");
+        transform.SetAsLastSibling();
+
+        Logger.Log(LogModule.RadialMenu, $"[{gameObject.name}] SetChoiceMode: {choices.Count} variants");
     }
 
     public void SetCurrentItem(InventoryItemMarker item)
     {
+        Logger.LogVerbose(LogModule.RadialMenu, $"SetCurrentItem menu={name} item={(item != null ? item.name : "null")}");
         currentItem = item;
-        Logger.Log(LogModule.RadialMenu, $"Установлен текущий предмет для контекстного меню: {item?.itemType}");
     }
 
     public void SetContextMenu(List<string> names, List<RadialAction> actions)
     {
+        Logger.LogVerbose(LogModule.RadialMenu, $"SetContextMenu menu={name} buttons={names.Count}");
         currentMode = RadialMenuMode.Context;
 
         buttonNames = new List<string>(names);
@@ -412,13 +518,9 @@ public class RadialMenu : MonoBehaviour
         buttonCount = names.Count;
 
         while (buttonActions.Count < buttonCount)
-        {
             buttonActions.Add(RadialAction.None);
-        }
 
         CreateMenu();
-
-        Logger.Log(LogModule.RadialMenu, $"Установлено контекстное меню с {names.Count} кнопками");
     }
 
     public void RestoreDefaultMenu()
@@ -428,8 +530,6 @@ public class RadialMenu : MonoBehaviour
         buttonActions = defaultButtonActions;
         buttonCount = defaultButtonCount;
         CreateMenu();
-
-        Logger.Log(LogModule.RadialMenu, "Восстановлено стандартное меню");
     }
 
     public RadialAction GetActionAtIndex(int index)
@@ -441,25 +541,39 @@ public class RadialMenu : MonoBehaviour
 
     public void ShowAtCenter()
     {
+        Logger.LogVerbose(LogModule.RadialMenu, $"ShowAtCenter menu={name}");
         Vector2 centerScreen = new Vector2(Screen.width / 2, Screen.height / 2);
         SetPosition(centerScreen);
         Show();
-        Logger.Log(LogModule.RadialMenu, "Меню показано по центру");
     }
 
     public void ShowAtPosition(Vector2 screenPosition)
     {
+        Logger.LogVerbose(LogModule.RadialMenu, $"ShowAtPosition menu={name} pos={screenPosition}");
         SetPosition(screenPosition);
         Show();
-        Logger.Log(LogModule.RadialMenu, $"Меню показано по позиции: {screenPosition}");
     }
 
     private void SetPosition(Vector2 screenPosition)
     {
+        RectTransform parentRect = transform.parent as RectTransform;
+        if (parentRect == null)
+        {
+            Logger.LogError(LogModule.RadialMenu, $"[{gameObject.name}] Parent is not RectTransform!");
+            return;
+        }
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null)
+        {
+            Logger.LogError(LogModule.RadialMenu, $"[{gameObject.name}] No Canvas in parent!");
+            return;
+        }
+
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            transform.parent as RectTransform,
+            parentRect,
             screenPosition,
-            GetComponentInParent<Canvas>().worldCamera,
+            canvas.worldCamera,
             out Vector2 localPoint
         );
         transform.localPosition = localPoint;
@@ -467,18 +581,26 @@ public class RadialMenu : MonoBehaviour
 
     public void Show()
     {
-        if (canvasGroup != null)
+        Logger.LogVerbose(LogModule.RadialMenu, $"Show menu={name} buttons={buttons.Count} canvasGroup={(canvasGroup != null)}");
+
+        if (canvasGroup == null)
         {
-            canvasGroup.alpha = 1f;
-            canvasGroup.blocksRaycasts = true;
-            canvasGroup.interactable = true;
+            Logger.LogError(LogModule.RadialMenu, $"[{gameObject.name}] canvasGroup is null!");
+            return;
         }
+
+        gameObject.SetActive(true);
+
+        canvasGroup.alpha = 1f;
+        canvasGroup.blocksRaycasts = true;
+        canvasGroup.interactable = true;
+
         transform.SetAsLastSibling();
-        Logger.Log(LogModule.RadialMenu, "Меню показано");
     }
 
     public void Hide()
     {
+        Logger.LogVerbose(LogModule.RadialMenu, $"Hide menu={name}");
         if (canvasGroup != null)
         {
             canvasGroup.alpha = 0f;
@@ -486,12 +608,18 @@ public class RadialMenu : MonoBehaviour
             canvasGroup.interactable = false;
         }
         onMenuClosed?.Invoke();
-        Logger.Log(LogModule.RadialMenu, "Меню скрыто");
     }
 
     private void OnDestroy()
     {
-        ClearMenu();
-        Logger.Log(LogModule.RadialMenu, "RadialMenu уничтожен");
+        foreach (var stack in buttonPools.Values)
+        {
+            foreach (var btn in stack)
+                if (btn != null) Destroy(btn.gameObject);
+            stack.Clear();
+        }
+        buttonPools.Clear();
+        buttonPrefabMap.Clear();
+        buttons.Clear();
     }
 }

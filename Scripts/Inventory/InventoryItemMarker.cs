@@ -4,14 +4,27 @@ using UnityEngine.EventSystems;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+using VContainer;
 
 public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler, IDropHandler, IPointerEnterHandler, IPointerExitHandler
 {
+    [Tooltip("Ссылка на ItemSO. Приоритетна.")]
+    public ItemSO itemSO;
+
+    [System.Obsolete("Используйте itemSO")]
     public ItemType itemType = ItemType.None;
+
     public int count = 1;
     public Transform originalSlotParent;
 
     public static bool IsAnyDragging = false;
+
+    [Inject] private ItemDatabase _itemDatabase;
+    [Inject] private InventoryUIManager _inventoryUIManager;
+    [Inject] private RadialMenuController _radialMenuController;
+    [Inject] private TooltipManager _tooltipManager;
+    [Inject] private ItemViewPanel _itemViewPanel;
+    [Inject] private CraftingUI _craftingUI;
 
     private TextMeshProUGUI countText;
     private CanvasGroup canvasGroup;
@@ -21,6 +34,23 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
     private bool isDragging = false;
     private float lastClickTime = 0f;
     private const float DOUBLE_CLICK_DELAY = 0.3f;
+
+    public ItemSO ItemSO
+    {
+        get
+        {
+            if (itemSO != null) return itemSO;
+
+#pragma warning disable CS0618
+            if (itemType != ItemType.None)
+                itemSO = _itemDatabase?.GetItemByLegacyType(itemType);
+#pragma warning restore CS0618
+
+            return itemSO;
+        }
+    }
+
+    public string ItemId => ItemSO != null ? ItemSO.id : "";
 
     private void Awake()
     {
@@ -32,8 +62,6 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
 
         parentCanvas = GetComponentInParent<Canvas>();
         UpdateUI();
-
-        Logger.Log(LogModule.Inventory, $"Маркер предмета {itemType} инициализирован, количество: {count}");
     }
 
     private void OnDestroy()
@@ -41,19 +69,21 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
         DestroyDragClone();
     }
 
+    public void Initialize(ItemSO so, int cnt = 1)
+    {
+        itemSO = so;
+        count = cnt;
+        UpdateUI();
+    }
+
     public void SetBlocksRaycasts(bool value)
     {
-        if (canvasGroup != null)
-            canvasGroup.blocksRaycasts = value;
+        if (canvasGroup != null) canvasGroup.blocksRaycasts = value;
     }
 
     public void DestroyDragClone()
     {
-        if (dragVisual != null)
-        {
-            Destroy(dragVisual);
-            dragVisual = null;
-        }
+        if (dragVisual != null) { Destroy(dragVisual); dragVisual = null; }
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -81,15 +111,13 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
                     parentCanvas.transform as RectTransform,
                     Input.mousePosition,
                     parentCanvas.worldCamera,
-                    out Vector2 localPoint
-                );
+                    out Vector2 localPoint);
 
                 rectTransform.anchoredPosition = localPoint;
                 rectTransform.sizeDelta = new Vector2(80, 80);
                 rectTransform.pivot = new Vector2(0.5f, 0.5f);
                 rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
                 rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                rectTransform.localScale = Vector3.one;
             }
 
             CanvasGroup cg = dragVisual.GetComponent<CanvasGroup>();
@@ -100,19 +128,17 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
                 cg.interactable = false;
             }
         }
-
-        Logger.Log(LogModule.Inventory, $"Начало перетаскивания предмета {itemType}");
     }
 
     private GameObject CreateDragVisual(int itemCount)
     {
-        ItemData data = ItemDatabase.Instance?.GetItemData(itemType);
-        GameObject visual = null;
+        var so = ItemSO;
+        GameObject visual;
 
-        if (data != null && data.uiPrefab != null)
+        if (so != null && so.uiPrefab != null)
         {
-            visual = Instantiate(data.uiPrefab, parentCanvas.transform, false);
-            visual.name = "DragVisual_" + data.itemName;
+            visual = Instantiate(so.uiPrefab, parentCanvas.transform, false);
+            visual.name = "DragVisual_" + so.itemName;
         }
         else
         {
@@ -123,25 +149,19 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
             rt.sizeDelta = new Vector2(80, 80);
 
             Image img = visual.AddComponent<Image>();
-            if (data != null && data.icon != null)
+            if (so != null && so.icon != null)
             {
-                img.sprite = data.icon;
+                img.sprite = so.icon;
                 img.color = Color.white;
             }
-            else
-            {
-                img.color = new Color(0.5f, 0.5f, 0.5f, 0.9f);
-            }
+            else img.color = new Color(0.5f, 0.5f, 0.5f, 0.9f);
             img.raycastTarget = false;
         }
 
         if (visual == null) return null;
 
         MonoBehaviour[] scripts = visual.GetComponents<MonoBehaviour>();
-        foreach (var script in scripts)
-        {
-            script.enabled = false;
-        }
+        foreach (var script in scripts) script.enabled = false;
 
         CanvasGroup cg = visual.GetComponent<CanvasGroup>();
         if (cg == null) cg = visual.AddComponent<CanvasGroup>();
@@ -154,33 +174,6 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
         {
             tmpText.text = itemCount > 1 ? itemCount.ToString() : "";
             tmpText.raycastTarget = false;
-        }
-        else
-        {
-            GameObject textObj = new GameObject("CountText");
-            textObj.transform.SetParent(visual.transform, false);
-
-            TextMeshProUGUI newText = textObj.AddComponent<TextMeshProUGUI>();
-            newText.text = itemCount > 1 ? itemCount.ToString() : "";
-            newText.fontSize = 24;
-            newText.color = Color.white;
-            newText.alignment = TextAlignmentOptions.BottomRight;
-            newText.raycastTarget = false;
-
-            RectTransform textRect = textObj.GetComponent<RectTransform>();
-            textRect.anchorMin = new Vector2(0, 0);
-            textRect.anchorMax = new Vector2(1, 1);
-            textRect.offsetMin = new Vector2(0, 0);
-            textRect.offsetMax = new Vector2(0, 0);
-            textRect.pivot = new Vector2(0.5f, 0.5f);
-        }
-
-        Outline outline = visual.GetComponent<Outline>();
-        if (outline == null)
-        {
-            outline = visual.AddComponent<Outline>();
-            outline.effectColor = Color.black;
-            outline.effectDistance = new Vector2(2, -2);
         }
 
         return visual;
@@ -197,8 +190,7 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
                     parentCanvas.transform as RectTransform,
                     Input.mousePosition,
                     parentCanvas.worldCamera,
-                    out Vector2 localPoint
-                );
+                    out Vector2 localPoint);
 
                 rectTransform.anchoredPosition = localPoint;
             }
@@ -235,7 +227,6 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
         {
             transform.SetParent(originalParent);
             transform.localPosition = Vector3.zero;
-            transform.localScale = Vector3.one;
             originalSlotParent = originalParent;
 
             originalSlot.isOccupied = true;
@@ -243,7 +234,6 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
         }
 
         StartCoroutine(CleanAllSlotsDelayed());
-        Logger.Log(LogModule.Inventory, $"Завершение перетаскивания предмета {itemType}");
     }
 
     private IEnumerator CleanAllSlotsDelayed()
@@ -254,10 +244,9 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
 
     private void ForceCleanAllSlots()
     {
-        InventoryUIManager uiManager = FindFirstObjectByType<InventoryUIManager>();
-        if (uiManager == null || uiManager.inventoryGrid == null) return;
+        if (_inventoryUIManager == null || _inventoryUIManager.inventoryGrid == null) return;
 
-        foreach (Transform slotTransform in uiManager.inventoryGrid.transform)
+        foreach (Transform slotTransform in _inventoryUIManager.inventoryGrid.transform)
         {
             InventorySlot slot = slotTransform.GetComponent<InventorySlot>();
             if (slot == null) continue;
@@ -267,49 +256,39 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
             slot.UpdateSlotText();
         }
 
-        uiManager.UpdateAllSlots();
+        _inventoryUIManager.UpdateAllSlots();
     }
 
     public void OnDrop(PointerEventData eventData)
     {
         InventorySlot slot = GetComponentInParent<InventorySlot>();
-        if (slot != null)
-        {
-            slot.OnDrop(eventData);
-        }
+        if (slot != null) slot.OnDrop(eventData);
     }
 
     public void OnPointerClick(PointerEventData eventData)
     {
         if (isDragging) return;
 
-        bool shiftPressed = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-        bool altPressed = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+        if (_craftingUI != null && _craftingUI.IsOpen && eventData.button == PointerEventData.InputButton.Left)
+        {
+            _craftingUI.TryAddItemToCraft(ItemId, 1);
+            return;
+        }
+
+        bool shiftPressed = IsSplitHalfPressed();
+        bool altPressed = IsSplitOnePressed();
 
         if (eventData.button == PointerEventData.InputButton.Left)
         {
-            if (shiftPressed && count > 1)
-            {
-                SplitStack(count / 2);
-                Logger.Log(LogModule.Inventory, $"Разделение стека {itemType}: {count / 2} предметов");
-                return;
-            }
-
-            if (altPressed && count > 1)
-            {
-                SplitStack(1);
-                Logger.Log(LogModule.Inventory, $"Разделение стека {itemType}: 1 предмет");
-                return;
-            }
+            if (shiftPressed && count > 1) { SplitStack(count / 2); return; }
+            if (altPressed && count > 1) { SplitStack(1); return; }
 
             float timeSinceLastClick = Time.time - lastClickTime;
             lastClickTime = Time.time;
 
             if (timeSinceLastClick < DOUBLE_CLICK_DELAY)
-            {
-                MenuManager.Instance?.OpenItemView(this);
-                Logger.Log(LogModule.Inventory, $"Двойной клик по предмету {itemType}");
-            }
+                _radialMenuController?.OpenItemView(this);
+
             return;
         }
 
@@ -320,117 +299,95 @@ public class InventoryItemMarker : MonoBehaviour, IBeginDragHandler, IDragHandle
         }
     }
 
+    private bool IsSplitHalfPressed()
+    {
+        var cfg = GameReferences.Instance?.InputManager?.Config;
+        if (cfg != null) return cfg.SplitHalfPressed();
+        return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+    }
+
+    private bool IsSplitOnePressed()
+    {
+        var cfg = GameReferences.Instance?.InputManager?.Config;
+        if (cfg != null) return cfg.SplitOnePressed();
+        return Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+    }
+
     private void SplitStack(int splitCount)
     {
-        if (splitCount <= 0 || splitCount >= count)
+        if (splitCount <= 0 || splitCount >= count) return;
+        if (_inventoryUIManager == null) return;
+
+        var so = ItemSO;
+        if (so == null || !so.canStack) return;
+
+        var targetStack = _inventoryUIManager.FindStackWithSpace(so, this);
+        if (targetStack != null)
         {
-            Logger.LogWarning(LogModule.Inventory, $"Некорректное разделение стека: {splitCount} из {count}");
-            return;
-        }
-
-        InventoryUIManager uiManager = FindFirstObjectByType<InventoryUIManager>();
-        if (uiManager == null || uiManager.inventoryGrid == null)
-        {
-            Logger.LogWarning(LogModule.Inventory, "InventoryUIManager не найден для разделения стека");
-            return;
-        }
-
-        Transform emptySlot = null;
-        foreach (Transform slot in uiManager.inventoryGrid.transform)
-        {
-            InventoryItemMarker marker = slot.GetComponentInChildren<InventoryItemMarker>();
-            if (marker == null)
+            int space = so.maxStack - targetStack.count;
+            int actual = Mathf.Min(splitCount, space);
+            if (actual > 0)
             {
-                emptySlot = slot;
-                break;
-            }
-        }
+                targetStack.AddCount(actual);
+                var targetSlot = targetStack.GetComponentInParent<InventorySlot>();
+                if (targetSlot != null) targetSlot.UpdateSlotText();
 
-        if (emptySlot == null)
-        {
-            Logger.Log(LogModule.Inventory, "Нет свободных слотов для разделения стека");
-            return;
-        }
+                count -= actual;
+                UpdateUI();
 
-        ItemData data = ItemDatabase.Instance?.GetItemData(itemType);
-        if (data != null && data.uiPrefab != null)
-        {
-            GameObject newItem = Instantiate(data.uiPrefab, emptySlot);
-            newItem.transform.localPosition = Vector3.zero;
-            newItem.transform.localScale = Vector3.one;
-
-            InventoryItemMarker newMarker = newItem.GetComponent<InventoryItemMarker>();
-            if (newMarker != null)
-            {
-                newMarker.itemType = itemType;
-                newMarker.count = splitCount;
-                newMarker.UpdateUI();
-            }
-
-            count -= splitCount;
-            UpdateUI();
-
-            InventorySlot originalSlot = GetComponentInParent<InventorySlot>();
-            if (originalSlot != null)
-            {
-                originalSlot.UpdateSlotText();
-                originalSlot.isOccupied = count > 0;
-            }
-
-            InventorySlot newSlot = emptySlot.GetComponent<InventorySlot>();
-            if (newSlot != null)
-            {
-                newSlot.UpdateSlotText();
-                newSlot.isOccupied = true;
-            }
-
-            if (count <= 0)
-            {
+                var originalSlot = GetComponentInParent<InventorySlot>();
                 if (originalSlot != null)
                 {
-                    originalSlot.isOccupied = false;
                     originalSlot.UpdateSlotText();
+                    originalSlot.isOccupied = count > 0;
                 }
-                Destroy(gameObject);
-            }
 
-            StartCoroutine(CleanAllSlotsDelayed());
-            Logger.Log(LogModule.Inventory, $"Стек {itemType} разделён: {splitCount} в новом слоте, {count} осталось");
+                if (count <= 0) DestroySelf();
+
+                _inventoryUIManager.UpdateAllSlots();
+                return;
+            }
         }
+
+        var emptySlot = _inventoryUIManager.FindEmptySlot();
+        if (emptySlot != null)
+            _inventoryUIManager.SplitStackToEmpty(this, splitCount, emptySlot);
+    }
+
+    private void DestroySelf()
+    {
+        var slot = GetComponentInParent<InventorySlot>();
+        if (slot != null)
+        {
+            slot.isOccupied = false;
+            slot.UpdateSlotText();
+        }
+        gameObject.SetActive(false);
+        Destroy(gameObject);
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        ItemData data = ItemDatabase.Instance?.GetItemData(itemType);
-        if (data != null)
+        var so = ItemSO;
+        if (so != null)
         {
-            string tooltip = $"<b>{data.itemName}</b>\n{data.description}";
-            TooltipManager.Instance?.ShowTooltip(tooltip, Input.mousePosition);
+            string tooltip = $"<b>{so.itemName}</b>\n{so.description}";
+            _tooltipManager?.ShowTooltip(tooltip, Input.mousePosition);
         }
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        TooltipManager.Instance?.HideTooltip();
+        _tooltipManager?.HideTooltip();
     }
 
-    public void AddCount(int amount)
-    {
-        count += amount;
-        UpdateUI();
-        Logger.Log(LogModule.Inventory, $"Добавлено {amount} к предмету {itemType}, теперь: {count}");
-    }
+    public void AddCount(int amount) { count += amount; UpdateUI(); }
 
     public void UpdateUI()
     {
         if (countText != null)
-        {
             countText.text = count > 1 ? count.ToString() : "";
-        }
     }
 
-    public bool IsDragging()
-    {
-        return isDragging;
-    }
+    public bool IsDragging() => isDragging;
 }

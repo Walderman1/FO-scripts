@@ -28,9 +28,37 @@ public class FindingOneselfAnimation : MonoBehaviour
 
     private bool isAnimationComplete = false;
     private bool isAnimationStopped = false;
+    private bool isFirstEnable = true;
     private bool isTrixieComplete = false;
     private Coroutine mainAnimationCoroutine;
     private Coroutine trixieCoroutine;
+
+    private void OnEnable()
+    {
+        if (isFirstEnable)
+        {
+            isFirstEnable = false;
+            return;
+        }
+
+        StopAllCoroutines();
+
+        isAnimationStopped = false;
+        isAnimationComplete = true;
+        isTrixieComplete = true;
+
+        ShowAllLettersImmediate();
+        ShowTrixieImmediate();
+
+        foreach (LetterData data in allLetters)
+        {
+            if (data.light != null)
+            {
+                if (data.flickerCoroutine != null) StopCoroutine(data.flickerCoroutine);
+                data.flickerCoroutine = StartCoroutine(RandomFlicker(data.light, data));
+            }
+        }
+    }
 
     private void Start()
     {
@@ -131,7 +159,7 @@ public class FindingOneselfAnimation : MonoBehaviour
 
                 if (trixieOriginalLightIntensity <= 0f)
                 {
-                    Logger.LogWarning(LogModule.Menu, $"Интенсивность света Trixie равна {trixieOriginalLightIntensity}, установка значения по умолчанию: {config.trixieDefaultLightIntensity}");
+                    Logger.LogVerbose(LogModule.Menu, $"Интенсивность света Trixie равна {trixieOriginalLightIntensity}, установка значения по умолчанию: {config.trixieDefaultLightIntensity}");
                     trixieOriginalLightIntensity = config.trixieDefaultLightIntensity;
                 }
 
@@ -153,6 +181,8 @@ public class FindingOneselfAnimation : MonoBehaviour
 
     private void FindAllLetters()
     {
+        allLetters.Clear();
+
         foreach (Transform word in transform)
         {
             foreach (Transform letter in word)

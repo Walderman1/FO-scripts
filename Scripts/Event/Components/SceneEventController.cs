@@ -1,11 +1,11 @@
+using System.Collections;
 using UnityEngine;
+using VContainer;
 
 public class SceneEventController : MonoBehaviour
 {
     [Header("Events to execute on scene start")]
     [SerializeField] private GameEvent[] eventsOnAwake;
-
-    [Header("Events to execute on scene enter")]
     [SerializeField] private GameEvent[] eventsOnEnter;
 
     [Header("Unique scene events (execute once)")]
@@ -19,60 +19,63 @@ public class SceneEventController : MonoBehaviour
         public string sceneName;
     }
 
-    private void Awake()
-    {
-        Logger.Log(LogModule.Event, $"Инициализация контроллера событий сцены: {gameObject.scene.name}");
+    [Inject] private EventStateManager _eventStateManager;
+    [Inject] private IObjectResolver _injectedContainer;
 
-        foreach (var evt in eventsOnAwake)
-        {
-            if (evt != null)
-            {
-                var context = new EventContext()
-                    .WithLocation(gameObject.scene.name)
-                    .WithValue("Awake");
-                evt.Execute(context);
-                Logger.Log(LogModule.Event, $"Выполнено событие Awake: {evt.name}");
-            }
-        }
-    }
+    private IObjectResolver Container => _injectedContainer ?? SceneInjector.Instance?.CurrentSceneScope;
 
     private void Start()
     {
-        Logger.Log(LogModule.Event, $"Запуск событий сцены: {gameObject.scene.name}");
+        StartCoroutine(RunEventsWhenReady());
+    }
+
+    private IEnumerator RunEventsWhenReady()
+    {
+        float timeout = 5f;
+        float elapsed = 0f;
+        while (Container == null && elapsed < timeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        var container = Container;
+        if (container == null)
+        {
+            Logger.LogWarning(LogModule.Event, "SceneEventController: контейнер не получен, события пропущены");
+            yield break;
+        }
+
+        foreach (var evt in eventsOnAwake)
+        {
+            if (evt == null) continue;
+            var context = new EventContext()
+                .WithContainer(container)
+                .WithLocation(gameObject.scene.name)
+                .WithValue("Awake");
+            evt.Execute(context);
+        }
 
         foreach (var evt in eventsOnEnter)
         {
-            if (evt != null)
-            {
-                var context = new EventContext()
-                    .WithLocation(gameObject.scene.name)
-                    .WithValue("Start");
-                evt.Execute(context);
-                Logger.Log(LogModule.Event, $"Выполнено событие Start: {evt.name}");
-            }
+            if (evt == null) continue;
+            var context = new EventContext()
+                .WithContainer(container)
+                .WithLocation(gameObject.scene.name)
+                .WithValue("Start");
+            evt.Execute(context);
         }
 
         foreach (var unique in uniqueEvents)
         {
-            if (unique.gameEvent != null)
+            if (unique?.gameEvent == null) continue;
+            bool isExecuted = _eventStateManager?.IsExecuted(unique.eventID) ?? false;
+            if (!isExecuted)
             {
-                bool isExecuted = EventStateManager.Instance?.IsExecuted(unique.eventID) ?? false;
-                if (!isExecuted)
-                {
-                    unique.gameEvent.Execute(new EventContext()
-                        .WithLocation(gameObject.scene.name));
-                    Logger.Log(LogModule.Event, $"Выполнено уникальное событие '{unique.eventID}' в сцене {gameObject.scene.name}");
-                }
-                else
-                {
-                    Logger.Log(LogModule.Event, $"Уникальное событие '{unique.eventID}' уже было выполнено ранее");
-                }
+                unique.gameEvent.Execute(new EventContext()
+                    .WithContainer(container)
+                    .WithLocation(gameObject.scene.name));
             }
         }
-    }
-
-    private void OnDestroy()
-    {
-        Logger.Log(LogModule.Event, $"Уничтожение контроллера событий сцены: {gameObject.scene.name}");
     }
 }

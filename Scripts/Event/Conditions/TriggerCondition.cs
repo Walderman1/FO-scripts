@@ -1,36 +1,103 @@
 using UnityEngine;
+using DialogueSystem;
+using VContainer;
 
 [System.Serializable]
 public abstract class TriggerCondition
 {
     public abstract bool Check(EventContext context);
+
+    protected static T Resolve<T>(EventContext context) where T : class
+    {
+        var c = context?.Container;
+        if (c != null)
+        {
+            try { var v = c.Resolve<T>(); if (v != null) return v; } catch { }
+        }
+
+        var root = SceneInjector.Instance?.RootScope ?? GameLifetimeScope.Current?.Container;
+        if (root != null)
+        {
+            try { return root.Resolve<T>(); } catch { }
+        }
+        return null;
+    }
 }
 
 [System.Serializable]
 public class TriggerConditionItem : TriggerCondition
 {
-    public ItemType targetItem;
+    [Newtonsoft.Json.JsonIgnore]
+    public ItemSO targetItemSO;
+
+    public string targetItemSOId;
+
+    [System.Obsolete("Используйте targetItemSO")]
+    public ItemType targetItem = ItemType.None;
+
     public bool requireNotEquipped = false;
 
     public override bool Check(EventContext context)
     {
-        if (context.ItemType != targetItem)
+        string requiredId = GetRequiredItemId(context);
+        if (string.IsNullOrEmpty(requiredId)) return false;
+
+        string contextId = context.ItemId;
+        if (string.IsNullOrEmpty(contextId))
         {
-            Logger.Log(LogModule.Event, $"Условие предмета: {targetItem} не совпадает с контекстом");
-            return false;
+#pragma warning disable CS0618
+            if (context.ItemType != ItemType.None)
+                contextId = Resolve<ItemDatabase>(context)?.GetItemByLegacyType(context.ItemType)?.id;
+#pragma warning restore CS0618
         }
+
+        if (contextId != requiredId) return false;
 
         if (requireNotEquipped)
         {
-            bool isEquipped = EquipmentSystem.Instance?.IsEquipped(targetItem) ?? false;
-            bool result = !isEquipped;
-            Logger.Log(LogModule.Event, $"Условие предмета: {targetItem} {(result ? "не экипирован" : "экипирован")}");
-            return result;
+            var so = ResolveItemSO(context);
+            if (so == null) return false;
+            bool isEquipped = Resolve<EquipmentSystem>(context)?.IsEquipped(so.equipmentType) ?? false;
+            return !isEquipped;
         }
-
-        Logger.Log(LogModule.Event, $"Условие предмета: {targetItem} выполнено");
         return true;
     }
+
+    public ItemSO ResolveItemSO() => ResolveItemSO(null);
+
+    public ItemSO ResolveItemSO(EventContext context)
+    {
+        if (targetItemSO != null) return targetItemSO;
+
+        var db = Resolve<ItemDatabase>(context);
+        if (db == null) return null;
+
+        if (!string.IsNullOrEmpty(targetItemSOId))
+        {
+            targetItemSO = db.GetItem(targetItemSOId);
+            if (targetItemSO != null) return targetItemSO;
+        }
+
+#pragma warning disable CS0618
+        if (targetItem != ItemType.None)
+        {
+            targetItemSO = db.GetItemByLegacyType(targetItem);
+            return targetItemSO;
+        }
+#pragma warning restore CS0618
+
+        return null;
+    }
+
+    public string GetRequiredItemId(EventContext context)
+    {
+        if (targetItemSO != null) return targetItemSO.id;
+        if (!string.IsNullOrEmpty(targetItemSOId)) return targetItemSOId;
+        var so = ResolveItemSO(context);
+        return so != null ? so.id : "";
+    }
+
+    public void SyncItemSOId() => targetItemSOId = targetItemSO != null ? targetItemSO.id : "";
 }
 
 [System.Serializable]
@@ -41,58 +108,19 @@ public class TriggerConditionLocation : TriggerCondition
 
     public override bool Check(EventContext context)
     {
-        if (string.IsNullOrEmpty(locationName))
-        {
-            Logger.Log(LogModule.Event, "Условие локации: имя локации пустое, условие пропущено");
-            return true;
-        }
+        if (string.IsNullOrEmpty(locationName)) return true;
 
-        string currentLocation = GetCurrentLocationFromTextBeginner();
+        string current = GetCurrentLocationName(context);
 
-        if (string.IsNullOrEmpty(currentLocation))
-        {
-            currentLocation = context.LocationName ?? GetCurrentLocationName();
-        }
-
-        bool result;
-        if (exactMatch)
-            result = currentLocation == locationName;
-        else
-            result = currentLocation.Contains(locationName);
-
-        Logger.Log(LogModule.Event, $"Условие локации: текущая '{currentLocation}', требуется '{locationName}' (точное={exactMatch}): {(result ? "успешно" : "провал")}");
-        return result;
+        if (exactMatch) return current == locationName;
+        return !string.IsNullOrEmpty(current) && current.Contains(locationName);
     }
 
-    private string GetCurrentLocationFromTextBeginner()
+    private string GetCurrentLocationName(EventContext context)
     {
-        TextBeginner textBeginner = Object.FindObjectOfType<TextBeginner>();
-        if (textBeginner != null)
-        {
-            var field = textBeginner.GetType().GetField("currentLocation",
-                System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.Instance);
-
-            if (field != null)
-            {
-                var loc = field.GetValue(textBeginner) as GameObject;
-                if (loc != null)
-                {
-                    return loc.name;
-                }
-            }
-        }
-        return string.Empty;
-    }
-
-    private string GetCurrentLocationName()
-    {
-        GameObject[] locations = GameObject.FindGameObjectsWithTag("Location");
-        foreach (var loc in locations)
-        {
-            if (loc.activeSelf)
-                return loc.name;
-        }
+        var tb = Resolve<TextBeginner>(context);
+        if (tb != null && tb.CurrentLocation != null) return tb.CurrentLocation.name;
+        if (!string.IsNullOrEmpty(context?.LocationName)) return context.LocationName;
         return string.Empty;
     }
 }
@@ -105,9 +133,11 @@ public class TriggerConditionFlag : TriggerCondition
 
     public override bool Check(EventContext context)
     {
-        bool result = FlagManager.Instance?.GetFlag(flagName) == flagValue;
-        Logger.Log(LogModule.Event, $"Условие флага: {flagName} = {flagValue}: {(result ? "успешно" : "провал")}");
-        return result;
+        if (context != null && !string.IsNullOrEmpty(context.FlagName))
+            return context.FlagName == flagName && context.FlagValue == flagValue;
+
+        bool current = Resolve<FlagManager>(context)?.GetFlag(flagName) ?? false;
+        return current == flagValue;
     }
 }
 
@@ -116,9 +146,5 @@ public class TriggerConditionCustom : TriggerCondition
 {
     public string customMethodName;
 
-    public override bool Check(EventContext context)
-    {
-        Logger.Log(LogModule.Event, $"Пользовательское условие: {customMethodName} - всегда выполняется");
-        return true;
-    }
+    public override bool Check(EventContext context) => true;
 }

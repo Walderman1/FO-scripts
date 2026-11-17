@@ -1,8 +1,7 @@
-// QuestConfigSO.cs - КОНФИГУРАЦИЯ КВЕСТОВОЙ СИСТЕМЫ
 using UnityEngine;
 using System.Collections.Generic;
 
-[CreateAssetMenu(fileName = "QuestConfig", menuName = "Quests/Quest Config")]
+[CreateAssetMenu(fileName = "КонфигКвестов", menuName = "|Конфиги|/Конфиг квестов")]
 public class QuestConfigSO : ScriptableObject
 {
     [Header("📁 ПУТИ К ПРЕФАБАМ")]
@@ -37,6 +36,10 @@ public class QuestConfigSO : ScriptableObject
     [SerializeField] private Color inactiveTabColor = new Color(0.2f, 0.2f, 0.3f);
     [SerializeField] private Color failedTabColor = new Color(0.8f, 0.3f, 0.3f);
 
+    [Header("——— Награды ———")]
+    [SerializeField] private Color rewardBgColor = new Color(0.2f, 0.5f, 0.2f, 0.3f);
+    [SerializeField] private Color rewardBorderColor = new Color(0.3f, 0.8f, 0.3f);
+
     [Header("📐 РАЗМЕРЫ UI")]
     [Header("——— Панель квестов ———")]
     [SerializeField] private float fadeDuration = 0.3f;
@@ -59,6 +62,11 @@ public class QuestConfigSO : ScriptableObject
     [Header("——— Панель деталей ———")]
     [SerializeField] private Vector2 detailOffsetMin = new Vector2(15, 15);
     [SerializeField] private Vector2 detailOffsetMax = new Vector2(-15, -80);
+
+    [Header("——— Награды ———")]
+    [SerializeField] private float rewardSlotSize = 60f;
+    [SerializeField] private float rewardSlotSpacing = 15f;
+    [SerializeField] private string rewardSlotPrefabPath = "Slot";
 
     [Header("🔔 УВЕДОМЛЕНИЯ")]
     [Header("——— Время ———")]
@@ -97,6 +105,10 @@ public class QuestConfigSO : ScriptableObject
     [SerializeField] private string progressDetailFormat = "Прогресс: {0} ({1}%)";
     [SerializeField] private string objectiveProgressFormat = " ({0}/{1})";
 
+    [Header("——— Награды ———")]
+    [SerializeField] private string rewardsLabelText = "🏆 Награды:";
+    [SerializeField] private string noRewardsText = "Нет наград";
+
     [Header("📑 ВКЛАДКИ")]
     [SerializeField] private string activeTabName = "Активные";
     [SerializeField] private string completedTabName = "Выполненные";
@@ -105,10 +117,6 @@ public class QuestConfigSO : ScriptableObject
     [Header("⚙️ ПРОЧЕЕ")]
     [SerializeField] private bool enableLogging = true;
     [SerializeField] private bool autoLoadQuests = true;
-
-    // ============ СВОЙСТВА ============
-
-    // Пути
     public string QuestItemPrefabPath => questItemPrefabPath;
     public string ObjectivePrefabPath => objectivePrefabPath;
     public string NotificationPrefabPath => notificationPrefabPath;
@@ -117,7 +125,6 @@ public class QuestConfigSO : ScriptableObject
     public string NotificationsTag => notificationsTag;
     public string InventoryItemsPath => inventoryItemsPath;
 
-    // Цвета
     public Color ActiveColor => activeColor;
     public Color CompletedColor => completedColor;
     public Color FailedColor => failedColor;
@@ -133,7 +140,9 @@ public class QuestConfigSO : ScriptableObject
     public Color InactiveTabColor => inactiveTabColor;
     public Color FailedTabColor => failedTabColor;
 
-    // Размеры
+    public Color RewardBgColor => rewardBgColor;
+    public Color RewardBorderColor => rewardBorderColor;
+
     public float FadeDuration => fadeDuration;
     public float QuestItemHeight => questItemHeight;
     public float FallbackItemHeight => fallbackItemHeight;
@@ -147,7 +156,10 @@ public class QuestConfigSO : ScriptableObject
     public Vector2 DetailOffsetMin => detailOffsetMin;
     public Vector2 DetailOffsetMax => detailOffsetMax;
 
-    // Уведомления
+    public float RewardSlotSize => rewardSlotSize;
+    public float RewardSlotSpacing => rewardSlotSpacing;
+    public string RewardSlotPrefabPath => rewardSlotPrefabPath;
+
     public float NotifyDuration => notifyDuration;
     public float NotifyFade => notifyFade;
     public float NotifySlide => notifySlide;
@@ -157,14 +169,12 @@ public class QuestConfigSO : ScriptableObject
     public float NotifyBgAlpha => notifyBgAlpha;
     public float NotifySlideOffset => notifySlideOffset;
 
-    // Иконки
     public Sprite StartIcon => startIcon;
     public Sprite CompleteIcon => completeIcon;
     public Sprite UpdateIcon => updateIcon;
     public Sprite ObjectiveIcon => objectiveIcon;
     public float IconSize => iconSize;
 
-    // Тексты
     public string TrackBtnText => trackBtnText;
     public string UntrackBtnText => untrackBtnText;
     public string CancelBtnText => cancelBtnText;
@@ -176,16 +186,15 @@ public class QuestConfigSO : ScriptableObject
     public string ProgressDetailFormat => progressDetailFormat;
     public string ObjectiveProgressFormat => objectiveProgressFormat;
 
-    // Вкладки
+    public string RewardsLabelText => rewardsLabelText;
+    public string NoRewardsText => noRewardsText;
+
     public string ActiveTabName => activeTabName;
     public string CompletedTabName => completedTabName;
     public string FailedTabName => failedTabName;
 
-    // Прочее
     public bool EnableLogging => enableLogging;
     public bool AutoLoadQuests => autoLoadQuests;
-
-    // ============ МЕТОДЫ ============
 
     public Color GetQuestColor(QuestInstance quest, int tab)
     {
@@ -255,9 +264,9 @@ public class QuestConfigSO : ScriptableObject
 
 public enum QuestNotifyType
 {
-    Start,
-    Update,
-    Complete,
-    Objective,
-    Tracking
+    [InspectorName("Старт")] Start,
+    [InspectorName("Обновление")] Update,
+    [InspectorName("Завершение")] Complete,
+    [InspectorName("Цель")] Objective,
+    [InspectorName("Отслеживание")] Tracking
 }

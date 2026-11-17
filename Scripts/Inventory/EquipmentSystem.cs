@@ -1,43 +1,38 @@
 using UnityEngine;
 using System.Collections.Generic;
+using VContainer;
 
 public class EquipmentSystem : MonoBehaviour
 {
-    public static EquipmentSystem Instance;
+    [Inject] private InventoryUIManager _inventoryUIManager;
+    [Inject] private TooltipManager _tooltipManager;
+    [Inject] private EventManager _eventManager;
+    [Inject] private ItemDatabase _itemDatabase;
 
     private Dictionary<EquipmentType, GameObject> equippedItems = new Dictionary<EquipmentType, GameObject>();
-    private Dictionary<EquipmentType, ItemType> equippedTypes = new Dictionary<EquipmentType, ItemType>();
-
+    private Dictionary<EquipmentType, ItemSO> equippedTypes = new Dictionary<EquipmentType, ItemSO>();
     private Dictionary<EquipmentType, Transform> pivotCache = new Dictionary<EquipmentType, Transform>();
 
-    private void Awake()
+    private void OnEnable()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            Logger.Log(LogModule.Inventory, "EquipmentSystem инициализирован");
-        }
-        else
-        {
-            Logger.Log(LogModule.Inventory, "Уничтожение дублирующего EquipmentSystem");
-            Destroy(gameObject);
-        }
+        var refs = GameReferences.Instance;
+        if (refs != null) refs.OnSceneReferencesRefreshed += ClearPivotCache;
     }
+
+    private void OnDisable()
+    {
+        var refs = GameReferences.Instance;
+        if (refs != null) refs.OnSceneReferencesRefreshed -= ClearPivotCache;
+    }
+
+    private void ClearPivotCache() => pivotCache.Clear();
 
     private Transform FindPivotByTag(EquipmentType slotType)
     {
-        if (pivotCache.ContainsKey(slotType))
-        {
-            return pivotCache[slotType];
-        }
+        if (pivotCache.ContainsKey(slotType)) return pivotCache[slotType];
 
         GameObject[] taggedObjects = GameObject.FindGameObjectsWithTag("EquipmentSlot");
-
-        if (taggedObjects.Length == 0)
-        {
-            Logger.LogWarning(LogModule.Inventory, "Объекты с тегом 'EquipmentSlot' не найдены");
-            return null;
-        }
+        if (taggedObjects.Length == 0) return null;
 
         foreach (GameObject parentObj in taggedObjects)
         {
@@ -48,213 +43,240 @@ public class EquipmentSystem : MonoBehaviour
 
                 switch (slotType)
                 {
-                    case EquipmentType.Head:
-                        if (childName == "HeadPivot" || childName.Contains("Head")) found = child;
-                        break;
-                    case EquipmentType.Face:
-                        if (childName == "FacePivot" || childName.Contains("Face")) found = child;
-                        break;
-                    case EquipmentType.Neck:
-                        if (childName == "NeckPivot" || childName.Contains("Neck")) found = child;
-                        break;
-                    case EquipmentType.Chest:
-                        if (childName == "ChestPivot" || childName.Contains("Chest")) found = child;
-                        break;
-                    case EquipmentType.Waist:
-                        if (childName == "WaistPivot" || childName.Contains("Waist")) found = child;
-                        break;
-                    case EquipmentType.Legs:
-                        if (childName == "LegsPivot" || childName.Contains("Legs")) found = child;
-                        break;
-                    case EquipmentType.Weapon:
-                        if (childName == "WeaponPivot" || childName.Contains("Weapon")) found = child;
-                        break;
-                    case EquipmentType.Offhand:
-                        if (childName == "OffhandPivot" || childName.Contains("Offhand")) found = child;
-                        break;
-                    case EquipmentType.Lantern:
-                        if (childName == "LanternPivot" || childName.Contains("Lantern")) found = child;
-                        break;
-                    default:
-                        return null;
+                    case EquipmentType.Head: if (childName.Contains("Head")) found = child; break;
+                    case EquipmentType.Face: if (childName.Contains("Face")) found = child; break;
+                    case EquipmentType.Neck: if (childName.Contains("Neck")) found = child; break;
+                    case EquipmentType.Chest: if (childName.Contains("Chest")) found = child; break;
+                    case EquipmentType.Waist: if (childName.Contains("Waist")) found = child; break;
+                    case EquipmentType.Legs: if (childName.Contains("Legs")) found = child; break;
+                    case EquipmentType.Weapon: if (childName.Contains("Weapon")) found = child; break;
+                    case EquipmentType.Offhand: if (childName.Contains("Offhand")) found = child; break;
+                    case EquipmentType.Lantern: if (childName.Contains("Lantern")) found = child; break;
                 }
 
                 if (found != null)
                 {
-                    Logger.Log(LogModule.Inventory, $"Найден пивот для {slotType}: {found.name} (дочерний от {parentObj.name})");
                     pivotCache[slotType] = found;
                     return found;
                 }
             }
         }
 
-        Logger.LogWarning(LogModule.Inventory, $"Пивот для {slotType} не найден в дочерних объектах с тегом 'EquipmentSlot'");
         return null;
     }
 
-    private Transform GetPivotForSlot(EquipmentType slotType)
-    {
-        Transform pivot = FindPivotByTag(slotType);
+    private Transform GetPivotForSlot(EquipmentType slotType) => FindPivotByTag(slotType);
 
-        if (pivot == null)
+    public EquipmentData ExportEquipment()
+    {
+        var data = new EquipmentData();
+        var slots = FindObjectsByType<EquipmentSlot>(FindObjectsInactive.Exclude);
+
+        foreach (var slot in slots)
         {
-            Logger.LogError(LogModule.Inventory, $"Пивот для {slotType} не найден");
+            if (!slot.isOccupied) continue;
+
+            ItemSO so = GetEquippedSO(slot.slotType);
+            if (so == null) continue;
+
+            var marker = slot.GetCurrentItem();
+            data.entries.Add(new EquipmentEntry
+            {
+                slotType = (int)slot.slotType,
+                itemId = so.id,
+                count = marker != null ? marker.count : 1
+            });
         }
 
-        return pivot;
+        return data;
+    }
+
+    public void ImportEquipment(EquipmentData data)
+    {
+        if (_inventoryUIManager == null) return;
+
+        var slots = FindObjectsByType<EquipmentSlot>(FindObjectsInactive.Exclude);
+
+        foreach (var slot in slots)
+        {
+            if (!slot.isOccupied) continue;
+            var child = slot.GetCurrentItem();
+            if (child != null)
+            {
+                child.gameObject.SetActive(false);
+                Destroy(child.gameObject);
+            }
+            slot.isOccupied = false;
+        }
+
+        foreach (EquipmentType type in System.Enum.GetValues(typeof(EquipmentType)))
+        {
+            if (type == EquipmentType.None) continue;
+            UnequipItem(type);
+        }
+
+        if (data?.entries == null) return;
+
+        foreach (var entry in data.entries)
+        {
+            var so = _itemDatabase?.GetItem(entry.itemId);
+            if (so != null) _inventoryUIManager.AddItem(so, entry.count);
+        }
+
+        foreach (var entry in data.entries)
+        {
+            var so = _itemDatabase?.GetItem(entry.itemId);
+            if (so == null) continue;
+
+            EquipmentType type = (EquipmentType)entry.slotType;
+            EquipmentSlot targetSlot = null;
+            foreach (var s in slots) if (s.slotType == type) { targetSlot = s; break; }
+            if (targetSlot == null) continue;
+
+            InventoryItemMarker marker = FindInventoryMarker(so);
+            if (marker == null) continue;
+
+            if (marker.count > entry.count)
+            {
+                marker.count -= entry.count;
+                marker.UpdateUI();
+
+                var invSlot = marker.GetComponentInParent<InventorySlot>();
+                if (invSlot != null) invSlot.UpdateSlotText();
+
+                var newMarker = CreateInventoryMarker(so, entry.count);
+                if (newMarker != null) targetSlot.EquipItem(newMarker);
+            }
+            else targetSlot.EquipItem(marker);
+        }
+    }
+
+    private InventoryItemMarker FindInventoryMarker(ItemSO so)
+    {
+        if (_inventoryUIManager == null || _inventoryUIManager.inventoryGrid == null) return null;
+
+        foreach (Transform slot in _inventoryUIManager.inventoryGrid.transform)
+        {
+            var marker = slot.GetComponentInChildren<InventoryItemMarker>();
+            if (marker != null && marker.ItemSO == so) return marker;
+        }
+        return null;
+    }
+
+    private InventoryItemMarker CreateInventoryMarker(ItemSO so, int count)
+    {
+        if (so == null || so.uiPrefab == null) return null;
+
+        var go = Instantiate(so.uiPrefab);
+        SceneInjector.InjectInto(go);
+
+        var marker = go.GetComponent<InventoryItemMarker>();
+        if (marker == null) marker = go.AddComponent<InventoryItemMarker>();
+
+        marker.itemSO = so;
+        marker.count = count;
+        marker.UpdateUI();
+
+        return marker;
     }
 
     public bool EquipItem(InventoryItemMarker item)
     {
-        if (item == null)
+        if (item == null) return false;
+
+        var so = item.ItemSO;
+        if (so == null || !so.isEquippable) return false;
+
+        bool willSwap = equippedItems.ContainsKey(so.equipmentType) && equippedItems[so.equipmentType] != null;
+        ItemSO oldType = willSwap && equippedTypes.TryGetValue(so.equipmentType, out var t) ? t : null;
+
+        if (willSwap && oldType != null)
         {
-            Logger.LogWarning(LogModule.Inventory, "Попытка экипировать null предмет");
-            return false;
+            if (_inventoryUIManager != null)
+            {
+                int space = _inventoryUIManager.GetFreeSpaceFor(oldType, 1);
+                if (space < 1)
+                {
+                    _tooltipManager?.ShowTooltip("Инвентарь полон", Input.mousePosition);
+                    return false;
+                }
+            }
         }
 
-        ItemData data = ItemDatabase.Instance?.GetItemData(item.itemType);
-        if (data == null || !data.isEquippable)
+        if (willSwap)
         {
-            Logger.Log(LogModule.Inventory, $"Предмет {item.itemType} нельзя экипировать");
-            return false;
+            UnequipItem(so.equipmentType);
+            if (oldType != null) _inventoryUIManager?.AddItem(oldType, 1);
         }
 
-        if (equippedItems.ContainsKey(data.equipmentType) && equippedItems[data.equipmentType] != null)
-        {
-            Logger.Log(LogModule.Inventory, $"Слот {data.equipmentType} занят, снятие текущего предмета");
-            UnequipItem(data.equipmentType);
-        }
+        Transform pivot = GetPivotForSlot(so.equipmentType);
+        if (pivot == null) return false;
+        if (so.worldPrefab == null) return false;
 
-        Transform pivot = GetPivotForSlot(data.equipmentType);
-        if (pivot == null)
-        {
-            Logger.LogError(LogModule.Inventory, $"Невозможно экипировать {item.itemType}: пивот для {data.equipmentType} не найден");
-            return false;
-        }
-
-        if (data.worldPrefab == null)
-        {
-            Logger.LogError(LogModule.Inventory, $"World префаб для {item.itemType} не найден");
-            return false;
-        }
-
-        GameObject newItem = Instantiate(data.worldPrefab, pivot);
+        GameObject newItem = Instantiate(so.worldPrefab, pivot);
         newItem.transform.localPosition = Vector3.zero;
         newItem.transform.localRotation = Quaternion.identity;
-        newItem.transform.localScale = Vector3.one;
 
         DisableItemInteractions(newItem);
 
-        equippedItems[data.equipmentType] = newItem;
-        equippedTypes[data.equipmentType] = item.itemType;
+        equippedItems[so.equipmentType] = newItem;
+        equippedTypes[so.equipmentType] = so;
 
-        EventManager.Instance?.TriggerEvent(EventTriggerType.EquipItem,
-            new EventContext().WithItem(item.itemType).WithEquipmentType(data.equipmentType));
+        _eventManager?.TriggerEvent(
+            EventTriggerType.EquipItem,
+            new EventContext().WithItem(so).WithEquipmentType(so.equipmentType));
 
-        Logger.Log(LogModule.Inventory, $"Экипирован предмет: {item.itemType} в слот {data.equipmentType}");
         return true;
     }
 
     public void UnequipItem(EquipmentType slotType)
     {
-        if (!equippedItems.ContainsKey(slotType))
-        {
-            Logger.Log(LogModule.Inventory, $"Слот {slotType} уже пуст");
-            return;
-        }
+        if (!equippedItems.ContainsKey(slotType)) return;
 
         GameObject item = equippedItems[slotType];
-        if (item != null)
-        {
-            Destroy(item);
-        }
+        if (item != null) Destroy(item);
 
         equippedItems.Remove(slotType);
         equippedTypes.Remove(slotType);
-
-        Logger.Log(LogModule.Inventory, $"Предмет снят со слота {slotType}");
     }
 
     public void UnequipCurrent()
     {
-        if (equippedItems.Count > 0)
-        {
-            var first = equippedItems.GetEnumerator();
-            first.MoveNext();
-            Logger.Log(LogModule.Inventory, $"Снятие предмета со слота {first.Current.Key}");
-            UnequipItem(first.Current.Key);
-        }
-        else
-        {
-            Logger.Log(LogModule.Inventory, "Нет экипированных предметов для снятия");
-        }
+        if (equippedItems.Count == 0) return;
+        var first = equippedItems.GetEnumerator();
+        first.MoveNext();
+        UnequipItem(first.Current.Key);
     }
 
-    public bool IsEquipped(ItemType itemType)
+    public bool IsEquipped(ItemSO item)
     {
-        return equippedTypes.ContainsValue(itemType);
+        if (item == null) return false;
+        return equippedTypes.ContainsValue(item);
     }
 
-    public bool IsEquipped(EquipmentType slotType)
-    {
-        return equippedItems.ContainsKey(slotType) && equippedItems[slotType] != null;
-    }
+    public bool IsEquipped(EquipmentType slotType) =>
+        equippedItems.ContainsKey(slotType) && equippedItems[slotType] != null;
 
-    public ItemType GetEquippedType(EquipmentType slotType)
-    {
-        return equippedTypes.ContainsKey(slotType) ? equippedTypes[slotType] : ItemType.None;
-    }
+    public ItemSO GetEquippedSO(EquipmentType slotType) =>
+        equippedTypes.ContainsKey(slotType) ? equippedTypes[slotType] : null;
 
-    public GameObject GetEquippedItem(EquipmentType slotType)
-    {
-        return equippedItems.ContainsKey(slotType) ? equippedItems[slotType] : null;
-    }
-
-    public ItemType GetEquippedType()
-    {
-        if (equippedTypes.Count > 0)
-        {
-            var first = equippedTypes.GetEnumerator();
-            first.MoveNext();
-            return first.Current.Value;
-        }
-        return ItemType.None;
-    }
-
-    public GameObject GetEquippedItem()
-    {
-        if (equippedItems.Count > 0)
-        {
-            var first = equippedItems.GetEnumerator();
-            first.MoveNext();
-            return first.Current.Value;
-        }
-        return null;
-    }
+    public GameObject GetEquippedItem(EquipmentType slotType) =>
+        equippedItems.ContainsKey(slotType) ? equippedItems[slotType] : null;
 
     private void DisableItemInteractions(GameObject item)
     {
-        PickupItem[] pickups = item.GetComponentsInChildren<PickupItem>(true);
-        foreach (PickupItem p in pickups) p.enabled = false;
+        foreach (var p in item.GetComponentsInChildren<PickupItem>(true)) p.enabled = false;
+        foreach (var col in item.GetComponentsInChildren<Collider2D>(true)) col.enabled = false;
+        foreach (var col in item.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+        foreach (var sr in item.GetComponentsInChildren<SpriteRenderer>(true)) sr.sortingOrder = 5;
 
-        Collider2D[] colliders2D = item.GetComponentsInChildren<Collider2D>(true);
-        foreach (Collider2D col in colliders2D) col.enabled = false;
-
-        Collider[] colliders3D = item.GetComponentsInChildren<Collider>(true);
-        foreach (Collider col in colliders3D) col.enabled = false;
-
-        SpriteRenderer[] renderers = item.GetComponentsInChildren<SpriteRenderer>(true);
-        foreach (SpriteRenderer sr in renderers) sr.sortingOrder = 5;
-
-        Rigidbody2D[] rb2D = item.GetComponentsInChildren<Rigidbody2D>(true);
-        foreach (Rigidbody2D rb in rb2D)
+        foreach (var rb in item.GetComponentsInChildren<Rigidbody2D>(true))
         {
-            rb.isKinematic = true;
+            rb.bodyType = RigidbodyType2D.Kinematic;
             rb.simulated = false;
         }
 
-        Rigidbody[] rb3D = item.GetComponentsInChildren<Rigidbody>(true);
-        foreach (Rigidbody rb in rb3D)
+        foreach (var rb in item.GetComponentsInChildren<Rigidbody>(true))
         {
             rb.isKinematic = true;
             rb.useGravity = false;
@@ -265,29 +287,20 @@ public class EquipmentSystem : MonoBehaviour
     {
         foreach (var kvp in equippedItems)
         {
-            if (kvp.Value != null)
-            {
-                Transform pivot = GetPivotForSlot(kvp.Key);
-                if (pivot != null)
-                {
-                    kvp.Value.transform.SetParent(pivot);
-                    kvp.Value.transform.localPosition = Vector3.zero;
-                    kvp.Value.transform.localRotation = Quaternion.identity;
-                    kvp.Value.transform.localScale = Vector3.one;
-                }
-            }
+            if (kvp.Value == null) continue;
+            Transform pivot = GetPivotForSlot(kvp.Key);
+            if (pivot == null) continue;
+            kvp.Value.transform.SetParent(pivot);
+            kvp.Value.transform.localPosition = Vector3.zero;
+            kvp.Value.transform.localRotation = Quaternion.identity;
         }
-        Logger.Log(LogModule.Inventory, "Визуальное отображение экипировки обновлено");
     }
 
     private void OnDestroy()
     {
         foreach (var item in equippedItems.Values)
-        {
             if (item != null) Destroy(item);
-        }
         equippedItems.Clear();
         equippedTypes.Clear();
-        Logger.Log(LogModule.Inventory, "EquipmentSystem уничтожен, экипировка очищена");
     }
 }

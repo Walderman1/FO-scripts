@@ -1,28 +1,24 @@
-// EventAction.cs - УНИВЕРСАЛЬНАЯ ВЕРСИЯ С ПОДДЕРЖКОЙ DELAY У ВСЕХ ДЕЙСТВИЙ
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using DialogueSystem;
+using VContainer;
 
 [System.Serializable]
 public abstract class EventAction
 {
     public string actionName = "Action";
-    public float delay = 0f;
+    public float delay = 0.5f;
 
-    // Основной метод Execute — теперь сам обрабатывает задержку
     public void Execute(EventContext context)
     {
         if (delay > 0f)
         {
-            if (EventManager.Instance != null)
-                EventManager.Instance.RunCoroutine(DelayedExecute(context));
-            else
-                ExecuteImmediate(context);
+            var em = Resolve<EventManager>(context);
+            if (em != null) em.RunCoroutine(DelayedExecute(context));
+            else ExecuteImmediate(context);
         }
-        else
-        {
-            ExecuteImmediate(context);
-        }
+        else ExecuteImmediate(context);
     }
 
     private IEnumerator DelayedExecute(EventContext context)
@@ -31,133 +27,147 @@ public abstract class EventAction
         ExecuteImmediate(context);
     }
 
-    // Этот метод переопределяют все наследники
     protected abstract void ExecuteImmediate(EventContext context);
-}
 
-// ============ ВСЕ ДЕЙСТВИЯ ============
+    protected static T Resolve<T>(EventContext context) where T : class
+    {
+        var c = context?.Container;
+        if (c != null)
+        {
+            try { var v = c.Resolve<T>(); if (v != null) return v; } catch { }
+        }
+
+        var root = SceneInjector.Instance?.RootScope ?? GameLifetimeScope.Current?.Container;
+        if (root != null)
+        {
+            try { return root.Resolve<T>(); } catch { }
+        }
+        return null;
+    }
+}
 
 [System.Serializable]
 public class EventActionStartDialogue : EventAction
 {
-    public int dialogueFileIndex;
+    public string dialogueFileName = "Prologue";
     public string dialogueID;
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        Debug.Log($"🔍 Ищем TextBeginner на сцене...");
-
-        TextBeginner textBeginner = Object.FindObjectOfType<TextBeginner>();
-
-        if (textBeginner != null)
-        {
-            Debug.Log($"✅ TextBeginner найден: {textBeginner.gameObject.name}");
-            Debug.Log($"🎯 Вызываем StartDialogueWithFile({dialogueFileIndex})");
-            textBeginner.StartDialogueWithFile(dialogueFileIndex);
-            Debug.Log($"📜 Команда на запуск диалога отправлена!");
-        }
-        else
-        {
-            Debug.LogError("❌❌❌ TextBeginner НЕ НАЙДЕН на сцене! ❌❌❌");
-        }
+        var tb = Resolve<TextBeginner>(context);
+        if (tb != null) tb.StartDialogue(dialogueFileName);
+        else Logger.LogError(LogModule.Event, "TextBeginner НЕ НАЙДЕН");
     }
 }
 
 [System.Serializable]
 public class EventActionAddItem : EventAction
 {
-    public ItemType itemType;
+    [Newtonsoft.Json.JsonIgnore]
+    public ItemSO itemSO;
+
+    public string itemSOId;
+
+    [System.Obsolete("Используйте itemSO")]
+    public ItemType itemType = ItemType.None;
+
     public int amount = 1;
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        InventoryUIManager inventory = Object.FindObjectOfType<InventoryUIManager>();
-        if (inventory != null)
-        {
-            for (int i = 0; i < amount; i++)
-            {
-                inventory.AddItem(itemType);
-            }
-            Debug.Log($"🎒 Добавлено {amount}x {itemType} в инвентарь");
-        }
-        else
-        {
-            Debug.LogWarning("InventoryUIManager не найден!");
-        }
+        var so = ResolveItemSO(context);
+        if (so == null) { Logger.LogWarning(LogModule.Event, "EventActionAddItem: предмет не задан"); return; }
+
+        var inv = Resolve<InventoryUIManager>(context);
+        if (inv == null) { Logger.LogWarning(LogModule.Event, "InventoryUIManager не найден"); return; }
+
+        int added = inv.AddItem(so, amount);
+        Logger.Log(LogModule.Event, $"Добавлено {added}x {so.id} в инвентарь");
     }
+
+    public ItemSO ResolveItemSO() => ResolveItemSO(null);
+
+    public ItemSO ResolveItemSO(EventContext context)
+    {
+        if (itemSO != null) return itemSO;
+
+        var db = Resolve<ItemDatabase>(context);
+        if (db == null) return null;
+
+        if (!string.IsNullOrEmpty(itemSOId))
+        {
+            itemSO = db.GetItem(itemSOId);
+            if (itemSO != null) return itemSO;
+        }
+
+#pragma warning disable CS0618
+        if (itemType != ItemType.None)
+        {
+            itemSO = db.GetItemByLegacyType(itemType);
+            return itemSO;
+        }
+#pragma warning restore CS0618
+
+        return null;
+    }
+
+    public void SyncItemSOId() => itemSOId = itemSO != null ? itemSO.id : "";
 }
 
 [System.Serializable]
 public class EventActionRemoveItem : EventAction
 {
-    public ItemType itemType;
+    [Newtonsoft.Json.JsonIgnore]
+    public ItemSO itemSO;
+
+    public string itemSOId;
+
+    [System.Obsolete("Используйте itemSO")]
+    public ItemType itemType = ItemType.None;
+
     public int amount = 1;
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        Debug.Log($"🗑️ Удаляем {amount}x {itemType} из инвентаря...");
+        var so = ResolveItemSO(context);
+        if (so == null) return;
 
-        InventoryUIManager inventory = Object.FindObjectOfType<InventoryUIManager>();
-        if (inventory == null)
-        {
-            Debug.LogWarning("InventoryUIManager не найден!");
-            return;
-        }
+        var inv = Resolve<InventoryUIManager>(context);
+        if (inv == null) return;
 
-        if (inventory.inventoryGrid == null)
-        {
-            Debug.LogWarning("inventoryGrid не назначен!");
-            return;
-        }
-
-        int removedCount = 0;
-
-        foreach (Transform slotTransform in inventory.inventoryGrid.transform)
-        {
-            InventoryItemMarker marker = slotTransform.GetComponentInChildren<InventoryItemMarker>();
-            if (marker == null) continue;
-
-            if (marker.itemType == itemType)
-            {
-                int toRemove = Mathf.Min(amount - removedCount, marker.count);
-                marker.count -= toRemove;
-                removedCount += toRemove;
-
-                if (marker.count <= 0)
-                {
-                    Object.Destroy(marker.gameObject);
-                    InventorySlot slot = slotTransform.GetComponent<InventorySlot>();
-                    if (slot != null)
-                    {
-                        slot.isOccupied = false;
-                        slot.UpdateSlotText();
-                    }
-                }
-                else
-                {
-                    marker.UpdateUI();
-                    InventorySlot slot = slotTransform.GetComponent<InventorySlot>();
-                    if (slot != null) slot.UpdateSlotText();
-                }
-
-                if (removedCount >= amount) break;
-            }
-        }
-
-        if (removedCount > 0)
-        {
-            Debug.Log($"🗑️ Удалено {removedCount}x {itemType} из инвентаря");
-        }
-        else
-        {
-            Debug.Log($"⚠️ Не найдено {itemType} в инвентаре для удаления");
-        }
-
-        inventory.UpdateAllSlots();
+        if (!inv.RemoveItem(so, amount))
+            Logger.LogWarning(LogModule.Event, $"Не удалось удалить {amount}x {so.id}");
     }
+
+    public ItemSO ResolveItemSO() => ResolveItemSO(null);
+
+    public ItemSO ResolveItemSO(EventContext context)
+    {
+        if (itemSO != null) return itemSO;
+
+        var db = Resolve<ItemDatabase>(context);
+        if (db == null) return null;
+
+        if (!string.IsNullOrEmpty(itemSOId))
+        {
+            itemSO = db.GetItem(itemSOId);
+            if (itemSO != null) return itemSO;
+        }
+
+#pragma warning disable CS0618
+        if (itemType != ItemType.None)
+        {
+            itemSO = db.GetItemByLegacyType(itemType);
+            return itemSO;
+        }
+#pragma warning restore CS0618
+
+        return null;
+    }
+
+    public void SyncItemSOId() => itemSOId = itemSO != null ? itemSO.id : "";
 }
 
-// EventActionSetFlag - ИСПОЛЬЗУЕТ ОБЪЕДИНЕННЫЙ FlagManager
 [System.Serializable]
 public class EventActionSetFlag : EventAction
 {
@@ -166,16 +176,8 @@ public class EventActionSetFlag : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        // ✅ Используем FlagManager вместо GlobalFlagManager
-        if (FlagManager.Instance != null)
-        {
-            FlagManager.Instance.SetFlag(flagName, flagValue);
-            Debug.Log($"🚩 Установлен флаг {flagName} = {flagValue}");
-        }
-        else
-        {
-            Debug.LogWarning("FlagManager.Instance is null!");
-        }
+        var fm = Resolve<FlagManager>(context);
+        fm?.SetFlag(flagName, flagValue);
     }
 }
 
@@ -188,15 +190,7 @@ public class EventActionTeleport : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (SceneSlideTransition.Instance != null)
-        {
-            SceneSlideTransition.Instance.SwitchToScene(locationName);
-            Debug.Log($"📍 Телепорт в: {locationName}");
-        }
-        else
-        {
-            Debug.LogWarning("SceneSlideTransition.Instance is null!");
-        }
+        Resolve<SceneSlideTransition>(context)?.SwitchToScene(locationName);
     }
 }
 
@@ -208,12 +202,7 @@ public class EventActionMultiple : EventAction
     protected override void ExecuteImmediate(EventContext context)
     {
         foreach (var action in subActions)
-        {
-            if (action != null)
-            {
-                action.Execute(context);
-            }
-        }
+            if (action != null) action.Execute(context);
     }
 }
 
@@ -225,15 +214,7 @@ public class EventActionPlaySound : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (soundClip != null)
-        {
-            AudioSource.PlayClipAtPoint(soundClip, Vector3.zero, volume);
-            Debug.Log($"🔊 Воспроизведён звук: {soundClip.name}");
-        }
-        else
-        {
-            Debug.LogWarning("soundClip не назначен!");
-        }
+        if (soundClip != null) AudioSource.PlayClipAtPoint(soundClip, Vector3.zero, volume);
     }
 }
 
@@ -246,25 +227,14 @@ public class EventActionSpawnObject : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (prefabToSpawn != null)
-        {
-            Vector3 position = spawnPosition;
-            if (context != null && context.TargetObject != null && parentTransform == null)
-            {
-                position = context.TargetObject.transform.position;
-            }
+        if (prefabToSpawn == null) return;
 
-            GameObject obj = Object.Instantiate(prefabToSpawn, position, Quaternion.identity);
-            if (parentTransform != null)
-            {
-                obj.transform.SetParent(parentTransform);
-            }
-            Debug.Log($"📦 Создан объект: {prefabToSpawn.name}");
-        }
-        else
-        {
-            Debug.LogWarning("prefabToSpawn не назначен!");
-        }
+        Vector3 position = spawnPosition;
+        if (context != null && context.TargetObject != null && parentTransform == null)
+            position = context.TargetObject.transform.position;
+
+        GameObject obj = Object.Instantiate(prefabToSpawn, position, Quaternion.identity);
+        if (parentTransform != null) obj.transform.SetParent(parentTransform);
     }
 }
 
@@ -276,15 +246,7 @@ public class EventActionDestroyObject : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (targetObject != null)
-        {
-            Object.Destroy(targetObject, destroyDelay);
-            Debug.Log($"💥 Удалён объект: {targetObject.name} (через {destroyDelay}с)");
-        }
-        else
-        {
-            Debug.LogWarning("targetObject не назначен!");
-        }
+        if (targetObject != null) Object.Destroy(targetObject, destroyDelay);
     }
 }
 
@@ -296,15 +258,7 @@ public class EventActionEnableObject : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (targetObject != null)
-        {
-            targetObject.SetActive(enable);
-            Debug.Log($"🔛 {(enable ? "Включён" : "Выключён")} объект: {targetObject.name}");
-        }
-        else
-        {
-            Debug.LogWarning("targetObject не назначен!");
-        }
+        if (targetObject != null) targetObject.SetActive(enable);
     }
 }
 
@@ -315,15 +269,7 @@ public class EventActionDisableObject : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (targetObject != null)
-        {
-            targetObject.SetActive(false);
-            Debug.Log($"🔛 Выключён объект: {targetObject.name}");
-        }
-        else
-        {
-            Debug.LogWarning("targetObject не назначен!");
-        }
+        if (targetObject != null) targetObject.SetActive(false);
     }
 }
 
@@ -335,16 +281,9 @@ public class EventActionEnableEvent : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (enable)
-        {
-            EventStateManager.Instance?.ResetEvent(eventID);
-            Debug.Log($"🔓 Событие '{eventID}' включено (сброшено состояние)");
-        }
-        else
-        {
-            EventStateManager.Instance?.MarkExecuted(eventID);
-            Debug.Log($"🔒 Событие '{eventID}' выключено (отмечено как выполненное)");
-        }
+        var sm = Resolve<EventStateManager>(context);
+        if (enable) sm?.ResetEvent(eventID);
+        else sm?.MarkExecuted(eventID);
     }
 }
 
@@ -355,8 +294,7 @@ public class EventActionDisableEvent : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        EventStateManager.Instance?.MarkExecuted(eventID);
-        Debug.Log($"🔒 Событие '{eventID}' выключено");
+        Resolve<EventStateManager>(context)?.MarkExecuted(eventID);
     }
 }
 
@@ -370,18 +308,10 @@ public class EventActionCheckEvent : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        bool state = EventStateManager.Instance?.IsExecuted(eventID) ?? false;
+        bool state = Resolve<EventStateManager>(context)?.IsExecuted(eventID) ?? false;
 
-        if (state == requiredState)
-        {
-            actionIfTrue?.Execute(context);
-            Debug.Log($"✅ Событие '{eventID}' соответствует состоянию ({requiredState})");
-        }
-        else
-        {
-            actionIfFalse?.Execute(context);
-            Debug.Log($"❌ Событие '{eventID}' НЕ соответствует состоянию ({requiredState})");
-        }
+        if (state == requiredState) actionIfTrue?.Execute(context);
+        else actionIfFalse?.Execute(context);
     }
 }
 
@@ -392,8 +322,7 @@ public class EventActionResetEvent : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        EventStateManager.Instance?.ResetEvent(eventID);
-        Debug.Log($"🔄 Событие '{eventID}' сброшено");
+        Resolve<EventStateManager>(context)?.ResetEvent(eventID);
     }
 }
 
@@ -405,15 +334,45 @@ public class EventActionSaveState : EventAction
 
     protected override void ExecuteImmediate(EventContext context)
     {
-        if (!string.IsNullOrEmpty(customKey))
+        if (string.IsNullOrEmpty(customKey)) return;
+        PlayerPrefs.SetString(customKey, value);
+        PlayerPrefs.Save();
+    }
+}
+[System.Serializable]
+public class EventActionStartQuest : EventAction
+{
+    public string questID;
+
+    protected override void ExecuteImmediate(EventContext context)
+    {
+        var qm = Resolve<QuestManager>(context);
+        if (qm == null)
         {
-            PlayerPrefs.SetString(customKey, value);
-            PlayerPrefs.Save();
-            Debug.Log($"💾 Сохранено состояние: {customKey} = {value}");
+            Logger.LogWarning(LogModule.Event, "EventActionStartQuest: QuestManager недоступен");
+            return;
         }
-        else
+
+        qm.StartQuest(questID);
+        Logger.Log(LogModule.Event, $"StartQuest: {questID}");
+    }
+}
+
+[System.Serializable]
+public class EventActionCompleteQuest : EventAction
+{
+    public string questID;
+
+    protected override void ExecuteImmediate(EventContext context)
+    {
+        var qm = Resolve<QuestManager>(context);
+        if (qm == null)
         {
-            Debug.LogWarning("customKey не указан!");
+            Logger.LogWarning(LogModule.Event, "EventActionCompleteQuest: QuestManager недоступен");
+            return;
         }
+
+        qm.CompleteQuest(questID);
+        Logger.Log(LogModule.Event, $"CompleteQuest: {questID}");
     }
 }

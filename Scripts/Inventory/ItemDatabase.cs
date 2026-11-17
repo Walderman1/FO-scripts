@@ -1,73 +1,58 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using VContainer;
 
 public class ItemDatabase : MonoBehaviour
 {
-    public static ItemDatabase Instance;
-
     [Header("=== НАСТРОЙКИ БАЗЫ ДАННЫХ ===")]
     [SerializeField] private List<ItemSO> allItems = new List<ItemSO>();
     [SerializeField] private bool autoLoadOnStart = true;
     [SerializeField] private bool validateOnLoad = true;
-
-    [Header("=== ЗАПАСНОЙ ПРЕДМЕТ ===")]
+    [SerializeField] private string resourcesPath = "Items/ScriptableObjects";
     [SerializeField] private ItemSO fallbackItem;
 
-    private Dictionary<ItemType, ItemSO> itemsByType = new Dictionary<ItemType, ItemSO>();
+    private Dictionary<string, ItemSO> itemsById = new Dictionary<string, ItemSO>();
     private Dictionary<string, ItemSO> itemsByName = new Dictionary<string, ItemSO>();
 
     public System.Action OnDatabaseLoaded;
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            if (autoLoadOnStart) LoadDatabase();
-            Logger.Log(LogModule.Inventory, "ItemDatabase инициализирован");
-        }
-        else
-        {
-            Logger.Log(LogModule.Inventory, "Уничтожение дублирующего ItemDatabase");
-            Destroy(gameObject);
-        }
+        if (autoLoadOnStart) LoadDatabase();
     }
 
     [ContextMenu("Загрузить базу данных")]
     public void LoadDatabase()
     {
-        itemsByType.Clear();
-        itemsByName.Clear();
+        allItems = Resources.LoadAll<ItemSO>(resourcesPath).ToList();
+        Logger.Log(LogModule.Inventory, $"Загружено {allItems.Count} предметов из Resources/{resourcesPath}");
+        BuildIndexes();
+    }
 
-        if (allItems == null || allItems.Count == 0)
-        {
-            allItems = Resources.LoadAll<ItemSO>("Items").ToList();
-            Logger.Log(LogModule.Inventory, $"Автозагрузка: найдено {allItems.Count} предметов в Resources/Items");
-        }
+    private void BuildIndexes()
+    {
+        itemsById.Clear();
+        itemsByName.Clear();
 
         foreach (var item in allItems)
         {
             if (item == null) continue;
 
-            if (!itemsByType.ContainsKey(item.itemType))
+            if (string.IsNullOrEmpty(item.id))
             {
-                itemsByType.Add(item.itemType, item);
-            }
-            else
-            {
-                Logger.LogWarning(LogModule.Inventory, $"Дубликат типа предмета: {item.itemType} в базе данных");
+                Logger.LogWarning(LogModule.Inventory, $"У предмета '{item.name}' пустой id — пропущен");
+                continue;
             }
 
-            if (!itemsByName.ContainsKey(item.itemName))
-            {
+            if (!itemsById.ContainsKey(item.id)) itemsById.Add(item.id, item);
+            else Logger.LogWarning(LogModule.Inventory, $"Дубликат id '{item.id}' (у {item.name})");
+
+            if (!string.IsNullOrEmpty(item.itemName) && !itemsByName.ContainsKey(item.itemName))
                 itemsByName.Add(item.itemName, item);
-            }
         }
 
         if (validateOnLoad) ValidateDatabase();
-
-        Logger.Log(LogModule.Inventory, $"База данных загружена: {itemsByType.Count} предметов");
         OnDatabaseLoaded?.Invoke();
     }
 
@@ -76,82 +61,86 @@ public class ItemDatabase : MonoBehaviour
         foreach (var item in allItems)
         {
             if (item == null) continue;
-
-            if (item.itemType == ItemType.None)
-                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} имеет тип None");
-
+            if (string.IsNullOrEmpty(item.id))
+                Logger.LogWarning(LogModule.Inventory, $"'{item.name}' без id");
             if (string.IsNullOrEmpty(item.itemName))
-                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} не имеет названия");
-
+                Logger.LogWarning(LogModule.Inventory, $"'{item.name}' без itemName");
             if (item.icon == null)
-                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} не имеет иконки");
-
-            if (item.isEquippable && item.equipmentType == EquipmentType.None)
-                Logger.LogWarning(LogModule.Inventory, $"Предмет {item.name} экипируемый, но не указан тип экипировки");
+                Logger.LogWarning(LogModule.Inventory, $"'{item.name}' без иконки");
         }
     }
 
-    public ItemSO GetItem(ItemType type)
+    public ItemSO GetItem(string id)
     {
-        if (itemsByType.TryGetValue(type, out ItemSO item))
-            return item;
-
-        Logger.LogWarning(LogModule.Inventory, $"Предмет не найден: {type}");
+        if (string.IsNullOrEmpty(id)) return fallbackItem;
+        if (itemsById.TryGetValue(id, out var item)) return item;
+        Logger.LogWarning(LogModule.Inventory, $"Предмет по id '{id}' не найден");
         return fallbackItem;
     }
 
-    public ItemSO GetItem(string name)
+    public ItemSO GetItemByName(string name)
     {
-        if (itemsByName.TryGetValue(name, out ItemSO item))
-            return item;
-
-        Logger.LogWarning(LogModule.Inventory, $"Предмет не найден: {name}");
+        if (string.IsNullOrEmpty(name)) return fallbackItem;
+        if (itemsByName.TryGetValue(name, out var item)) return item;
         return fallbackItem;
     }
 
-    public ItemData GetItemData(ItemType type)
+    public ItemSO GetItemByLegacyType(ItemType legacyType)
     {
-        var item = GetItem(type);
-        return item != null ? item.ToItemData() : null;
+        if (legacyType == ItemType.None) return fallbackItem;
+
+        string name = legacyType.ToString();
+
+        // 1. Точное совпадение по имени
+        if (itemsByName.TryGetValue(name, out var item)) return item;
+
+        // 2. Точное совпадение по id
+        string idLower = name.ToLowerInvariant();
+        if (itemsById.TryGetValue(idLower, out item)) return item;
+
+        // 3. Поиск по префиксу id: Potion → potion_item_0, Lamp → lamp_0
+        string prefix = idLower + "_";
+        foreach (var kv in itemsById)
+        {
+            if (kv.Key.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.LogVerbose(LogModule.Inventory,
+                    $"Legacy ItemType.{name} резолвится по префиксу в '{kv.Key}'");
+                return kv.Value;
+            }
+        }
+
+        Logger.LogWarning(LogModule.Inventory, $"Legacy ItemType.{name} не найден");
+        return fallbackItem;
     }
 
-    public Sprite GetItemIcon(ItemType type) => GetItem(type)?.icon;
-    public GameObject GetUIPrefab(ItemType type) => GetItem(type)?.uiPrefab;
-    public GameObject GetWorldPrefab(ItemType type) => GetItem(type)?.worldPrefab;
-
+    public ItemData GetItemData(string id) => GetItem(id)?.ToItemData();
+    public ItemData GetItemDataByLegacyType(ItemType legacyType) => GetItemByLegacyType(legacyType)?.ToItemData();
     public List<ItemSO> GetAllItems() => allItems;
-    public List<ItemSO> GetEquippableItems() => allItems.Where(i => i != null && i.isEquippable).ToList();
-    public List<ItemSO> GetItemsByType(EquipmentType equipmentType) =>
+
+    public List<ItemSO> GetItemsByCategory(ItemCategory category) =>
+        allItems.Where(i => i != null && i.category == category).ToList();
+
+    public List<ItemSO> GetEquippableItems() =>
+        allItems.Where(i => i != null && i.isEquippable).ToList();
+
+    public List<ItemSO> GetItemsByEquipmentType(EquipmentType equipmentType) =>
         allItems.Where(i => i != null && i.isEquippable && i.equipmentType == equipmentType).ToList();
 
-    public GameObject SpawnWorldItem(ItemType type, Vector3 position)
+    public GameObject SpawnWorldItem(string id, Vector3 position)
     {
-        var item = GetItem(type);
+        var item = GetItem(id);
         return item != null ? item.SpawnWorld(position, Quaternion.identity) : null;
     }
 
-    public GameObject CreateUIItem(ItemType type, Transform parent)
+    public GameObject CreateUIItem(string id, Transform parent)
     {
-        var item = GetItem(type);
+        var item = GetItem(id);
         return item != null ? item.CreateUIElement(parent) : null;
     }
 
 #if UNITY_EDITOR
     [ContextMenu("Обновить из Resources")]
-    public void RefreshFromResources()
-    {
-        allItems = Resources.LoadAll<ItemSO>("Items").ToList();
-        UnityEditor.EditorUtility.SetDirty(this);
-        LoadDatabase();
-        Logger.Log(LogModule.Inventory, $"База данных обновлена: {allItems.Count} предметов");
-    }
-
-    [ContextMenu("Сортировать предметы")]
-    public void SortItems()
-    {
-        allItems = allItems.OrderBy(i => i != null ? i.itemType : ItemType.None).ToList();
-        UnityEditor.EditorUtility.SetDirty(this);
-        Logger.Log(LogModule.Inventory, "Предметы отсортированы по типу");
-    }
+    public void RefreshFromResources() => LoadDatabase();
 #endif
 }

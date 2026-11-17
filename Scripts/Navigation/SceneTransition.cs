@@ -3,26 +3,8 @@ using System.Collections;
 
 public class SceneTransition : MonoBehaviour
 {
-    public static SceneTransition Instance;
-
-    [Header("Settings")]
     [SerializeField] private CanvasGroup fadePanel;
-    [SerializeField] private float fadeDuration = 0.5f;
     [SerializeField] private float holdDuration = 0.2f;
-
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-            Logger.Log(LogModule.Navigation, "SceneTransition инициализирован");
-        }
-        else
-        {
-            Logger.Log(LogModule.Navigation, "Уничтожение дублирующего SceneTransition");
-            Destroy(gameObject);
-        }
-    }
 
     public IEnumerator FadeOut(float duration)
     {

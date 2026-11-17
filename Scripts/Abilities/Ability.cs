@@ -4,7 +4,6 @@ public abstract class Ability : MonoBehaviour
 {
     [Header("Ability Settings")]
     public string abilityName = "New Ability";
-    public KeyCode activationKey = KeyCode.None;
     public float cooldown = 0f;
     public float energyCost = 0f;
 
@@ -22,19 +21,18 @@ public abstract class Ability : MonoBehaviour
                 OnCooldownEnd();
             }
         }
-
-        if (Input.GetKeyDown(activationKey) && !isOnCooldown)
-        {
-            if (CanActivate())
-            {
-                Activate();
-            }
-        }
     }
 
     protected virtual bool CanActivate()
     {
         return true;
+    }
+
+    public virtual void TryActivate()
+    {
+        if (isOnCooldown) return;
+        if (!CanActivate()) return;
+        Activate();
     }
 
     public abstract void Activate();
@@ -47,7 +45,9 @@ public abstract class Ability : MonoBehaviour
         {
             isOnCooldown = true;
             currentCooldown = cooldown;
-            Logger.Log(LogModule.Abilities, $"Способность {abilityName} перешла в режим перезарядки на {cooldown} секунд");
+            Logger.LogVerbose(LogModule.Abilities, $"Способность {abilityName} перешла в режим перезарядки на {cooldown} секунд");
         }
     }
+
+    public bool IsOnCooldown => isOnCooldown;
 }

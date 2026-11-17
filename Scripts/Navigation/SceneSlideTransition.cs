@@ -1,78 +1,82 @@
-using UnityEngine;
+using DialogueSystem;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
+using VContainer;
 
 public class SceneSlideTransition : MonoBehaviour
 {
-    public static SceneSlideTransition Instance;
-
     [Header("Settings")]
     [SerializeField] private float slideDuration = 0.5f;
 
     [Header("Character")]
     [SerializeField] private TextBeginner textBeginner;
+    [SerializeField] private DialogueData dialogueConfig;
+
+    [Inject] private DialogueData _injectedConfig;
+    [Inject] private GameReferences _refs;
+    [Inject] private DialogueCharacterManager _dialogueCharacterManager;
+    [Inject] private TextBeginner _textBeginner;
+
+    private GameReferences Refs => _refs;
+
+    public event System.Action<GameObject> OnSceneChanged;
+    public bool IsTransitioning => isTransitioning;
 
     private List<GameObject> scenes = new List<GameObject>();
     private GameObject currentScene;
     private GameObject targetScene;
     private bool isTransitioning = false;
 
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-            Logger.Log(LogModule.Navigation, "SceneSlideTransition инициализирован");
-        }
-        else
-        {
-            Logger.Log(LogModule.Navigation, "Уничтожение дублирующего SceneSlideTransition");
-            Destroy(gameObject);
-        }
-    }
+    private TextBeginner TB => textBeginner != null ? textBeginner : _textBeginner;
+    private DialogueCharacterManager DCM => _dialogueCharacterManager;
 
     private void Start()
     {
+        if (dialogueConfig == null) dialogueConfig = _injectedConfig;
+
+        if (dialogueConfig == null)
+            Logger.LogWarning(LogModule.Navigation, "DialogueConfig не найден");
+
         FindAllScenes();
         InitializeScenes();
         FindCurrentScene();
         InitializeNeighbors();
-        FindTextBeginner();
 
-        Logger.Log(LogModule.Navigation, $"Найдено {scenes.Count} сцен");
-    }
-
-    private void FindTextBeginner()
-    {
-        if (textBeginner == null)
-        {
-            textBeginner = FindFirstObjectByType<TextBeginner>();
-            if (textBeginner != null)
-            {
-                Logger.Log(LogModule.Navigation, "TextBeginner найден автоматически");
-            }
-        }
+        OnSceneChanged?.Invoke(currentScene);
     }
 
     private void FindAllScenes()
     {
-        GameObject[] foundScenes = GameObject.FindGameObjectsWithTag("Location");
+        string locationTag = dialogueConfig != null ? dialogueConfig.LocationTag : "Location";
+        GameObject[] foundScenes = GameObject.FindGameObjectsWithTag(locationTag);
         scenes = foundScenes.ToList();
         Logger.Log(LogModule.Navigation, $"Найдено {scenes.Count} локаций");
     }
 
     private void InitializeScenes()
     {
+        GameObject activeScene = null;
+
         foreach (GameObject scene in scenes)
         {
-            bool isActive = scene.transform.position == Vector3.zero;
-            scene.SetActive(isActive);
-            if (isActive)
-            {
-                Logger.Log(LogModule.Navigation, $"Сцена {scene.name} активна при инициализации");
-            }
+            if (activeScene == null && scene.transform.position.sqrMagnitude < 0.0001f)
+                activeScene = scene;
         }
+
+        if (activeScene == null && scenes.Count > 0) activeScene = scenes[0];
+
+        foreach (GameObject scene in scenes)
+        {
+            bool shouldBeActive = (scene == activeScene);
+            if (scene.activeSelf != shouldBeActive) scene.SetActive(shouldBeActive);
+            if (shouldBeActive && scene.transform.localPosition != Vector3.zero)
+                scene.transform.localPosition = Vector3.zero;
+        }
+
+        if (activeScene != null)
+            Logger.LogVerbose(LogModule.Navigation, $"Активна локация: {activeScene.name}");
     }
 
     private void FindCurrentScene()
@@ -86,7 +90,7 @@ public class SceneSlideTransition : MonoBehaviour
         }
         else if (currentScene != null)
         {
-            Logger.Log(LogModule.Navigation, $"Текущая сцена: {currentScene.name}");
+            Logger.LogVerbose(LogModule.Navigation, $"Текущая сцена: {currentScene.name}");
         }
     }
 
@@ -125,7 +129,7 @@ public class SceneSlideTransition : MonoBehaviour
         }
 
         targetScene = scene;
-        Logger.Log(LogModule.Navigation, $"Начало перехода на сцену {sceneName} по направлению {slideDirection}");
+        Logger.LogVerbose(LogModule.Navigation, $"Начало перехода на сцену {sceneName} по направлению {slideDirection}");
         StartCoroutine(SlideTransition(slideDirection));
     }
 
@@ -156,6 +160,62 @@ public class SceneSlideTransition : MonoBehaviour
         StartCoroutine(SlideTransition(direction));
     }
 
+    public void SetCurrentSceneInstant(string sceneName)
+    {
+        if (string.IsNullOrEmpty(sceneName)) return;
+
+        GameObject scene = scenes.Find(s => s.name == sceneName);
+        if (scene == null)
+        {
+            Logger.LogWarning(LogModule.Navigation, $"Сцена {sceneName} не найдена");
+            return;
+        }
+
+        if (scene == currentScene) return;
+
+        if (isTransitioning)
+        {
+            StartCoroutine(SetCurrentSceneInstantWhenReady(scene));
+            return;
+        }
+
+        if (currentScene != null)
+        {
+            currentScene.SetActive(false);
+            currentScene.transform.localPosition = Vector3.zero;
+        }
+
+        scene.SetActive(true);
+        scene.transform.localPosition = Vector3.zero;
+        currentScene = scene;
+
+        OnSceneChanged?.Invoke(currentScene);
+
+        var tb = TB;
+        if (tb != null)
+        {
+            DCM?.MoveCharacterToCurrentLocationReference();
+            tb.UpdateCurrentLocation();
+        }
+
+        Logger.LogVerbose(LogModule.Navigation, $"Мгновенное переключение на сцену: {currentScene.name}");
+    }
+
+    private IEnumerator SetCurrentSceneInstantWhenReady(GameObject scene)
+    {
+        float timeout = 5f;
+        float elapsed = 0f;
+
+        while (isTransitioning && elapsed < timeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (scene == null) yield break;
+        SetCurrentSceneInstant(scene.name);
+    }
+
     private IEnumerator SlideTransition(Vector2 direction)
     {
         isTransitioning = true;
@@ -171,7 +231,7 @@ public class SceneSlideTransition : MonoBehaviour
         float elapsed = 0f;
         bool switched = false;
 
-        Logger.Log(LogModule.Navigation, $"Анимация перехода из {currentScene.name} в {targetScene.name}");
+        Logger.LogVerbose(LogModule.Navigation, $"Анимация перехода из {currentScene.name} в {targetScene.name}");
 
         while (elapsed < slideDuration)
         {
@@ -201,28 +261,21 @@ public class SceneSlideTransition : MonoBehaviour
         targetScene = null;
         isTransitioning = false;
 
-        Logger.Log(LogModule.Navigation, $"Переход завершён, текущая сцена: {currentScene.name}");
+        Logger.LogVerbose(LogModule.Navigation, $"Переход завершён, текущая сцена: {currentScene.name}");
+
+        OnSceneChanged?.Invoke(currentScene);
 
         yield return null;
 
-        if (textBeginner != null)
+        var tb = TB;
+        if (tb != null)
         {
-            textBeginner.MoveCharacterToCurrentScene();
-            textBeginner.MoveCharacterToActiveLocationReference();
-            Logger.Log(LogModule.Navigation, "Персонаж перемещён на новую локацию");
+            DCM?.MoveCharacterToCurrentLocationReference();
+            tb.UpdateCurrentLocation();
 
-            textBeginner.UpdateCurrentLocation();
-            Logger.Log(LogModule.Navigation, $"Локация обновлена в TextBeginner: {currentScene.name}");
-
-            EventManager.Instance?.TriggerEvent(EventTriggerType.EnterLocation,
+            Refs?.EventManager?.TriggerEvent(
+                EventTriggerType.EnterLocation,
                 new EventContext().WithLocation(currentScene.name));
-            Logger.Log(LogModule.Navigation, $"Событие входа в локацию: {currentScene.name}");
-
-            if (QuestManager.Instance != null)
-            {
-                Logger.Log(LogModule.Navigation, $"Прямое обновление квеста по локации: {currentScene.name}");
-                QuestManager.Instance.UpdateQuestByLocation(currentScene.name);
-            }
         }
         else
         {
@@ -257,24 +310,28 @@ public class SceneSlideTransition : MonoBehaviour
 
     private float GetWorldWidth()
     {
-        Vector3 worldOffset = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width, 0, 0));
+        var cam = Refs?.MainCamera;
+        if (cam == null)
+        {
+            Logger.LogWarning(LogModule.Navigation, "MainCamera отсутствует, возвращаем значение по умолчанию");
+            return 5f;
+        }
+        Vector3 worldOffset = cam.ScreenToWorldPoint(new Vector3(Screen.width, 0, 0));
         return Mathf.Abs(worldOffset.x);
     }
 
     private float GetWorldHeight()
     {
-        Vector3 worldOffset = Camera.main.ScreenToWorldPoint(new Vector3(0, Screen.height, 0));
+        var cam = Refs?.MainCamera;
+        if (cam == null)
+        {
+            Logger.LogWarning(LogModule.Navigation, "MainCamera отсутствует, возвращаем значение по умолчанию");
+            return 5f;
+        }
+        Vector3 worldOffset = cam.ScreenToWorldPoint(new Vector3(0, Screen.height, 0));
         return Mathf.Abs(worldOffset.y);
     }
 
-    public GameObject GetCurrentScene()
-    {
-        Logger.Log(LogModule.Navigation, $"Запрос текущей сцены: {currentScene?.name ?? "None"}");
-        return currentScene;
-    }
-
-    public List<GameObject> GetAllScenes()
-    {
-        return scenes;
-    }
+    public GameObject GetCurrentScene() => currentScene;
+    public List<GameObject> GetAllScenes() => scenes;
 }

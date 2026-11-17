@@ -5,8 +5,6 @@ using UnityEngine.EventSystems;
 
 public class ItemViewPanel : MonoBehaviour
 {
-    public static ItemViewPanel Instance;
-
     private TMP_Text itemNameText;
     private TMP_Text itemDescriptionText;
     private Image itemIconImage;
@@ -21,17 +19,6 @@ public class ItemViewPanel : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            Logger.Log(LogModule.RadialMenu, "ItemViewPanel инициализирован");
-        }
-        else
-        {
-            Logger.Log(LogModule.RadialMenu, "Уничтожение дублирующего ItemViewPanel");
-            Destroy(gameObject);
-        }
-
         panelObject = gameObject;
 
         canvasGroup = GetComponent<CanvasGroup>();
@@ -62,7 +49,7 @@ public class ItemViewPanel : MonoBehaviour
             else
             {
                 itemPreviewContainer = container;
-                Logger.Log(LogModule.RadialMenu, $"Найден слот: {container.name}");
+                Logger.LogVerbose(LogModule.RadialMenu, $"Найден слот: {container.name}");
             }
         }
 
@@ -87,13 +74,13 @@ public class ItemViewPanel : MonoBehaviour
             if (itemNameText == null && (name.Contains("name") || name.Contains("title")))
             {
                 itemNameText = text;
-                Logger.Log(LogModule.RadialMenu, $"Найден ItemNameText: {text.gameObject.name}");
+                Logger.LogVerbose(LogModule.RadialMenu, $"Найден ItemNameText: {text.gameObject.name}");
             }
 
             if (itemDescriptionText == null && (name.Contains("desc") || name.Contains("description")))
             {
                 itemDescriptionText = text;
-                Logger.Log(LogModule.RadialMenu, $"Найден ItemDescriptionText: {text.gameObject.name}");
+                Logger.LogVerbose(LogModule.RadialMenu, $"Найден ItemDescriptionText: {text.gameObject.name}");
             }
         }
 
@@ -126,14 +113,14 @@ public class ItemViewPanel : MonoBehaviour
             if (backButton == null && (name.Contains("back") || name.Contains("close") || name.Contains("exit") || name.Contains("назад")))
             {
                 backButton = btn;
-                Logger.Log(LogModule.RadialMenu, $"Найден BackButton: {btn.gameObject.name}");
+                Logger.LogVerbose(LogModule.RadialMenu, $"Найден BackButton: {btn.gameObject.name}");
             }
         }
 
         if (backButton == null && allButtons.Length > 0)
         {
             backButton = allButtons[0];
-            Logger.Log(LogModule.RadialMenu, $"Запасной вариант: {allButtons[0].gameObject.name} как BackButton");
+            Logger.LogVerbose(LogModule.RadialMenu, $"Запасной вариант: {allButtons[0].gameObject.name} как BackButton");
         }
     }
 
@@ -182,14 +169,14 @@ public class ItemViewPanel : MonoBehaviour
             return;
         }
 
-        ItemData data = ItemDatabase.Instance?.GetItemData(item.itemType);
-        if (data == null)
+        var so = item.ItemSO;
+        if (so == null)
         {
-            Logger.LogWarning(LogModule.RadialMenu, $"Нет данных для предмета {item.itemType}");
+            Logger.LogWarning(LogModule.RadialMenu, "У предмета нет ItemSO");
             return;
         }
 
-        if (data.uiPrefab != null && itemPreviewContainer != null)
+        if (so.uiPrefab != null && itemPreviewContainer != null)
         {
             if (currentPreviewItem != null)
             {
@@ -197,55 +184,37 @@ public class ItemViewPanel : MonoBehaviour
                 currentPreviewItem = null;
             }
 
-            currentPreviewItem = Instantiate(data.uiPrefab, itemPreviewContainer);
+            currentPreviewItem = Instantiate(so.uiPrefab, itemPreviewContainer);
 
             RectTransform rt = currentPreviewItem.GetComponent<RectTransform>();
             if (rt != null)
             {
                 rt.anchoredPosition = Vector2.zero;
-                rt.localScale = Vector3.one;
                 rt.sizeDelta = new Vector2(150, 150);
-            }
-
-            InventoryItemMarker marker = currentPreviewItem.GetComponent<InventoryItemMarker>();
-            if (marker != null)
-            {
-                marker.enabled = false;
-                Logger.Log(LogModule.RadialMenu, "InventoryItemMarker отключён на превью");
             }
 
             InventoryItemMarker[] markers = currentPreviewItem.GetComponentsInChildren<InventoryItemMarker>(true);
             foreach (InventoryItemMarker m in markers)
-            {
                 m.enabled = false;
-            }
 
             currentPreviewItem.transform.SetAsFirstSibling();
 
             Image[] images = currentPreviewItem.GetComponentsInChildren<Image>(true);
-            foreach (Image img in images)
-            {
-                img.enabled = true;
-            }
+            foreach (Image img in images) img.enabled = true;
 
             TMP_Text[] texts = currentPreviewItem.GetComponentsInChildren<TMP_Text>(true);
-            foreach (TMP_Text txt in texts)
-            {
-                txt.enabled = true;
-            }
-
-            Logger.Log(LogModule.RadialMenu, $"Создано превью предмета: {data.uiPrefab.name}");
+            foreach (TMP_Text txt in texts) txt.enabled = true;
         }
 
         if (itemNameText != null)
-            itemNameText.text = data.itemName;
+            itemNameText.text = so.itemName;
 
         if (itemDescriptionText != null)
-            itemDescriptionText.text = data.description;
+            itemDescriptionText.text = so.description;
 
         if (itemIconImage != null)
         {
-            itemIconImage.sprite = data.icon;
+            itemIconImage.sprite = so.icon;
             itemIconImage.preserveAspect = true;
         }
 
@@ -266,7 +235,7 @@ public class ItemViewPanel : MonoBehaviour
             canvasGroup.interactable = true;
         }
 
-        Logger.Log(LogModule.RadialMenu, "ItemViewPanel показана");
+        Logger.LogVerbose(LogModule.RadialMenu, "ItemViewPanel показана");
     }
 
     public void HidePanel()
@@ -284,7 +253,7 @@ public class ItemViewPanel : MonoBehaviour
             currentPreviewItem = null;
         }
 
-        Logger.Log(LogModule.RadialMenu, "ItemViewPanel скрыта");
+        Logger.LogVerbose(LogModule.RadialMenu, "ItemViewPanel скрыта");
     }
 
     public bool IsPanelVisible()

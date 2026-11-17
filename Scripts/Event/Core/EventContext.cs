@@ -1,10 +1,17 @@
 using UnityEngine;
+using VContainer;
 
 public class EventContext
 {
     public GameObject SourceObject { get; set; }
     public GameObject TargetObject { get; set; }
+
+    public ItemSO ItemSO { get; set; }
+    public string ItemId { get; set; }
+
+    [System.Obsolete("Используйте ItemSO / ItemId")]
     public ItemType ItemType { get; set; }
+
     public string LocationName { get; set; }
     public string DialogueID { get; set; }
     public int IntValue { get; set; }
@@ -12,72 +19,100 @@ public class EventContext
     public string StringValue { get; set; }
     public object CustomData { get; set; }
     public EquipmentType EquipmentType { get; set; }
+    public string FlagName { get; set; }
+    public bool FlagValue { get; set; }
 
-    public EventContext()
-    {
-        Logger.Log(LogModule.Event, "Создан новый контекст события");
-    }
+    public IObjectResolver Container { get; set; }
+
+    public EventContext() { }
 
     public EventContext(GameObject source, GameObject target = null)
     {
         SourceObject = source;
         TargetObject = target;
-        Logger.Log(LogModule.Event, $"Создан контекст события с источником: {source?.name}, целью: {target?.name}");
     }
 
+    public EventContext WithContainer(IObjectResolver container)
+    {
+        Container = container;
+        return this;
+    }
+
+    public EventContext WithItem(ItemSO item)
+    {
+        ItemSO = item;
+        ItemId = item != null ? item.id : "";
+        return this;
+    }
+
+    public EventContext WithItemId(string id)
+    {
+        ItemId = id;
+        if (ItemSO == null && !string.IsNullOrEmpty(id))
+            ItemSO = Container?.Resolve<ItemDatabase>()?.GetItem(id);
+        return this;
+    }
+
+    [System.Obsolete("Используйте WithItem(ItemSO) или WithItemId(string)")]
     public EventContext WithItem(ItemType item)
     {
+#pragma warning disable CS0618
         ItemType = item;
-        Logger.Log(LogModule.Event, $"Контекст: установлен предмет {item}");
+        if (item != ItemType.None)
+        {
+            ItemSO = Container?.Resolve<ItemDatabase>()?.GetItemByLegacyType(item);
+            if (ItemSO != null) ItemId = ItemSO.id;
+        }
+#pragma warning restore CS0618
         return this;
     }
 
     public EventContext WithEquipmentType(EquipmentType equipmentType)
     {
         EquipmentType = equipmentType;
-        Logger.Log(LogModule.Event, $"Контекст: установлен тип экипировки {equipmentType}");
         return this;
     }
 
     public EventContext WithLocation(string location)
     {
         LocationName = location;
-        Logger.Log(LogModule.Event, $"Контекст: установлена локация {location}");
         return this;
     }
 
     public EventContext WithDialogue(string dialogueID)
     {
         DialogueID = dialogueID;
-        Logger.Log(LogModule.Event, $"Контекст: установлен ID диалога {dialogueID}");
         return this;
     }
 
     public EventContext WithValue(int value)
     {
         IntValue = value;
-        Logger.Log(LogModule.Event, $"Контекст: установлено целое значение {value}");
         return this;
     }
 
     public EventContext WithValue(float value)
     {
         FloatValue = value;
-        Logger.Log(LogModule.Event, $"Контекст: установлено дробное значение {value}");
         return this;
     }
 
     public EventContext WithValue(string value)
     {
         StringValue = value;
-        Logger.Log(LogModule.Event, $"Контекст: установлена строка {value}");
         return this;
     }
 
     public EventContext WithData(object data)
     {
         CustomData = data;
-        Logger.Log(LogModule.Event, $"Контекст: установлены пользовательские данные {data?.GetType().Name}");
+        return this;
+    }
+
+    public EventContext WithFlag(string name, bool value)
+    {
+        FlagName = name;
+        FlagValue = value;
         return this;
     }
 }
