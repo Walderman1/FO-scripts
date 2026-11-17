@@ -1,0 +1,27 @@
+name: Sync Scripts to Public Repo
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Scripts/**'
+
+jobs:
+  copy-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+
+      - name: Push scripts to public repo
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'Scripts'
+          destination-github-username: 'Walderman1'
+          destination-repository-name: 'FO-scripts'
+          user-email: 'zybindanil201059@gmail.com'
+          commit-message: 'Update scripts'
+          target-branch: main
