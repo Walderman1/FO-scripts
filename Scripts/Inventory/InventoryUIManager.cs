@@ -206,6 +206,32 @@ public class InventoryUIManager : MonoBehaviour
             Destroy(child.gameObject);
     }
 
+    /// <summary>
+    /// Полностью очищает инвентарь, оставляя пустые слоты. Нужно отладочному окну DevTools,
+    /// чтобы одной кнопкой убрать всё выданное для теста.
+    /// </summary>
+    /// <returns>Сколько предметов было убрано (с учётом стопок).</returns>
+    public int ClearAllItems()
+    {
+        if (inventoryGrid == null) return 0;
+
+        int removed = 0;
+
+        foreach (Transform slot in inventoryGrid.transform)
+        {
+            var marker = slot.GetComponentInChildren<InventoryItemMarker>();
+            if (marker == null) continue;
+
+            removed += marker.count;
+
+            marker.gameObject.SetActive(false);
+            Destroy(marker.gameObject);
+        }
+
+        UpdateAllSlots();
+        return removed;
+    }
+
     private void CreateInventorySlots()
     {
         if (inventoryGrid == null || itemSlotPrefab == null) return;

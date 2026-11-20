@@ -209,6 +209,10 @@ namespace DialogueSystem
         private void Update()
         {
             if (!isDialogueActive) return;
+
+            // Клики по внутриигровому окну DevTools не должны листать диалог.
+            if (InGameDevTools.BlocksGameplayInput) return;
+
             if (state == DialogueState.Choosing) return;
             if (state == DialogueState.Idle) return;
 

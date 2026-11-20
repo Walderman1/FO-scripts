@@ -108,6 +108,9 @@ public class InputManager : MonoBehaviour
 
     private void Update()
     {
+        // Пока открыто внутриигровое окно DevTools, игровые хоткеи не обрабатываем.
+        if (InGameDevTools.BlocksGameplayInput) return;
+
         var cfg = Config;
         if (cfg == null) return;
         if (SceneManager.GetActiveScene().buildIndex == 0) return;

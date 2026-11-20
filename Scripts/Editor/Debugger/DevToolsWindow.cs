@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 
-public class DevToolsWindow : EditorWindow, ICallbacks
+public class DevToolsWindow : EditorWindow
 {
     private enum Tab { Logs, World, Progress, Tests }
 
@@ -17,22 +17,10 @@ public class DevToolsWindow : EditorWindow, ICallbacks
     private int selectedItemIndex = 0;
     private int itemCountToAdd = 1;
 
-    private TestRunnerApi testRunnerApi;
-    private bool testRunInProgress = false;
-    private int testsPassed = 0;
-    private int testsFailed = 0;
     private int testsTotal = 0;
-
-    private struct TestResultData
-    {
-        public TestStatus Status;
-        public double Duration;
-        public string Message;
-    }
 
     private ITestAdaptor loadedTestTree;
     private Vector2 testTreeScroll;
-    private Dictionary<string, TestResultData> testResults = new Dictionary<string, TestResultData>();
     private bool isLoadingTestList = false;
     private string testSearchFilter = "";
     private HashSet<string> expandedCategories = new HashSet<string>();
@@ -60,18 +48,15 @@ public class DevToolsWindow : EditorWindow, ICallbacks
     private void OnEnable()
     {
         DebuggerCore.Register(this);
-        testRunnerApi = ScriptableObject.CreateInstance<TestRunnerApi>();
-        testRunnerApi.RegisterCallbacks(this);
     }
 
     private void OnDisable()
     {
         DebuggerCore.Unregister(this);
-        if (testRunnerApi != null) testRunnerApi.UnregisterCallbacks(this);
 
-        if (_bannerTex != null) DestroyImmediate(_bannerTex);
-        if (_hoverTex != null) DestroyImmediate(_hoverTex);
-        if (_activeTex != null) DestroyImmediate(_activeTex);
+        if (_bannerTex != null) { DestroyImmediate(_bannerTex); _bannerTex = null; }
+        if (_hoverTex != null) { DestroyImmediate(_hoverTex); _hoverTex = null; }
+        if (_activeTex != null) { DestroyImmediate(_activeTex); _activeTex = null; }
     }
 
     private void OnFocus() => Repaint();
@@ -106,10 +91,9 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         if (_bannerTex != null) return;
         if (Event.current == null) return;
 
-        // Текстуры для фонов
         _bannerTex = MakeTex(2, 2, new Color(0.16f, 0.28f, 0.48f));
-        _hoverTex = MakeTex(2, 2, new Color(0.3f, 0.3f, 0.3f, 0.4f)); // Полупрозрачный серый
-        _activeTex = MakeTex(2, 2, new Color(0.2f, 0.4f, 0.6f, 0.5f)); // Полупрозрачный синий
+        _hoverTex = MakeTex(2, 2, new Color(0.3f, 0.3f, 0.3f, 0.4f));
+        _activeTex = MakeTex(2, 2, new Color(0.2f, 0.4f, 0.6f, 0.5f));
 
         _bannerTitle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 13, alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.white } };
         _cardBox = new GUIStyle(EditorStyles.helpBox) { padding = new RectOffset(10, 10, 8, 8), margin = new RectOffset(0, 0, 4, 4) };
@@ -130,7 +114,6 @@ public class DevToolsWindow : EditorWindow, ICallbacks
 
         _wrapLabelStyle = new GUIStyle(EditorStyles.label) { wordWrap = true };
 
-        // Стиль для кликабельной строки категории
         _categoryRowBtnStyle = new GUIStyle(EditorStyles.boldLabel)
         {
             richText = true,
@@ -143,7 +126,6 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         _categoryRowBtnStyle.active.background = _activeTex;
         _categoryRowBtnStyle.active.textColor = Color.white;
 
-        // Стиль для кликабельного имени теста
         _testRowBtnStyle = new GUIStyle(EditorStyles.label)
         {
             richText = true,
@@ -341,8 +323,10 @@ public class DevToolsWindow : EditorWindow, ICallbacks
 
     private void DrawTestsTab(float width)
     {
+        bool running = TestRunnerGlobalBridge.IsRunning;
+
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-        GUI.enabled = !testRunInProgress && !EditorApplication.isPlaying;
+        GUI.enabled = !running && !EditorApplication.isPlaying;
 
         if (GUILayout.Button("▶ EditMode", EditorStyles.toolbarButton)) StartTests(TestMode.EditMode);
         if (GUILayout.Button("▶ PlayMode", EditorStyles.toolbarButton)) StartTests(TestMode.PlayMode);
@@ -351,13 +335,22 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         if (GUILayout.Button("Test Runner", EditorStyles.toolbarButton)) EditorApplication.ExecuteMenuItem("Window/General/Test Runner");
 
         GUI.enabled = true;
+
+        Color prev = GUI.backgroundColor;
+        GUI.backgroundColor = new Color(1f, 0.85f, 0.4f);
+        if (GUILayout.Button("Сброс", EditorStyles.toolbarButton, GUILayout.Width(60)))
+        {
+            ForceResetTestState();
+        }
+        GUI.backgroundColor = prev;
+
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField($"Всего: {testsTotal}", EditorStyles.boldLabel, GUILayout.Width(80));
-        EditorGUILayout.LabelField($"<color=#4CAF50>Прошло: {testsPassed}</color>", new GUIStyle(EditorStyles.boldLabel) { richText = true }, GUILayout.Width(100));
-        EditorGUILayout.LabelField($"<color=#F44336>Провалено: {testsFailed}</color>", new GUIStyle(EditorStyles.boldLabel) { richText = true }, GUILayout.Width(110));
-        EditorGUILayout.LabelField(testRunInProgress ? "Выполняется..." : "Готово", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField($"<color=#4CAF50>Прошло: {TestRunnerGlobalBridge.Passed}</color>", new GUIStyle(EditorStyles.boldLabel) { richText = true }, GUILayout.Width(100));
+        EditorGUILayout.LabelField($"<color=#F44336>Провалено: {TestRunnerGlobalBridge.Failed}</color>", new GUIStyle(EditorStyles.boldLabel) { richText = true }, GUILayout.Width(110));
+        EditorGUILayout.LabelField(running ? "Выполняется..." : "Готово", EditorStyles.boldLabel);
         EditorGUILayout.EndHorizontal();
 
         if (EditorApplication.isPlaying)
@@ -397,6 +390,13 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         EditorGUILayout.EndScrollView();
     }
 
+    private void ForceResetTestState()
+    {
+        TestRunnerGlobalBridge.ResetAll();
+        Repaint();
+        Debug.Log("[DevTools] Состояние тестов сброшено.");
+    }
+
     private void DrawTestCategory(ITestAdaptor node, int depth)
     {
         if (node == null) return;
@@ -432,7 +432,6 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         string arrow = expanded ? "▼" : "▶";
         string label = $"<color={statusColor}>{statusIcon}</color> {arrow} {displayName}";
 
-        // Кликабельная строка категории с эффектом наведения
         if (GUILayout.Button(label, _categoryRowBtnStyle, GUILayout.ExpandWidth(true), GUILayout.Height(22)))
         {
             if (expandedCategories.Contains(key)) expandedCategories.Remove(key);
@@ -474,7 +473,7 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         string description = testInfo != null ? testInfo.Description : "";
         string fullName = node.FullName ?? node.Name;
 
-        TestResultData? result = testResults.TryGetValue(fullName, out var r) ? r : (TestResultData?)null;
+        TestRunnerGlobalBridge.ResultData? result = TestRunnerGlobalBridge.Results.TryGetValue(fullName, out var r) ? r : (TestRunnerGlobalBridge.ResultData?)null;
 
         string icon = "•";
         string color = "white";
@@ -500,7 +499,6 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         string infoKey = fullName;
         bool isInfoExpanded = expandedTestInfos.Contains(infoKey);
 
-        // Если есть описание, название теста становится кликабельным
         if (!string.IsNullOrEmpty(description))
         {
             if (GUILayout.Button(displayName, _testRowBtnStyle, GUILayout.ExpandWidth(true)))
@@ -553,9 +551,7 @@ public class DevToolsWindow : EditorWindow, ICallbacks
 
     private void ClearResults()
     {
-        testsPassed = 0;
-        testsFailed = 0;
-        testResults.Clear();
+        TestRunnerGlobalBridge.ResetAll();
         expandedTestInfos.Clear();
         Repaint();
     }
@@ -607,7 +603,7 @@ public class DevToolsWindow : EditorWindow, ICallbacks
         if (node == null) return 0;
         if (!node.HasChildren)
         {
-            if (testResults.TryGetValue(node.FullName, out var r) && r.Status == status) return 1;
+            if (TestRunnerGlobalBridge.Results.TryGetValue(node.FullName, out var r) && r.Status == status) return 1;
             return 0;
         }
         int count = 0;
@@ -678,13 +674,8 @@ public class DevToolsWindow : EditorWindow, ICallbacks
 
     private void LoadTestList(TestMode mode)
     {
-        if (testRunnerApi == null)
-        {
-            testRunnerApi = ScriptableObject.CreateInstance<TestRunnerApi>();
-            testRunnerApi.RegisterCallbacks(this);
-        }
         isLoadingTestList = true;
-        testRunnerApi.RetrieveTestList(mode, OnTestListLoaded);
+        TestRunnerGlobalBridge.RetrieveTestList(mode, OnTestListLoaded);
     }
 
     private void OnTestListLoaded(ITestAdaptor tests)
@@ -697,43 +688,20 @@ public class DevToolsWindow : EditorWindow, ICallbacks
 
     private void RunSingleTest(ITestAdaptor test)
     {
-        if (EditorApplication.isPlaying || test == null || testRunInProgress) return;
-        if (testRunnerApi == null) testRunnerApi = ScriptableObject.CreateInstance<TestRunnerApi>();
+        if (EditorApplication.isPlaying || test == null) return;
+        if (TestRunnerGlobalBridge.IsRunning) return;
 
         var filter = new Filter { testMode = TestMode.EditMode, testNames = new[] { test.FullName } };
-        testRunnerApi.Execute(new ExecutionSettings(filter));
+        TestRunnerGlobalBridge.Execute(new ExecutionSettings(filter));
     }
 
     private void StartTests(TestMode mode)
     {
-        if (EditorApplication.isPlaying || testRunnerApi == null) return;
-
-        ClearResults();
-        testRunInProgress = true;
+        if (EditorApplication.isPlaying) return;
+        if (TestRunnerGlobalBridge.IsRunning) return;
 
         var filter = new Filter { testMode = mode };
-        testRunnerApi.Execute(new ExecutionSettings(filter));
-    }
-
-    public void RunStarted(ITestAdaptor testsToRun) { Repaint(); }
-    public void RunFinished(ITestResultAdaptor result) { testRunInProgress = false; Repaint(); }
-    public void TestStarted(ITestAdaptor test) { }
-
-    public void TestFinished(ITestResultAdaptor result)
-    {
-        if (!result.HasChildren)
-        {
-            testResults[result.Test.FullName] = new TestResultData
-            {
-                Status = result.TestStatus,
-                Duration = result.Duration,
-                Message = result.Message
-            };
-
-            if (result.TestStatus == TestStatus.Passed) testsPassed++;
-            else if (result.TestStatus == TestStatus.Failed) testsFailed++;
-        }
-        Repaint();
+        TestRunnerGlobalBridge.Execute(new ExecutionSettings(filter));
     }
 
     #endregion

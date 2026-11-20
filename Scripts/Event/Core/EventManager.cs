@@ -17,7 +17,10 @@ public class EventManager : MonoBehaviour
 
     [Header("Event Configuration")]
     [SerializeField] private bool autoLoadEvents = true;
-    [SerializeField] private string eventsResourcesPath = "EventsData";
+    [Tooltip("Папка в Resources с ассетами GameEvent (Resources/Events). Именно она используется в билде.")]
+    [SerializeField] private string eventsResourcesPath = "Events";
+    [Tooltip("Необязательная папка в Resources с JSON-копиями событий (Resources/EventsData).")]
+    [SerializeField] private string eventsJsonResourcesPath = "EventsData";
     public bool logEvents = true;
 
     public List<GameEvent> registeredEvents = new List<GameEvent>();
@@ -76,6 +79,11 @@ public class EventManager : MonoBehaviour
             bool loadedFromJson = LoadEventsFromJson();
             if (!loadedFromJson) LoadEventsFromResourcesDirectly();
             if (!loadedFromJson && registeredEvents.Count == 0) LoadAllEventsFromResources();
+
+            if (registeredEvents.Count == 0)
+                Logger.LogError(LogModule.Event,
+                    $"События не загружены: нет ассетов GameEvent в Resources/{eventsResourcesPath} " +
+                    $"и JSON в Resources/{eventsJsonResourcesPath}. Все события будут молчать.");
         }
         else InitializeEventIndexes();
     }
@@ -91,7 +99,7 @@ public class EventManager : MonoBehaviour
 
     private void LoadEventsFromResourcesDirectly()
     {
-        TextAsset[] jsonAssets = Resources.LoadAll<TextAsset>(eventsResourcesPath);
+        TextAsset[] jsonAssets = Resources.LoadAll<TextAsset>(eventsJsonResourcesPath);
         if (jsonAssets.Length == 0) return;
 
         registeredEvents.Clear();
@@ -118,7 +126,7 @@ public class EventManager : MonoBehaviour
         }
 
         if (logEvents)
-            Logger.Log(LogModule.Event, $"Loaded {loadedCount} events from Resources/{eventsResourcesPath}");
+            Logger.Log(LogModule.Event, $"Loaded {loadedCount} events from Resources/{eventsJsonResourcesPath}");
     }
 
     public void RunCoroutine(IEnumerator routine) => StartCoroutine(routine);
@@ -161,6 +169,10 @@ public class EventManager : MonoBehaviour
 
         foreach (var evt in loadedEvents)
             if (evt != null) RegisterEvent(evt);
+
+        if (logEvents)
+            Logger.Log(LogModule.Event,
+                $"Загружено {registeredEvents.Count} событий из Resources/{eventsResourcesPath}");
     }
 
     public void RegisterEvent(GameEvent evt)
@@ -318,7 +330,8 @@ public class EventManager : MonoBehaviour
     public void ReloadEvents()
     {
         bool loadedFromJson = LoadEventsFromJson();
-        if (!loadedFromJson) LoadAllEventsFromResources();
+        if (!loadedFromJson) LoadEventsFromResourcesDirectly();
+        if (!loadedFromJson && registeredEvents.Count == 0) LoadAllEventsFromResources();
     }
 
     public List<GameEvent> GetEventsByTrigger(EventTriggerType triggerType)

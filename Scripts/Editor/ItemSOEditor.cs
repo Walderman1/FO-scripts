@@ -365,13 +365,12 @@ public class ItemSOEditor : Editor
             image.preserveAspect = true;
 
             RectTransform rt = image.rectTransform;
-            float maxSide = Mathf.Max(newItemIcon.rect.width, newItemIcon.rect.height);
-            float normalizedSize = 64f;
-            float scale = normalizedSize / Mathf.Max(maxSide, 1f);
 
-            rt.sizeDelta = new Vector2(
-                newItemIcon.rect.width * scale,
-                newItemIcon.rect.height * scale);
+            // Размер иконки = размер картинки в пикселях, как у уже существующих предметов
+            // (coin 512x512, pondlily 510x453, potion 206x341). Корень префаба имеет scale 0.2,
+            // поэтому на экране иконка занимает ровно 0.2 от размера картинки.
+            rt.sizeDelta = new Vector2(newItemIcon.rect.width, newItemIcon.rect.height);
+
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);

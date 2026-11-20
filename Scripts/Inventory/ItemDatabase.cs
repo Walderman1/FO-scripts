@@ -12,6 +12,9 @@ public class ItemDatabase : MonoBehaviour
     [SerializeField] private string resourcesPath = "Items/ScriptableObjects";
     [SerializeField] private ItemSO fallbackItem;
 
+    [Tooltip("Подключать предметы, созданные во время игры из папки ItemsInbox (PNG от художника).")]
+    [SerializeField] private bool includeRuntimeItems = true;
+
     private Dictionary<string, ItemSO> itemsById = new Dictionary<string, ItemSO>();
     private Dictionary<string, ItemSO> itemsByName = new Dictionary<string, ItemSO>();
 
@@ -26,8 +29,55 @@ public class ItemDatabase : MonoBehaviour
     public void LoadDatabase()
     {
         allItems = Resources.LoadAll<ItemSO>(resourcesPath).ToList();
-        Logger.Log(LogModule.Inventory, $"Загружено {allItems.Count} предметов из Resources/{resourcesPath}");
+
+        int runtimeCount = 0;
+
+        if (includeRuntimeItems)
+        {
+            var runtimeItems = RuntimeItemFolder.Items;
+            for (int i = 0; i < runtimeItems.Count; i++)
+            {
+                var runtimeItem = runtimeItems[i];
+                if (runtimeItem == null) continue;
+                if (allItems.Contains(runtimeItem)) continue;
+
+                allItems.Add(runtimeItem);
+                runtimeCount++;
+            }
+        }
+
+        Logger.Log(LogModule.Inventory,
+            $"Загружено {allItems.Count} предметов из Resources/{resourcesPath}" +
+            (runtimeCount > 0 ? $" (+{runtimeCount} из папки {RuntimeItemFolder.FolderName})" : ""));
+
         BuildIndexes();
+    }
+
+    /// <summary>
+    /// Регистрирует предмет, созданный во время игры (например, из PNG в папке ItemsInbox).
+    /// Возвращает true, если предмет уже есть в базе — добавлен сейчас или был добавлен раньше.
+    /// false означает конфликт: такой id уже занят другим предметом.
+    /// </summary>
+    public bool RegisterRuntimeItem(ItemSO item)
+    {
+        if (item == null || string.IsNullOrEmpty(item.id)) return false;
+
+        if (itemsById.TryGetValue(item.id, out var existing) && existing != null)
+            return existing == item;
+
+        if (!allItems.Contains(item)) allItems.Add(item);
+
+        itemsById[item.id] = item;
+
+        if (!string.IsNullOrEmpty(item.itemName) && !itemsByName.ContainsKey(item.itemName))
+            itemsByName.Add(item.itemName, item);
+
+        return true;
+    }
+
+    public bool HasItem(string id)
+    {
+        return !string.IsNullOrEmpty(id) && itemsById.ContainsKey(id);
     }
 
     private void BuildIndexes()

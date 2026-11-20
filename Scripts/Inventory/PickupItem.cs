@@ -435,6 +435,7 @@ public class PickupItem : MonoBehaviour
 
     private bool IsBlockedByUI()
     {
+        if (InGameDevTools.BlocksGameplayInput) return true;
         if (_textBeginner != null && _textBeginner.IsDialogueActive) return true;
         if (_radialMenuController != null && _radialMenuController.IsAnyMenuOpen()) return true;
         return false;

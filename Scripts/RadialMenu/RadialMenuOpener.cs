@@ -31,6 +31,8 @@ public class RadialMenuOpener : MonoBehaviour
 
     private void Update()
     {
+        if (InGameDevTools.BlocksGameplayInput) return;
+
         if (Time.unscaledTime >= nextCheckTime)
         {
             nextCheckTime = Time.unscaledTime + CHECK_INTERVAL;

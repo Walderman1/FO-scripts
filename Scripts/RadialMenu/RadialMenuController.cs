@@ -425,6 +425,22 @@ public class RadialMenuController : MonoBehaviour
         int dropCount = item.count;
         var so = item.ItemSO;
 
+        // Предмет нельзя выбрасывать без мировой модели — иначе он просто исчезнет из инвентаря.
+        if (so == null)
+        {
+            Logger.LogWarning(LogModule.Inventory, "Нельзя выбросить предмет без ItemSO");
+            CloseContextMenu();
+            return;
+        }
+
+        if (so.worldPrefab == null)
+        {
+            Logger.LogWarning(LogModule.Inventory,
+                $"Нельзя выбросить «{so.itemName}»: у предмета нет worldPrefab");
+            CloseContextMenu();
+            return;
+        }
+
         if (so != null && so.worldPrefab != null)
         {
             var currentLocation = _textBeginner?.CurrentLocation;
@@ -432,6 +448,9 @@ public class RadialMenuController : MonoBehaviour
             Vector3 spawnPos = GetDropPosition();
             Vector2 randomOffset = new Vector2(Random.Range(-1.0f, 1.0f), Random.Range(-0.5f, 0.1f));
             Vector3 targetWorldPos = spawnPos + (Vector3)randomOffset;
+
+            Logger.Log(LogModule.Inventory,
+                $"Выброшен предмет «{so.itemName}» x{dropCount} → {targetWorldPos}");
 
             GameObject droppedItem = Instantiate(so.worldPrefab, spawnPos, Quaternion.identity);
 

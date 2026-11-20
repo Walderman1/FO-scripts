@@ -347,6 +347,10 @@ public class GlobalControl : MonoBehaviour
 
     private IEnumerator StartSceneWithLoading(int sceneIndex)
     {
+        // Новую игру надо запомнить сразу: InitializeGameScene() удалит этот ключ,
+        // когда сцена уже загрузится.
+        bool isNewGame = PlayerPrefs.GetInt("NewGameStart", 0) == 1;
+
         _loadingScreen?.Show("Загрузка мира...");
         yield return null;
 
@@ -384,18 +388,23 @@ public class GlobalControl : MonoBehaviour
         _loadingScreen?.SetProgress(0.65f, "Расстановка локаций...");
         yield return null;
 
-        var tb = _resolver?.Resolve<TextBeginner>();
-        var dcm = _resolver?.Resolve<DialogueCharacterManager>();
+        var tb = ResolveSceneSafe<TextBeginner>();
+        var dcm = ResolveSceneSafe<DialogueCharacterManager>();
         if (tb != null && dcm != null)
         {
             _loadingScreen?.SetProgress(0.7f, "Появление персонажа...");
-            yield return SpawnCharacterAsync(tb, dcm, needLoad);
+            yield return SpawnCharacterAsync(tb, dcm, needLoad, isNewGame);
         }
 
         _loadingScreen?.SetProgress(0.75f, "События...");
         yield return null;
         yield return null;
         _eventManager?.ExecuteAwakeEvents();
+        yield return null;
+
+        // Страховка: если событие «Новая игра» почему-то не выполнилось,
+        // персонаж и пролог всё равно должны появиться.
+        if (isNewGame) EnsureNewGameStarted(tb);
         yield return null;
 
         float animDuration = Mathf.Max(LoadingScreen.GetArtificialDelay(), 0.5f);
@@ -419,16 +428,23 @@ public class GlobalControl : MonoBehaviour
             yield return _loadingScreen.HideAsync();
     }
 
-    private IEnumerator SpawnCharacterAsync(TextBeginner tb, DialogueCharacterManager dcm, bool fromSave)
+    private const string NewGameEventId = "event_novaya_igra";
+
+    private IEnumerator SpawnCharacterAsync(TextBeginner tb, DialogueCharacterManager dcm,
+                                           bool fromSave, bool isNewGame)
     {
+        if (dcm == null || tb == null) yield break;
         if (dcm.CurrentCharacter != null) yield break;
         if (tb.IsDialogueActive) yield break;
 
-        string defaultCharacter = _resolver?.Resolve<DialogueData>()?.DefaultCharacterName;
+        string defaultCharacter = null;
+        try { defaultCharacter = _resolver?.Resolve<DialogueData>()?.DefaultCharacterName; } catch { }
         if (string.IsNullOrEmpty(defaultCharacter)) yield break;
 
-        bool shouldSpawn = fromSave ||
-                           (_eventStateManager != null && _eventStateManager.IsExecuted("event_novaya_igra"));
+        // Новая игра больше не зависит от того, успело ли отметиться событие:
+        // персонаж появляется всегда, а пролог запускает само событие (или EnsureNewGameStarted).
+        bool shouldSpawn = fromSave || isNewGame ||
+                           (_eventStateManager != null && _eventStateManager.IsExecuted(NewGameEventId));
 
         if (!shouldSpawn) yield break;
 
@@ -436,6 +452,54 @@ public class GlobalControl : MonoBehaviour
         yield return null;
         dcm.MoveCharacterToCurrentLocationReference();
         yield return null;
+    }
+
+    /// <summary>Гарантирует старт «Новой игры», даже если событие не выполнилось само.</summary>
+    private void EnsureNewGameStarted(TextBeginner tb)
+    {
+        if (_eventStateManager != null && _eventStateManager.IsExecuted(NewGameEventId)) return;
+
+        var evt = _eventManager?.GetEventById(NewGameEventId);
+        if (evt != null)
+        {
+            Logger.LogWarning(LogModule.Event,
+                $"Событие '{NewGameEventId}' не выполнилось на старте — запускаю вручную");
+
+            var container = SceneInjector.Instance?.CurrentSceneScope;
+            evt.Execute(new EventContext().WithContainer(container));
+
+            if (_eventStateManager != null && _eventStateManager.IsExecuted(NewGameEventId)) return;
+        }
+        else
+        {
+            Logger.LogWarning(LogModule.Event,
+                $"Событие '{NewGameEventId}' не найдено — пролог запускается напрямую");
+        }
+
+        if (tb == null || tb.IsDialogueActive) return;
+
+        string dialogueFile = GetNewGameDialogueFileName();
+        if (string.IsNullOrEmpty(dialogueFile)) return;
+
+        Logger.LogWarning(LogModule.Event, $"Прямой запуск пролога: {dialogueFile}");
+        tb.StartDialogue(dialogueFile);
+    }
+
+    private string GetNewGameDialogueFileName()
+    {
+        var evt = _eventManager?.GetEventById(NewGameEventId);
+        if (evt?.actions != null)
+        {
+            foreach (var action in evt.actions)
+                if (action is EventActionStartDialogue start && !string.IsNullOrEmpty(start.dialogueFileName))
+                    return start.dialogueFileName;
+        }
+        return "Prologue";
+    }
+
+    private T ResolveSceneSafe<T>() where T : class
+    {
+        try { return _resolver?.Resolve<T>(); } catch { return null; }
     }
 
     public void ReturnToMenu() => SceneManager.LoadScene(0);

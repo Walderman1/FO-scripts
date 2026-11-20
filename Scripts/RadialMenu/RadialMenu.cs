@@ -444,6 +444,15 @@ public class RadialMenu : MonoBehaviour
             var controller = SceneInjector.Instance?.CurrentSceneScope?.Resolve<RadialMenuController>();
             controller?.HandleContextAction(currentItem, action);
             currentItem = null;
+
+            // Действие контекстного меню уже выполнено (например «Выбросить» → DropItem).
+            // Пробрасывать его дальше в RadialMenuActionHandler нельзя: там Exit = QuitGame,
+            // из-за чего игра закрывалась при выбрасывании любого предмета.
+            Hide();
+
+            var contextController = SceneInjector.Instance?.CurrentSceneScope?.Resolve<RadialMenuController>();
+            contextController?.CloseAllMenus();
+            return;
         }
 
         if (onButtonClick != null)
