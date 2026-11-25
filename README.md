@@ -5,7 +5,7 @@
 **Экспериментальная RPG о пони, потерявшей память**
 
 ![Версия](https://img.shields.io/badge/версия-0.39-blue)
-![Unity](https://img.shields.io/badge/Unity-6000.4-black?logo=unity)
+![Unity](https://img.shields.io/badge/Unity-6000.6-black?logo=unity)
 ![C#](https://img.shields.io/badge/C%23-239120?logo=csharp&logoColor=white)
 ![Статус](https://img.shields.io/badge/статус-в%20разработке-orange)
 
