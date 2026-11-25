@@ -556,10 +556,10 @@ finding-oneself/
 
 ---
 
-## Контакты
+## Ссылки
 
-- GitHub: [GitHub](https://github.com/Walderman1)
-- Telegram: [Telegram](https://t.me/VValderman)
+- [GitHub](https://github.com/Walderman1)
+- [Telegram](https://t.me/FindingOneselfGame)
 
 ---
 
