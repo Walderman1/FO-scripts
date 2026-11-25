@@ -1,263 +1,499 @@
-# ✨ Finding Oneself
+<div align="center">
 
-### _Экспериментальная RPG о пони, потерявшей память_
+# Finding Oneself
+
+**Экспериментальная RPG о пони, потерявшей память**
+
+![Версия](https://img.shields.io/badge/версия-0.39-blue)
+![Unity](https://img.shields.io/badge/Unity-6000.4-black?logo=unity)
+![C#](https://img.shields.io/badge/C%23-239120?logo=csharp&logoColor=white)
+![Статус](https://img.shields.io/badge/статус-в%20разработке-orange)
 
 ![Finding Oneself](GIF/hero.gif)
 
----
-
-**🎮 Жанр**  
-RPG / Эксперимент | **🎨 Визуал**  
-AI-генерируемый | **🧠 Логика**  
-AI-ассистируемая | **⚡ Статус**  
-Прототип
----|---|---|---
+</div>
 
 ---
 
-## 🎯 О проекте
+## Содержание
 
-> _"Визуал и часть логики создаются с помощью нейросетей. Эксперимент — насколько ИИ может помочь соло-разработчику."_
-
-**Finding Oneself** — это экспериментальная RPG, где пони **Трикси** просыпается в шахте без воспоминаний. Ей предстоит заново учиться, сражаться и собирать отряд в опасном Вечнозеленом лесу и за его пределами.
-
-Проект написан на **Unity** с использованием **C#** и активно развивается. Визуальная часть, часть логики и текстовый контент создаются с помощью нейросетей.
-
----
-
-## 🎭 Сюжет
-
-🌟 Что предстоит героине
---- 
-🔄 Заново научиться всему с нуля
-⚔️ Набить руку в бою
-👥 Собрать верный отряд по всему миру
-🔍 Раскрыть тайну своего прошлого
-
-> _Вечнозеленый лес — лишь первая глава в большой истории._
+- [О проекте](#о-проекте)
+- [Сюжет](#сюжет)
+- [Технологический стек](#технологический-стек)
+- [Управление](#управление)
+- [Архитектура](#архитектура)
+- [Системы игры](#системы-игры)
+- [Сохранения](#сохранения)
+- [Предметы из картинок](#предметы-из-картинок)
+- [Инструменты разработчика](#инструменты-разработчика)
+- [Структура проекта](#структура-проекта)
+- [Статус разработки](#статус-разработки)
+- [Как помочь](#как-помочь)
+- [Контакты](#контакты)
 
 ---
 
-## 🤖 Ключевая особенность
+## О проекте
 
-🎨 Визуал | 🧠 Логика | 📝 Контент
----|---|---
-Арты персонажей, фоны, текстуры
+**Finding Oneself** — 2D-RPG на Unity. Пони Трикси просыпается в шахте и ничего не помнит. Ей нужно заново учиться жить, драться и собирать команду — сначала в Вечнозелёном лесу, потом за его пределами.
 
-**Генерируется через ИИ** | Игровые механики
+Проект делает один человек. Часть артов, текстов и кода создаётся с помощью нейросетей — отчасти это эксперимент: насколько они могут помочь соло-разработчику.
 
-**Создаётся с помощью ИИ** | Идеи, тексты, диалоги
+## Сюжет
 
-**Создаётся с помощью ИИ**
+Трикси предстоит:
 
----
+- заново научиться всему с нуля;
+- набить руку в бою;
+- собрать отряд по всему миру;
+- разобраться, кто она и что с ней произошло.
 
-## 🛠 Технологический стек
-
-🎮 **Движок** | Unity 6000.4.8f1
----|---
-💻 **Язык** | C#
-🎨 **Рендер** | Universal Render Pipeline (URP) + Light2D
-🖥️ **UI** | Unity UI + TextMeshPro
-🤖 **ИИ-инструменты** | Stable Diffusion, ChatGPT
-📦 **Контроль версий** | Git + GitHub
-🧩 **Архитектура** | ScriptableObject + JSON + Singleton-менеджеры
-📜 **Данные** | JSON (события, диалоги, настройки, крафт)
+Вечнозелёный лес — только первая глава.
 
 ---
 
-## 🏗 Архитектура проекта
+## Технологический стек
 
-Loading
-
-    graph TD
-        A[🧠 Core Systems] --> B[🎮 Gameplay]
-        A --> C[🎨 UI]
-        A --> D[🗺️ Navigation]
-        A --> E[🎬 Presentation]
-        A --> F[🐞 Debug & Tools]
-
-        B --> B1[Abilities]
-        B --> B2[Inventory]
-        B --> B3[Craft]
-        B --> B4[Equipment]
-        B --> B5[Dialogue]
-        B --> B6[Quests]
-        B --> B7[Events]
-
-        C --> C1[MenuUI]
-        C --> C2[InventoryUI]
-        C --> C3[QuestUI]
-        C --> C4[RadialMenu]
-        C --> C5[HUD / Tooltips]
-
-        D --> D1[LocationNeighbors]
-        D --> D2[SceneSlideTransition]
-        D --> D3[NavigationArrow]
-
-        E --> E1[EyeController]
-        E --> E2[DialogueCharacterManager]
-        E --> E3[FindingOneselfAnimation]
-
-        F --> F1[Logger]
-        F --> F2[DebuggerWindow]
-        F --> F3[QuestDebugger]
-        F --> F4[Editor Tools]
-
-**📋 Подробное описание модулей**
-
-* **Ядро (Core Systems):** `GlobalControl`, `Logger`, `SettingsManager`, `InputManager`, `FlagManager`
-* **Событийная система (Event):** `EventManager`, `EventStateManager`, `EventDataManager`, `GameEvent`, `EventAction`, `EventConverter`
-* **Игровая логика (Gameplay):** Abilities, Inventory, Craft, Equipment, Dialogue, Quests
-* **UI:** `MenuUIManager`, `InventoryUIManager`, `DialogueUI`, `QuestUI`, `RadialMenu`, `UIBuilder`
-* **Навигация (Navigation):** `LocationNeighbors`, `NavigationArrow`, `SceneSlideTransition`
-* **Презентация (Presentation):** `EyeController`, `DialogueCharacterManager`, `FindingOneselfAnimation`
-* **Отладка (Debug & Tools):** `Logger`, `DebuggerWindow`, `QuestDebugger`, Editor-расширения
+| | |
+|---|---|
+| Движок | Unity 6000.6.4f1 |
+| Язык | C# |
+| Рендер | Universal Render Pipeline + Light2D |
+| UI | Unity UI + TextMeshPro, часть окон — IMGUI |
+| DI | VContainer |
+| Данные | ScriptableObject, JSON (Newtonsoft.Json и JsonUtility) |
+| Тесты | NUnit (EditMode) |
+| Нейросети | Stable Diffusion, Claude.ai, DeepSeek |
+| Версионирование | Git + GitHub |
 
 ---
 
-## 📁 Структура проекта
+## Управление
+
+| Действие | Клавиша по умолчанию |
+|---|---|
+| Инвентарь / экипировка / квесты | `I` / `E` / `J` |
+| Закрыть панель, меню настроек | `Esc` |
+| Радиальное меню | ПКМ |
+| Взаимодействие | ЛКМ |
+| Навигация между локациями | стрелки |
+| Магический свет / ясновидение | `L` / `F` |
+| Разделить стак: пополам / по одному | `Shift` / `Alt` |
+| Сортировка инвентаря | `R` |
+| Пропуск диалога (удерживать) | `Ctrl` |
+| Быстрое сохранение / загрузка | `F5` / `F9` |
+| DevTools | `F1` |
+| Панель отладки квестов | `F12` |
+
+Все игровые клавиши переназначаются во вкладке «Клавиши» в настройках.
+
+---
+
+## Архитектура
+
+Проект собран на **VContainer**. Статических синглтонов почти не осталось: зависимости приходят через `[Inject]`.
+
+**Порядок работы**
+
+1. `GameLifetimeScope` — корневой скоуп, живёт между сценами. Находит или создаёт менеджеры (настройки, ввод, флаги, события, квесты, сохранения, база предметов и рецептов и т. д.), регистрирует конфиги из `Resources/Configs`.
+2. `SceneInjector` на каждой загрузке сцены создаёт дочерний скоуп, регистрирует в нём сценовые компоненты (диалоги, инвентарь, квестовый UI, способности, радиальное меню) и внедряет зависимости во все `MonoBehaviour` сцены.
+3. `GameReferences` — кэш ссылок на объекты сцены. Обновляется на `sceneLoaded` и нужен там, где DI недоступен (ScriptableObject, старый код).
+4. `GlobalControl` — постоянный объект, который держит подконтроллеры: `SettingsUI`, `EquipmentUIController`, `ObjectInteractionController`, `AbilityController`, `RadialMenuActionHandler`.
+5. `UICoordinator` закрывает конфликтующие панели при открытии новой.
+
+Сцена с индексом 0 — главное меню, остальные — игровые. `EditorGameSceneBootstrap` позволяет запускать игровую сцену напрямую из редактора в режимах `NewGame`, `Continue` и `Empty` (меню `Tools → Test → Mode`).
+
+**Слои**
+
+| Слой | Основные классы |
+|---|---|
+| Ядро и DI | `GameLifetimeScope`, `SceneInjector`, `GameReferences`, `GlobalControl`, `UICoordinator`, `Logger` |
+| Данные и сохранения | `SaveSystem`, `SaveBackups`, `SafeFile`, `GamePaths`, `WorldItemTracker`, `SettingsManager` |
+| События | `EventManager`, `EventStateManager`, `EventDataManager`, `FlagManager`, `GameEvent`, `EventConverter` |
+| Геймплей | `QuestManager`, `DialogueTracker`, `CraftingSystem`, `EquipmentSystem`, `AbilityManager`, `PickupItem` |
+| UI | `MenuUIManager`, `SettingsUI`, `InventoryUIManager`, `QuestUI`, `DialogueUI`, `RadialMenu`, `CraftingUI`, `LoadingScreen` |
+| Навигация | `LocationNeighbors`, `SceneSlideTransition`, `NavigationArrow` |
+| Презентация | `EyeController`, `DialogueCharacterManager`, `FindingOneselfAnimation`, `TintCharacter` |
+| Инструменты | `DebuggerWindow`, `DevToolsWindow`, `InGameDevTools`, `LocationCreatorWizard`, редакторы ассетов |
+
+---
+
+## Системы игры
+
+Каждый раздел свёрнут — раскрывайте нужный.
 
 <details>
-<summary><b>📂 Развернуть структуру</b></summary>
+<summary><b>Событийная система</b></summary>
+
+![Event System](GIF/EventSystem.gif)
+
+- 12 значений `EventTriggerType` (`PickupItem`, `EnterLocation`, `EquipItem`, `DialogueEnd`, `GlobalFlag`, `Custom` и др.).
+- 4 политики выполнения: один раз, несколько раз, раз за сессию, каждый раз.
+- 4 типа условий триггера: предмет, локация, флаг, пользовательское.
+- 7 типов требований: есть предмет, флаг, локация, событие выполнено, число выполнений, случайный шанс, пользовательское.
+- 18 типов действий: диалог, квест, предметы, флаги, телепорт, звук, спавн и удаление объектов, управление другими событиями, группа действий, ветвление `CheckEvent` (if/else).
+- Зависимости (`dependsOnEventID`) и взаимные исключения (`mutuallyExclusiveWithEventID`).
+- События хранятся как ассеты `GameEvent` в `Resources/Events`. В редакторе есть JSON-копии в `Assets/EventsData` с бэкапами (до 5 на событие); `EventDataRestorer` восстанавливает ассеты из JSON после компиляции.
+- Автосохранение в JSON (при входе в Play Mode, компиляции, сохранении сцены и т. д.) настраивается в `EventDataManager` и по умолчанию выключено.
+- Сохранённое состояние событий попадает в общий файл сохранения.
+- Компоненты для сцены: `EventTriggerWithState`, `SceneEventController`.
+
+Файлы: `EventManager`, `EventStateManager`, `EventDataManager`, `GameEvent`, `EventAction`, `EventContext`, `EventConverter`, `EventDataRestorer`
+
+</details>
+
+<details>
+<summary><b>Квесты</b></summary>
+
+![Quest System](GIF/QuestSystem.gif)
+
+- 8 типов квестов и 6 типов целей (`Collect`, `TalkTo`, `GoTo`, `UseItem`, `Kill`, `Interact`).
+- Условия старта: флаги и завершённые квесты. Автостарт и повторяемые квесты.
+- Награды: предметы, флаги. Квест не завершается, пока в инвентаре нет места под награду.
+- Прогресс обновляется сам: по подобранным и экипированным предметам, посещённым локациям, диалогам.
+- Диалоги на старте и на завершении квеста.
+- Панель с вкладками «Активные», «Выполненные», «Проваленные», прогресс-бары, отслеживание с уведомлениями о прогрессе, отмена квеста с подтверждением.
+- Состояние квестов сохраняется, любое изменение запускает автосохранение.
+- `QuestDebugger` — отладочная панель на `F12`.
+
+Файлы: `QuestManager`, `QuestUI`, `QuestInstance`, `QuestSO`, `QuestConfigSO`, `QuestNotifications`, `QuestDebugger`
+
+</details>
+
+<details>
+<summary><b>Инвентарь</b></summary>
+
+![Inventory](GIF/Inventory.gif)
+
+- 30 слотов, перетаскивание, слияние и обмен стаков.
+- Разделение стака: `Shift` — пополам, `Alt` — по одному.
+- 4 режима сортировки (категория, название, количество, приоритет): клавиша `R` или выпадающий список.
+- Контекстное меню по ПКМ, тултипы, панель просмотра предмета (`ItemViewPanel`).
+- Предметы описываются `ItemSO` со стабильным строковым `id`. Старый enum `ItemType` оставлен для совместимости и мигрируется через редакторы.
+- 9 категорий: ингредиент, расходник, оружие, броня, аксессуар, инструмент, квестовый, валюта, разное.
+- Предметы в мире: подбор кликом, перенос перетаскиванием (с лучом от персонажа, а глаза Трикси следят за предметом), выбрасывание из инвентаря с анимацией. Положение выброшенных и перемещённых предметов сохраняется.
+- Панель быстрых кнопок: квесты, крафт, заклинания.
+
+Файлы: `InventoryUIManager`, `InventorySlot`, `InventoryItemMarker`, `ItemSO`, `ItemDatabase`, `PickupItem`, `InventorySortDropdown`
+
+</details>
+
+<details>
+<summary><b>Крафт</b></summary>
+
+![Craft](GIF/Craft.gif)
+
+- Рецепты — ScriptableObject (`CraftingRecipe`).
+- `RecipeKey` нормализует набор ингредиентов: порядок не важен, дубликаты суммируются.
+- Режимы совпадения `ExactCount` и `AtLeastCount`, приоритеты при конфликте рецептов.
+- Рецепт изучается после первого успешного крафта; поиск работает только по изученным и подставляет ингредиенты из инвентаря.
+- Если в инвентаре нет места под результат, крафт отменяется, ингредиенты не тратятся.
+
+Файлы: `CraftingDatabase`, `CraftingRecipe`, `CraftingSystem`, `CraftingUI`, `CraftingProgress`, `RecipeKey`, `Ingredient`, `CraftSlotUI`
+
+</details>
+
+<details>
+<summary><b>Экипировка</b></summary>
+
+![Equipment](GIF/Equipment.gif)
+
+- 11 типов слотов: голова, лицо, шея, грудь, пояс, ноги, обувь, оружие, вторая рука, кольцо, фонарь.
+- Экипировка перетаскиванием или через контекстное меню, снятие двойным кликом.
+- Предмет появляется на персонаже в точках, найденных по тегу `EquipmentSlot`; коллизии и физика у него отключаются.
+- Если инвентарь полон, замена экипировки отменяется.
+- Экипировка сохраняется и восстанавливается вместе с инвентарём.
+
+Файлы: `EquipmentSystem`, `EquipmentSlot`, `EquipmentUIController`
+
+</details>
+
+<details>
+<summary><b>Диалоги</b></summary>
+
+![Dialogue](GIF/Dialogue.gif)
+
+- Диалоги — JSON-файлы в `Resources/Dialogues`: узлы, варианты выбора, действия.
+- Локализация по суффиксу файла (`.ru`, `.en`, `.de`) в зависимости от выбранного языка; запасной вариант — русский.
+- Условия выбора: `Flag:`, `DialogueCompleted:`, `DialogueNotCompleted:`, `DialogueUnlocked:`, `DialoguePlayCount:`.
+- Действия: `SetFlag`, `StartQuest`, `CompleteQuest`, `AddItem`, `CompleteDialogue`, `UnlockDialogue`, `LockDialogue`, `ResetDialogue`, `SetNextDialogue`, `CheckDialogueStatus`.
+- `DialogueTracker` помнит статусы: пройден, число прохождений, блокировка, следующий диалог. `DialogueTrigger` умеет цепочки, альтернативы и пулы с случайным выбором.
+- Печать текста с настраиваемой скоростью, автопродолжение, кнопка пропуска и пропуск удержанием `Ctrl`.
+- Варианты выбора показываются через радиальное меню, при его отсутствии — обычными кнопками.
+- Персонажи появляются с fade-анимацией, переходят между локациями и зоной говорящего.
+
+Файлы: `TextBeginner`, `DialogueData`, `DialogueUI`, `DialogueFileManager`, `DialogueCharacterManager`, `DialogueTracker`, `DialogueTrigger`
+
+</details>
+
+<details>
+<summary><b>Главное меню и настройки</b></summary>
+
+![Main Menu](GIF/MainMenu.gif)
+
+**Меню**
+
+- Анимация букв «Finding Oneself» с мерцающим светом, затем появление Трикси.
+- Плавные переходы между панелями и фонами, подтверждение выхода.
+- Выбор профиля сохранения: создание, загрузка, перезапись, удаление, превью-скриншот.
+- Загрузочный экран с прогрессом.
+- Внешний вид меню настраивается в `MenuUIConfig`.
+
+**Настройки** (доступны и в игре по `Esc`), 5 вкладок:
+
+- Графика: полный экран, разрешение, качество, VSync, лимит FPS, счётчик FPS, размер шрифта и масштаб интерфейса.
+- Звук: общая громкость применяется сразу; музыка, звуки и голос сохраняются в настройках.
+- Управление: схема управления.
+- Клавиши: переназначение всех игровых клавиш.
+- Игра: язык, сложность, автосохранение, скорость текста, автодиалог, подсказки.
+
+Также есть фильтр для дальтоников (три режима через URP Channel Mixer).
+
+Файлы: `MenuUIManager`, `MenuUIConfig`, `SettingsUI`, `TabManager`, `SaveSelectionPanel`, `BackgroundManager`, `FindingOneselfAnimation`, `LoadingScreen`
+
+</details>
+
+<details>
+<summary><b>Радиальное меню</b></summary>
+
+![Radial Menu](GIF/RadialMenu.gif)
+
+- Три роли, определяемые тегом: главное меню (`RadialMenu`), выбор в диалоге (`ChoicePanel`), контекстное меню предмета (`ContextMenu`). `RadialMenuRegistry` находит их при загрузке сцены.
+- 4 раскладки: круг, веер, вертикальная, горизонтальная.
+- Главное меню: инвентарь, экипировка, магический свет, настройки, выход в меню, выход из игры.
+- Контекстное меню предмета: использовать, экипировать или снять, разделить, осмотреть, выбросить. Набор кнопок зависит от свойств `ItemSO`.
+- Открывается по ПКМ, не открывается во время диалога и поверх слотов инвентаря.
+- Кнопки берутся из пула; если префабы в `Resources` не найдены, создаются запасные.
+
+Файлы: `RadialMenu`, `RadialButton`, `RadialMenuController`, `RadialMenuActionHandler`, `RadialMenuOpener`, `RadialMenuRegistry`, `MenuCloseHandler`
+
+</details>
+
+<details>
+<summary><b>Навигация</b></summary>
+
+![Navigation](GIF/Navigation.gif)
+
+- Соседи локации определяются автоматически по позиции (учитываются угол и максимальная дистанция) или задаются вручную в инспекторе.
+- Переход между локациями со слайд-анимацией, управление стрелками.
+- Персонаж переезжает вместе с локацией и встаёт в точку `LocationReference`.
+- Событие `OnSceneChanged` и триггер `EnterLocation`.
+- Стрелки-подсказки `NavigationArrow` видны только пока включено ясновидение.
+- `SceneTransition` — fade между сценами.
+
+Файлы: `LocationNeighbors`, `NavigationArrow`, `LocationArrows`, `SceneSlideTransition`, `SceneTransition`
+
+</details>
+
+<details>
+<summary><b>Способности</b></summary>
+
+![Abilities](GIF/Abilities.gif)
+
+- Базовый класс `Ability`: кулдаун, стоимость энергии. `AbilityManager` собирает способности из дочерних объектов и управляет частицами персонажа.
+- **Магический свет**: луч следует за курсором, Light2D, пульсация, след из частиц, поиск объектов в радиусе. Глаза персонажа реагируют на свет.
+- **Ясновидение**: включает навигационные стрелки и эффект частиц.
+- Панель заклинаний `MagicSpellPanel` строится сама по списку зарегистрированных способностей.
+
+Файлы: `Ability`, `AbilityManager`, `MagicLightAbility`, `ClairvoyanceAbility`, `MagicSpellPanel`
+
+</details>
+
+<details>
+<summary><b>Глаза персонажа и освещение</b></summary>
+
+![Eye Controller](GIF/EyeController.gif)
+
+`EyeController` делится на три подсистемы: `EyeLookController`, `EyeBlinkController`, `EyeLightController`.
+
+- Автопоиск частей глаза по именам в иерархии.
+- Движение радужки внутри эллипса со своими границами для каждого состояния (обычный, прищур, широко открытый, полузакрытый).
+- Блуждание взгляда на Perlin-шуме и саккадах, слежение за курсором или произвольной целью.
+- Перспективное сжатие радужки.
+- Зрачок реагирует на ближайшие Light2D и магический свет; от яркого света глаза прищуриваются, с гистерезисом на вход и выход.
+- Случайное моргание, двойное моргание, ручные вызовы.
+- `TintCharacter` подкрашивает спрайты персонажа под освещение текущей локации.
+
+Файлы: `EyeController`, `EyeLookController`, `EyeBlinkController`, `EyeLightController`, `TintCharacter`
+
+</details>
+
+---
+
+## Сохранения
+
+<details>
+<summary><b>Как устроено</b></summary>
+
+Всё состояние игры лежит в одном файле на профиль: `Save/<профиль>/Game/save.sv` (JSON, версия формата 2).
+
+В файле: инвентарь, экипировка, текущая локация, флаги, квесты (активные, завершённые, отменённые), предметы в мире (подобранные, выброшенные, перемещённые), состояния событий, статусы диалогов, изученные рецепты, скриншот-превью.
+
+**Где лежит `Save/`:** в корне проекта в редакторе, в `Application.persistentDataPath` в билде.
+
+| Файл | Назначение |
+|---|---|
+| `Save/Settings/settings.json` | Настройки игрока, общие для всех профилей |
+| `Save/<профиль>/Game/save.sv` | Основное сохранение |
+| `save.sv.bak` | Предыдущая версия основного файла |
+| `Game/Backups/*.sv` | Бэкапы: перед каждым сохранением и при выходе из игры (до 10) |
+| `Assets/EventsData/*.json` | JSON-копии событий (только редактор) |
+
+**Надёжность**
+
+- Запись идёт через временный файл и `.bak` (`SafeFile`): при повреждении основного файла читается резервная копия.
+- Выход из игры пишет снимок только в `Backups`, основной файл не трогает.
+- Профили — отдельные папки. Имя: латиница, цифры, `_`, до 20 символов.
+
+**Когда сохраняется**
+
+- `F5`, по завершении диалога, при изменении состояния квестов (с задержкой 1,5 с).
+- Загрузка — `F9`, «Продолжить» или выбор профиля в меню.
+
+</details>
+
+---
+
+## Предметы из картинок
+
+<details>
+<summary><b>Добавление предметов без Unity</b></summary>
+
+Художник кладёт PNG или JPG в папку `ItemsInbox` рядом с игрой (в редакторе — в корень проекта), и игра сама собирает из него полноценный предмет: иконку в инвентаре, спрайт на земле, запись в `ItemDatabase`.
+
+- Папка опрашивается раз в 1,5 секунды: новые и изменённые файлы подхватываются без перезапуска.
+- Имя файла становится названием, а его транслит — `id` (`Красный цветок.png` → `krasnyy_tsvetok`). Переименование файла создаёт новый предмет.
+- Размер иконки и спрайта в мире считается так же, как у обычных предметов.
+- Подпапка с именем категории (`ItemsInbox/Ingredient/...`) задаёт категорию.
+- Рядом можно положить `.json` с тем же именем: название, описание, категория, стак, экипировка, цвет подсветки, размеры, теги, характеристики. Все поля необязательны.
+- Максимальный размер картинки — 512×512 px. Более крупные файлы не загружаются, причина видна в DevTools.
+- Предметы живут только в рантайме, ассетами проекта не становятся.
+
+Подробности: [`Scripts/RuntimeItems/README_Предметы_из_картинок.md`](Assets/Scripts/RuntimeItems/README_Предметы_из_картинок.md)
+
+</details>
+
+---
+
+## Инструменты разработчика
+
+<details>
+<summary><b>Внутриигровой DevTools (F1)</b></summary>
+
+Окно на IMGUI, работает и в билде. Пока открыто, игровой ввод заблокирован.
+
+| Вкладка | Что умеет |
+|---|---|
+| Предметы | Выдать в инвентарь, поставить в мир, поиск, пересканировать `ItemsInbox`, удалить всё заспавненное |
+| Логи | Фильтры по модулям, только ошибки или предупреждения, поиск, размер шрифта, экспорт в файл |
+| Мир | Телепорт по локациям |
+| Прогресс | Завершить или отменить квест, просмотр и переключение флагов |
+| Инфо | Пути папок, ошибки `ItemsInbox`, версия Unity, сцена, verbose-логи |
+
+</details>
+
+<details>
+<summary><b>Редакторские инструменты</b></summary>
+
+![Editor Tools](Screenshots/EditorTools.png)
+
+| Инструмент | Назначение |
+|---|---|
+| `LocationCreatorWizard` | Пошаговое создание локации (8 шагов): регион, спрайт и имя, позиция, точка появления персонажа, источники света, предметы |
+| `DevToolsWindow` | `Tools → DevTools`: логи, телепорт, спавн предметов, квесты и флаги, запуск тестов с описанием каждого |
+| `DebuggerWindow` | Отдельное окно логов (`Tools → Личное Окно Отладки`) |
+| `QuestSOEditor` | Редактор квестов |
+| `GameEventEditor` | Редактор событий с вложенными действиями |
+| `ItemSOEditor` | Редактор предметов, быстрое создание UI и World префабов по иконке |
+| `CraftingRecipeEditor` | Редактор рецептов с проверкой и миграцией legacy-полей |
+| `QuestConfigEditor`, `MenuUIConfigEditor`, `DialogueDataEditor` | Редакторы конфигов по разделам |
+| `InputManagerEditor` | Правка `InputConfig` по категориям |
+| `EventDataRestorer`, `EventEditorHelper` | Восстановление событий из JSON, меню `Tools → Система событий` |
+| `IdEditorHelper`, `IdGenerator` | Генерация ID, массовая генерация через `Tools → Миграция` |
+| `TestModeMenu` | Режим запуска игровой сцены из редактора |
+
+</details>
+
+<details>
+<summary><b>Логирование и отладка</b></summary>
+
+![Logger](Screenshots/Logger.png)
+
+`Logger` делит логи на 18 модулей (`Core`, `DI`, `UI`, `Dialogue`, `Event`, `Inventory`, `Craft`, `Menu`, `Navigation`, `QuestSystem`, `RadialMenu`, `Abilities`, `Audio`, `Animation`, `Save`, `Editor`, `Tests`, `Debug`).
+
+- Методы `Log`, `LogWarning`, `LogError`, `LogVerbose`.
+- Модули включаются и выключаются через `SetModuleEnabled()`, подробный режим — через `SetVerbose()`.
+- Окна отладки показывают модуль, время, стек ошибок и умеют фильтровать и экспортировать логи.
+- Внутриигровой буфер `RuntimeLogBuffer` собирает логи в билде для окна DevTools.
+
+Использование:
+
+```csharp
+Logger.Log(LogModule.Inventory, "Предмет добавлен");
+```
+
+</details>
+
+<details>
+<summary><b>Тесты</b></summary>
+
+20 тестовых классов EditMode (NUnit) в `Scripts/Editor/Tests`. Запускаются через Test Runner или вкладку «Тесты» в `DevToolsWindow`.
+
+Покрыто: ключи и поиск рецептов, ингредиенты, прогресс и завершение квестов, условия старта квестов, `QuestManager`, контекст и сериализация событий, структура сохранения и его JSON round-trip, `SafeFile`, `KeyBindings`, `Logger`, генерация ID, `ItemSO`, предметы из картинок.
+
+</details>
+
+---
+
+## Структура проекта
+
+<details>
+<summary><b>Развернуть дерево</b></summary>
 
 ```
 finding-oneself/
-│
 ├── Assets/
 │   ├── Scripts/
-│   │   ├── Abilities/
-│   │   │   ├── Ability.cs
-│   │   │   ├── AbilityManager.cs
-│   │   │   └── MagicLightAbility.cs
-│   │   ├── Dialogue/
-│   │   │   ├── TextBeginner.cs
-│   │   │   ├── DialogueData.cs
-│   │   │   ├── DialogueUI.cs
-│   │   │   ├── DialogueFileManager.cs
-│   │   │   ├── DialogueCharacterManager.cs
-│   │   │   ├── DialogueTrigger.cs
-│   │   │   ├── DialogueTracker.cs
-│   │   │   └── DialogueStatusHelper.cs
+│   │   ├── Abilities/       способности, панель заклинаний, визуал подбора предметов
+│   │   ├── DI/              GameLifetimeScope, SceneInjector, RadialMenuRegistry, EditorGameSceneBootstrap
+│   │   ├── Dialogue/        TextBeginner, DialogueUI, DialogueTracker, DialogueTrigger и др.
 │   │   ├── Event/
 │   │   │   ├── Actions/
-│   │   │   │   └── EventAction.cs
 │   │   │   ├── Components/
-│   │   │   │   ├── EventTriggerWithState.cs
-│   │   │   │   └── SceneEventController.cs
 │   │   │   ├── Conditions/
-│   │   │   │   ├── EventRequirements.cs
-│   │   │   │   └── TriggerCondition.cs
 │   │   │   ├── Core/
-│   │   │   │   ├── EventContext.cs
-│   │   │   │   ├── EventManager.cs
-│   │   │   │   ├── EventTypes.cs
-│   │   │   │   └── GameEvent.cs
 │   │   │   ├── Integration/
-│   │   │   │   └── EventIntegration.cs
 │   │   │   ├── Serialization/
-│   │   │   │   ├── EventConverter.cs
-│   │   │   │   ├── EventData.cs
-│   │   │   │   └── EventDataManager.cs
-│   │   │   ├── State/
-│   │   │   │   ├── EventStateManager.cs
-│   │   │   │   └── FlagManager.cs
-│   │   │   ├── EventDataRestorer.cs
-│   │   │   ├── EventEditorHelper.cs
-│   │   │   └── SessionManager.cs
-│   │   ├── Eyes/
-│   │   │   └── EyeController.cs
+│   │   │   └── State/
+│   │   ├── Eyes/            контроллер глаз и его подсистемы
 │   │   ├── Inventory/
-│   │   │   ├── Craft/
-│   │   │   │   ├── CraftingDatabase.cs
-│   │   │   │   ├── CraftingProgress.cs
-│   │   │   │   ├── CraftingRecipe.cs
-│   │   │   │   ├── CraftingSystem.cs
-│   │   │   │   ├── CraftingUI.cs
-│   │   │   │   ├── CraftSlotUI.cs
-│   │   │   │   ├── Ingredient.cs
-│   │   │   │   └── RecipeKey.cs
-│   │   │   ├── EquipmentSlot.cs
-│   │   │   ├── EquipmentSystem.cs
-│   │   │   ├── InventoryButtonPanel.cs
-│   │   │   ├── InventoryItemMarker.cs
-│   │   │   ├── InventorySlot.cs
-│   │   │   ├── InventoryUIManager.cs
-│   │   │   ├── ItemCategory.cs
-│   │   │   ├── ItemData.cs
-│   │   │   ├── ItemDatabase.cs
-│   │   │   ├── ItemSO.cs
-│   │   │   ├── ItemType.cs
-│   │   │   ├── MenuCloseHandler.cs
-│   │   │   └── PickupItem.cs
-│   │   ├── Menu/
-│   │   │   ├── BackgroundManager.cs
-│   │   │   ├── FindingOneselfAnimation.cs
-│   │   │   ├── MenuUIConfig.cs
-│   │   │   ├── MenuUIManager.cs
-│   │   │   ├── PanelManager.cs
-│   │   │   ├── TabManager.cs
-│   │   │   └── UIBuilder.cs
+│   │   │   └── Craft/
+│   │   ├── Menu/            фоны меню, анимация заставки
 │   │   ├── Navigation/
-│   │   │   ├── LocationArrows.cs
-│   │   │   ├── LocationNeighbors.cs
-│   │   │   ├── NavigationArrow.cs
-│   │   │   ├── SceneSlideTransition.cs
-│   │   │   └── SceneTransition.cs
 │   │   ├── QuestSystem/
-│   │   │   ├── QuestConfigSO.cs
-│   │   │   ├── QuestDebugger.cs
-│   │   │   ├── QuestInstance.cs
-│   │   │   ├── QuestListItem.cs
-│   │   │   ├── QuestManager.cs
-│   │   │   ├── QuestNotifications.cs
-│   │   │   ├── QuestSO.cs
-│   │   │   └── QuestUI.cs
 │   │   ├── RadialMenu/
-│   │   │   ├── ItemViewPanel.cs
-│   │   │   ├── MenuManager.cs
-│   │   │   ├── RadialButton.cs
-│   │   │   ├── RadialMenu.cs
-│   │   │   ├── RadialMenuOpener.cs
-│   │   │   └── TooltipManager.cs
-│   │   ├── BuildDebugger.cs
-│   │   ├── ClickManager.cs
-│   │   ├── DialogueTest.cs
-│   │   ├── DontDestroyOnLoad.cs
-│   │   ├── GlobalControl.cs
-│   │   ├── IInteractable.cs
-│   │   ├── InputConfig.cs
-│   │   ├── InputManager.cs
-│   │   ├── Logger.cs
-│   │   ├── SettingsData.cs
-│   │   └── SettingsManager.cs
-│   ├── Editor/
-│   │   ├── DebuggerWindow.cs
-│   │   ├── DialogueDataEditor.cs
-│   │   ├── GameEventEditor.cs
-│   │   ├── InputManagerEditor.cs
-│   │   ├── ItemSOEditor.cs
-│   │   ├── MenuUIConfigEditor.cs
-│   │   ├── QuestConfigEditor.cs
-│   │   └── QuestSOEditor.cs
+│   │   ├── RuntimeItems/    предметы из картинок и внутриигровой DevTools
+│   │   ├── Save/            SaveSystem, SaveData, SaveBackups, SaveSelectionPanel
+│   │   ├── Settings/        настройки, ввод, меню и окно настроек
+│   │   │   └── UI/
+│   │   ├── Editor/
+│   │   │   ├── Creator/
+│   │   │   ├── Debugger/
+│   │   │   └── Tests/
+│   │   └── *.cs             GlobalControl, GameReferences, GamePaths, Logger,
+│   │                        SafeFile, UICoordinator, LoadingScreen и др.
 │   ├── Resources/
-│   │   ├── Quests/
-│   │   ├── Items/
 │   │   ├── Configs/
+│   │   ├── Dialogues/
+│   │   ├── Events/
+│   │   ├── Items/
+│   │   ├── Quests/
 │   │   └── UI/
 │   ├── Scenes/
-│   │   └── ...
-│   ├── TextAssets/
-│   │   └── Texts/
 │   └── EventsData/
-│       ├── *.json
 │       └── Backups/
-│           └── *.json
-├── Save/
-│   ├── Settings/
-│   ├── DialogueData/
-│   ├── EventData/
-│   └── CraftData/
+├── Save/                    создаётся при запуске (в билде — в persistentDataPath)
+├── ItemsInbox/              PNG-предметы художника
 ├── GIF/
 ├── Screenshots/
 ├── README.md
@@ -269,445 +505,64 @@ finding-oneself/
 
 ---
 
-## ✅ Что уже готово
+## Статус разработки
 
-### 🧠 Событийная система (Event System)
-
-![Event System](GIF/EventSystem.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ 12 типов триггеров (`PickupItem`, `EnterLocation`, `DialogueEnd`, `EquipItem`, `UseItem`, `GlobalFlag`, `Custom` и др.)
-* ✅ 4 политики выполнения (`ExecuteOnce`, `ExecuteMultiple`, `ExecutePerSession`, `ExecuteEveryTime`)
-* ✅ Условия триггера (Item, Location, Flag, Custom)
-* ✅ Требования (HasItem, Flag, Location, EventExecuted, ExecutionCount, RandomChance, CustomCondition)
-* ✅ Зависимости (`dependsOnEventID`) и взаимные исключения (`mutuallyExclusiveWithEventID`)
-* ✅ 16+ типов действий (`StartDialogue`, `AddItem`, `RemoveItem`, `SetFlag`, `Teleport`, `PlaySound`, `SpawnObject`, `DestroyObject`, `EnableObject`, `DisableObject`, `EnableEvent`, `DisableEvent`, `CheckEvent`, `ResetEvent`, `SaveState`, `Multiple`)
-* ✅ Вложенные действия (группы, if/else)
-* ✅ Сохранение в JSON и восстановление в ScriptableObject
-* ✅ Автосохранение при компиляции, смене сцен, выходе из Play Mode
-* ✅ Резервные копии (до 5 на событие)
-
-**Ключевые файлы:** `EventManager`, `EventStateManager`, `EventDataManager`, `GameEvent`, `EventAction`, `EventContext`, `EventConverter`, `EventDataRestorer`
-
-</details>
-
-### 📜 Квестовая система
-
-![Quest System](GIF/QuestSystem.gif)
+| Система | Статус |
+|---|---|
+| Передвижение и взаимодействие | Готово |
+| Событийная система | Готово |
+| Квесты | Готово |
+| Инвентарь, крафт, экипировка | Готово |
+| Диалоги | Готово |
+| Радиальное меню | Готово |
+| Главное меню, настройки, переназначение клавиш | Готово |
+| Сохранения с профилями | Готово |
+| Навигация по локациям | Готово |
+| Способности (магический свет, ясновидение) | Готово |
+| Глаза персонажа | Готово |
+| Предметы из картинок | Готово |
+| Инструменты разработчика и тесты | Готово |
+| Локализация интерфейса | Частично: диалоги поддерживают `ru/en/de`, тексты интерфейса пока на русском |
+| Прокачка | Планируется |
+| Система отряда | Планируется |
+| Боевая система | Планируется |
+| Множество локаций | Планируется |
 
 <details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ 8 типов квестов (`Fetch`, `Kill`, `Talk`, `Explore`, `Use`, `Escort`, `Collection`, `Story`)
-* ✅ 6 типов целей (`Collect`, `TalkTo`, `GoTo`, `UseItem`, `Kill`, `Interact`)
-* ✅ Условия старта (флаги, завершение других квестов)
-* ✅ Награды (предметы, опыт, флаги)
-* ✅ Интеграция с диалогами (`startDialogueID`, `completeDialogueID`)
-* ✅ Панель с 3 вкладками (Активные / Выполненные / Проваленные)
-* ✅ Прогресс-бары, детальная панель, отслеживание квеста
-* ✅ Уведомления при старте, обновлении и завершении
-* ✅ Встроенный отладчик (F12) с логом и проверкой ProgressBar
-* ✅ Автообновление по предметам, локациям и NPC
-* ✅ Сохранение и загрузка состояния
-* ✅ Отмена квестов
-
-**Ключевые файлы:** `QuestManager`, `QuestUI`, `QuestInstance`, `QuestSO`, `QuestConfigSO`, `QuestNotifications`, `QuestDebugger`
-
-</details>
-
-### 🎒 Инвентарь
-
-![Inventory](GIF/Inventory.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Drag-and-drop между слотами
-* ✅ Двойной клик для быстрого снятия
-* ✅ Контекстное меню (ПКМ)
-* ✅ Стэкинг и разделение стэка (Shift — пополам, Alt — по одному)
-* ✅ Визуальное отображение, тултипы
-* ✅ Панель просмотра предмета (`ItemViewPanel`)
-* ✅ База данных предметов (`ItemDatabase` + `ItemSO`)
-* ✅ 9 категорий (`Ingredient`, `Consumable`, `Weapon`, `Armor`, `Accessory`, `Tool`, `Quest`, `Currency`, `Misc`)
-* ✅ Быстрое создание UI/World префабов через редактор
-
-**Ключевые файлы:** `InventoryUIManager`, `InventorySlot`, `InventoryItemMarker`, `ItemSO`, `ItemDatabase`, `ItemViewPanel`
-
-</details>
-
-### 🔨 Крафт
-
-![Craft](GIF/Craft.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Рецепты как ScriptableObject (`CraftingRecipe`)
-* ✅ Нормализованные ключи рецептов (`RecipeKey`) — порядок ингредиентов не важен
-* ✅ Два режима совпадения: `ExactCount` и `AtLeastCount`
-* ✅ Приоритеты рецептов при конфликтах
-* ✅ Прогресс изучения рецептов с сохранением в JSON (`CraftingProgress`)
-* ✅ UI с слотами, кнопкой "Go" и поиском по изученным рецептам
-* ✅ Автоматическое изучение рецепта после успешного крафта
-* ✅ Поиск по названию с dropdown-подсказками
-
-**Ключевые файлы:** `CraftingDatabase`, `CraftingRecipe`, `CraftingSystem`, `CraftingUI`, `CraftingProgress`, `RecipeKey`, `Ingredient`, `CraftSlotUI`
-
-</details>
-
-### ⚔️ Экипировка
-
-![Equipment](GIF/Equipment.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ 11 типов экипировки (Head, Face, Neck, Chest, Waist, Legs, Boots, Weapon, Offhand, Ring, Lantern)
-* ✅ Экипировка через перетаскивание в слот
-* ✅ Снятие через двойной клик или контекстное меню
-* ✅ Визуальное отображение на модели через систему пивотов (`HeadPivot`, `WeaponPivot` и др.)
-* ✅ Отключение коллизий и физики на экипированных предметах
-* ✅ Проверка совместимости типа предмета и слота
-
-**Ключевые файлы:** `EquipmentSystem`, `EquipmentSlot`
-
-</details>
-
-### 💬 Диалоговая система
-
-![Dialogue](GIF/Dialogue.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Загрузка диалогов из **JSON-файлов** (`DialogueWrapper` с узлами, выборами, действиями)
-* ✅ Ветвление диалогов с условиями (`Flag:`, `DialogueCompleted:`, `DialogueNotCompleted:`, `DialogueUnlocked:`, `DialoguePlayCount:`)
-* ✅ Система статусов диалогов (`DialogueTracker`) с JSON-сохранением: пройден, счётчик прохождений, блокировка, следующий диалог
-* ✅ Цепочки диалогов, альтернативы, пулы (со случайным выбором)
-* ✅ Появление персонажей с fade-анимациями
-* ✅ Перемещение персонажей между локациями и в зону говорящего
-* ✅ Портреты и анимации (`Speak`, `IdleEye`)
-* ✅ Кнопка пропуска диалога с защитой от зацикливания
-* ✅ Интеграция с RadialMenu для выбора вариантов
-* ✅ Действия в диалогах: `SetFlag`, `StartQuest`, `CompleteQuest`, `AddItem`, `CompleteDialogue`, `UnlockDialogue`, `LockDialogue`, `ResetDialogue`, `SetNextDialogue`, `CheckDialogueStatus`
-* ✅ Настройка через ScriptableObject (`DialogueData`)
-
-**Ключевые файлы:** `TextBeginner`, `DialogueData`, `DialogueUI`, `DialogueFileManager`, `DialogueCharacterManager`, `DialogueTracker`, `DialogueTrigger`
-
-</details>
-
-### 🎮 Главное меню
-
-![Main Menu](GIF/MainMenu.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Анимация букв "Finding Oneself" с подсветкой (`FindingOneselfAnimation`)
-* ✅ Появление Trixie со светом (Light2D + fade)
-* ✅ Плавные переходы между панелями и фонами
-* ✅ Панель настроек с 4 вкладками (Графика, Звук, Управление, Игра)
-* ✅ Настройки: разрешение, качество, VSync, громкость, музыка, звуки, голос, чувствительность, инверсия Y, схема управления, вибрация, язык, сложность, автосохранение
-* ✅ Сброс прогресса с уведомлением
-* ✅ Панель выхода с подтверждением и анимацией
-* ✅ Сохранение настроек в JSON (`Save/Settings/settings.json`)
-
-**Ключевые файлы:** `MenuUIManager`, `MenuUIConfig`, `PanelManager`, `BackgroundManager`, `TabManager`, `UIBuilder`, `FindingOneselfAnimation`
-
-</details>
-
-### 🌀 Радиальное меню
-
-![Radial Menu](GIF/RadialMenu.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ 4 типа отображения (Circle, Fan, Vertical, Horizontal)
-* ✅ 3 режима работы (Default, Choice, Context)
-* ✅ Главное меню с действиями (Talk, Use, Examine, OpenInventory, OpenEquipment, Settings, Exit, Cancel)
-* ✅ Контекстное меню для предметов (Use, Equip, Split, Examine, Drop)
-* ✅ Поддержка выбора в диалогах
-* ✅ Управление через клавишу (по умолчанию ПКМ)
-* ✅ Блокировка открытия при активном UI
-* ✅ Fallback-префабы кнопок, если Resources пусты
-
-**Ключевые файлы:** `RadialMenu`, `RadialButton`, `MenuManager`, `RadialMenuOpener`, `ItemViewPanel`, `TooltipManager`
-
-</details>
-
-### 🗺️ Навигация
-
-![Navigation](GIF/Navigation.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Автоматическое обнаружение соседей локаций по позиции
-* ✅ Переход со слайд-анимацией (`SceneSlideTransition`)
-* ✅ Событие `OnSceneChanged` для подписчиков (квесты, события)
-* ✅ Поддержка клавиатурных стрелок
-* ✅ Персонаж перемещается вместе с новой локацией (через `LocationReference`)
-* ✅ Триггер события `EnterLocation` при входе
-* ✅ Fade-переход между сценами (`SceneTransition`)
-
-**Ключевые файлы:** `LocationNeighbors`, `NavigationArrow`, `LocationArrows`, `SceneSlideTransition`, `SceneTransition`
-
-</details>
-
-### ⚡ Способности
-
-![Abilities](GIF/Abilities.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Абстрактный базовый класс (`Ability`) с кулдауном и стоимостью энергии
-* ✅ Менеджер способностей с авто-поиском в детях (`AbilityManager`)
-* ✅ Магический свет (`MagicLightAbility`): луч за мышью, Light2D, детекция объектов в радиусе, частицы, след, пульсация
-* ✅ Реакция глаз персонажа на магический свет (через `EyeController`)
-
-**Ключевые файлы:** `Ability`, `AbilityManager`, `MagicLightAbility`
-
-</details>
-
-### 👁️ Контроллер глаз персонажа
-
-![Eye Controller](GIF/EyeController.gif)
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Автопоиск частей глаза (`EyeWhite`, `EyeIris`, `EyeHighlight`, `EyePupil`, `EyeLash`, `EyelidUpper`)
-* ✅ Движение по эллипсу с наклоном орбиты и смещением центра
-* ✅ Следование за курсором мыши
-* ✅ Perlin-шум и саккады для естественного движения
-* ✅ Перспективное сжатие радужки при повороте
-* ✅ Реакция зрачка на свет (автопоиск `Light2D`, влияние интенсивности и расстояния)
-* ✅ Автоматическое моргание (случайные интервалы, двойное моргание, ручные вызовы)
-* ✅ Gizmos для отладки границ и осей
-
-**Ключевые файлы:** `EyeController`
-
-</details>
-
-### 🎛️ Input System и настройки
-
-<details>
-<summary><b>📖 Подробнее</b></summary>
-
-**Возможности:**
-
-* ✅ Централизованный `InputManager` с конфигом в ScriptableObject (`InputConfig`)
-* ✅ Блокировка UI при открытых панелях
-* ✅ Игнорирование ввода при фокусе на `TMP_InputField`
-* ✅ Настройки сохраняются в JSON (`SettingsManager` + `SettingsData`)
-* ✅ Отдельный `InputManagerEditor` для редактирования клавиш по категориям
-
-**Ключевые файлы:** `InputManager`, `InputConfig`, `SettingsManager`, `SettingsData`, `InputManagerEditor`
+<summary><b>Цифры</b></summary>
+
+| Метрика | Значение |
+|---|---|
+| Версия | 0.39 |
+| Сервисов в корневом DI-скоупе | 20 |
+| Типов ScriptableObject | 8 (`ItemSO`, `QuestSO`, `GameEvent`, `CraftingRecipe`, `QuestConfigSO`, `DialogueData`, `InputConfig`, `MenuUIConfig`) |
+| Модулей логирования | 18 |
+| Тестовых классов | 20 |
 
 </details>
 
 ---
 
-## 🛠 Редакторские инструменты
+## Как помочь
 
-![Editor Tools](Screenshots/EditorTools.png)
+Идеи по сюжету, механикам и квестам, арт и спрайты, код и багфиксы, тестирование и фидбек. Присоединяйтесь через Pull Request или пишите в Telegram.
 
-<details>
-<summary><b>📖 Развернуть список</b></summary>
-
-Редактор | Назначение
----|---
-**QuestSOEditor** | Визуальный редактор квестов с русскими названиями, подсказками, статистикой и сбросом
-**GameEventEditor** | Редактор событий с поддержкой вложенных действий (reflection), отображением состояния и кнопками управления
-**ItemSOEditor** | Редактор предметов с группировкой полей, быстрым созданием UI/World префабов и добавлением нового `ItemType` в enum
-**QuestConfigEditor** | Настройка цветов, размеров, текстов, иконок и уведомлений квестовой системы
-**MenuUIConfigEditor** | Все настройки UI-меню в одном месте (пути, цвета, размеры, анимации, тексты)
-**DialogueDataEditor** | Настройка тегов, путей, скоростей, цветов и маппинга действий диалогов
-**InputManagerEditor** | Редактирование `InputConfig` по категориям
-**EventDataRestorer** | Автоматическое восстановление событий из JSON после компиляции
-**EventEditorHelper** | Tools-меню: сохранение, загрузка, восстановление событий, работа с бэкапами
-**DebuggerWindow** | Кастомное окно отладки с фильтрацией по 16 модулям, поиском, экспортом и стеком ошибок
-
-</details>
+**Автор:** Walderman, соло-разработчик.
 
 ---
 
-## 🐞 Система отладки
+## Контакты
 
-![Logger](Screenshots/Logger.png)
-
-<details>
-<summary><b>📖 Развернуть описание</b></summary>
-
-**Logger** — иерархическая система логирования с разделением по модулям.
-
-**Возможности:**
-
-* ✅ **16 модулей:** Core, UI, Dialogue, Event, Inventory, Craft, Menu, Navigation, QuestSystem, RadialMenu, Abilities, Audio, Animation, Save, Editor, Debug
-* ✅ Цветовое кодирование модулей
-* ✅ Поддержка `Log`, `LogError`, `LogWarning`
-* ✅ Возможность отключать модули через `SetModuleEnabled()`
-
-**DebuggerWindow** — кастомное окно отладки для Unity Editor (`Tools → Личное Окно Отладки`).
-
-**Возможности:**
-
-* ✅ Фильтрация логов по модулям через выпадающий список с поиском
-* ✅ Фильтрация по типам (ошибки, предупреждения)
-* ✅ Текстовый поиск по сообщениям
-* ✅ Автоскролл и очистка логов
-* ✅ Экспорт отфильтрованных логов в файл
-* ✅ Удаление дублирующихся модулей из сообщений
-* ✅ Цветовая маркировка модулей и типов логов
-* ✅ Время появления каждого лога
-* ✅ Кнопка "Стек" для ошибок
-
-**QuestDebugger** — внутриигровая панель (F12) для отслеживания состояния квестов, событий и ProgressBar.
-
-**Ключевые файлы:** `Logger.cs`, `DebuggerWindow.cs`, `QuestDebugger.cs`
-
-**Как использовать:**
-
-1. В любом скрипте: `Logger.Log(LogModule.Inventory, "Предмет добавлен")`
-2. В редакторе: `Tools → Личное Окно Отладки`
-3. Настройте фильтры и наблюдайте за логами в реальном времени
-4. В игре: нажмите **F12** для панели QuestDebugger
-
-</details>
+- GitHub: [Walderman1/FO-scripts](https://github.com/Walderman1/FO-scripts)
+- Telegram: @VValderman
 
 ---
 
-## 💾 Система сохранений
+<div align="center">
 
-<details>
-<summary><b>📖 Развернуть описание</b></summary>
-
-Все данные сохраняются в формате JSON в папке `Save/` (в корне проекта в редакторе, рядом с билдом — в релизе).
-
-Файл | Содержимое
----|---
-`Save/Settings/settings.json` | Настройки игрока (графика, звук, управление, игра)
-`Save/DialogueData/dialogue_statuses.json` | Статусы диалогов (пройден, счётчик, блокировка, следующий)
-`Save/EventData/event_statuses.json` | Статусы событий (выполнено, счётчик, сессия)
-`Save/CraftData/CraftData.json` | Изученные рецепты крафта
-`Assets/EventsData/*.json` | Данные событий (сериализованные GameEvent)
-`Assets/EventsData/Backups/*.json` | Резервные копии событий (до 5 на событие)
-
-</details>
-
----
-
-## ✅ Статус разработки
-
-Система | Статус
----|---
-Передвижение и взаимодействие | ✅ Готово
-Базовая нейро-арт | ✅ Готово
-Событийная система | ✅ Готово
-Квестовая система | ✅ Готово
-Инвентарь | ✅ Готово
-Крафт | ✅ Готово
-Экипировка | ✅ Готово
-Диалоговая система | ✅ Готово
-Радиальное меню | ✅ Готово
-Главное меню | ✅ Готово
-Настройки | ✅ Готово
-Input System | ✅ Готово
-Навигация | ✅ Готово
-Способности (MagicLight) | ✅ Готово
-Контроллер глаз | ✅ Готово
-Отладка (Logger + DebuggerWindow) | ✅ Готово
-Редакторские инструменты | ✅ Готово
-Прокачка | 📝 Планируется
-Система отряда | 📝 Планируется
-Боевая система | 📝 Планируется
-Множество локаций | 📝 Планируется
-Сохранения игры | 📝 Планируется
-
----
-
-## 🤝 Как помочь
-
-🎨 **Идеи** | 🧠 **Нейросети** | 🖼️ **Арт** | 💻 **Код** | ☀️ **Поддержка**
----|---|---|---|---
-Сюжет, механики, квесты, мир | Освоение инструментов, промпты, контент | Генерация картинок, текстур, спрайтов | Скрипты, баги, оптимизация, рефакторинг | Тестирование, фидбек, репосты
-
-> **Присоединяйтесь через Pull Request или пишите в Telegram!**
-
----
-
-## 👥 Команда
-
-**👤 Walderman**
-_Соло-разработчик_
-GitHub • Telegram
----
-
-> _Проект открыт для контрибьюторов! Присоединяйтесь! 🦄_
-
----
-
-## 📊 Статистика проекта
-
-<details>
-<summary><b>📖 Развернуть статистику</b></summary>
-
-Метрика | Значение
----|---
-Всего `.cs` файлов | 61
-Скриптов (Scripts) | 50
-Редакторских расширений (Editor) | 9
-Примерно строк кода | ~33 000
-Подсистем | 10+
-ScriptableObject-конфигов | 8
-Синглтон-менеджеров | ~15
-JSON-сохранений | 5
-
-</details>
-
----
-
-## 🙏 Благодарности
-
-> _Спасибо всем, кто поддерживает этот проект! 💜_
-
-> _"Даже если ты потерял память, ты всегда можешь найти себя заново."_
+> «Даже если ты потерял память, ты всегда можешь найти себя заново.»
 > — Трикси
 
----
+Если проект нравится, поставьте звезду на GitHub.
 
-## 🔗 Контакты
-
-* **GitHub:** [Walderman1/FO-scripts](https://github.com/Walderman1/FO-scripts)
-* **Telegram:** указан в профиле GitHub
-
----
-
-### ⭐ Если вам нравится проект — поставьте звезду на GitHub! ⭐
+</div>
