@@ -13,6 +13,18 @@
 
 </div>
 
+<div align="center">
+
+## ⬇️ Скачать игру
+
+[![Скачать Finding Oneself](https://img.shields.io/badge/⬇_СКАЧАТЬ-Finding_Oneself_v0.39-2ea44f?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/drive/folders/1Z7qweNOrzZihqW9BofF_iBCF-KGE0ifa?usp=drive_link)
+
+**Windows · v0.39 · ~59,3 МБ**
+
+<sub>Архив лежит на Google Drive. Распакуйте и запустите <code>FindingOneself.exe</code>.</sub>
+
+</div>
+
 ---
 
 ## Содержание
