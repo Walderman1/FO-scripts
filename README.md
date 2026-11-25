@@ -125,7 +125,7 @@
 <details>
 <summary><b>Событийная система</b></summary>
 
-![Event System](GIF/EventSystem.gif)
+![Event System](Screenshots/EventSystem.png)
 
 - 12 значений `EventTriggerType` (`PickupItem`, `EnterLocation`, `EquipItem`, `DialogueEnd`, `GlobalFlag`, `Custom` и др.).
 - 4 политики выполнения: один раз, несколько раз, раз за сессию, каждый раз.
@@ -145,7 +145,8 @@
 <details>
 <summary><b>Квесты</b></summary>
 
-![Quest System](GIF/QuestSystem.gif)
+![Quest System](Screenshots/QuestSystem.png)
+![Quest System](Screenshots/QuestPanel.png)
 
 - 8 типов квестов и 6 типов целей (`Collect`, `TalkTo`, `GoTo`, `UseItem`, `Kill`, `Interact`).
 - Условия старта: флаги и завершённые квесты. Автостарт и повторяемые квесты.
@@ -181,6 +182,7 @@
 <details>
 <summary><b>Крафт</b></summary>
 
+![Craft](Screenshots/CraftSystem.png)
 ![Craft](GIF/Craft.gif)
 
 - Рецепты — ScriptableObject (`CraftingRecipe`).
@@ -239,6 +241,7 @@
 - Загрузочный экран с прогрессом.
 - Внешний вид меню настраивается в `MenuUIConfig`.
 
+![Settings](Screenshots/Settings.png)
 **Настройки** (доступны и в игре по `Esc`), 5 вкладок:
 
 - Графика: полный экран, разрешение, качество, VSync, лимит FPS, счётчик FPS, размер шрифта и масштаб интерфейса.
@@ -302,7 +305,7 @@
 <details>
 <summary><b>Глаза персонажа и освещение</b></summary>
 
-![Eye Controller](GIF/EyeController.gif)
+![Eye Controller](GIF/Eyes.gif)
 
 `EyeController` делится на три подсистемы: `EyeLookController`, `EyeBlinkController`, `EyeLightController`.
 
@@ -359,6 +362,8 @@
 <details>
 <summary><b>Добавление предметов без Unity</b></summary>
 
+![DevTools  ](GIF/AddItems.gif)
+
 Художник кладёт PNG или JPG в папку `ItemsInbox` рядом с игрой (в редакторе — в корень проекта), и игра сама собирает из него полноценный предмет: иконку в инвентаре, спрайт на земле, запись в `ItemDatabase`.
 
 - Папка опрашивается раз в 1,5 секунды: новые и изменённые файлы подхватываются без перезапуска.
@@ -380,6 +385,8 @@
 <details>
 <summary><b>Внутриигровой DevTools (F1)</b></summary>
 
+![DevTools](GIF/DevToolsGame.gif)
+
 Окно на IMGUI, работает и в билде. Пока открыто, игровой ввод заблокирован.
 
 | Вкладка | Что умеет |
@@ -395,7 +402,8 @@
 <details>
 <summary><b>Редакторские инструменты</b></summary>
 
-![Editor Tools](Screenshots/EditorTools.png)
+![Editor Tools](GIF/DevToolsEditor.gif)
+![Editor Tools](Screenshots/LocationMaster.png)
 
 | Инструмент | Назначение |
 |---|---|
@@ -417,7 +425,7 @@
 <details>
 <summary><b>Логирование и отладка</b></summary>
 
-![Logger](Screenshots/Logger.png)
+![Logger](Screenshots/LoggerEditor.png)
 
 `Logger` делит логи на 18 модулей (`Core`, `DI`, `UI`, `Dialogue`, `Event`, `Inventory`, `Craft`, `Menu`, `Navigation`, `QuestSystem`, `RadialMenu`, `Abilities`, `Audio`, `Animation`, `Save`, `Editor`, `Tests`, `Debug`).
 
@@ -436,6 +444,8 @@ Logger.Log(LogModule.Inventory, "Предмет добавлен");
 
 <details>
 <summary><b>Тесты</b></summary>
+
+![Tests](Screenshots/Tests.png)
 
 20 тестовых классов EditMode (NUnit) в `Scripts/Editor/Tests`. Запускаются через Test Runner или вкладку «Тесты» в `DevToolsWindow`.
 
@@ -494,11 +504,6 @@ finding-oneself/
 │       └── Backups/
 ├── Save/                    создаётся при запуске (в билде — в persistentDataPath)
 ├── ItemsInbox/              PNG-предметы художника
-├── GIF/
-├── Screenshots/
-├── README.md
-├── LICENSE
-└── .gitignore
 ```
 
 </details>
@@ -553,8 +558,8 @@ finding-oneself/
 
 ## Контакты
 
-- GitHub: [Walderman1/FO-scripts](https://github.com/Walderman1/FO-scripts)
-- Telegram: @VValderman
+- GitHub: [GitHub](https://github.com/Walderman1)
+- Telegram: [Telegram](https://t.me/VValderman)
 
 ---
 
